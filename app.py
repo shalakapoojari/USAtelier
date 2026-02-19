@@ -13,7 +13,7 @@ from html import escape
 
 load_dotenv()
 
-from models import db, User, Product, Order, OrderItem, CartItem, Review, Coupon
+from models import db, User, Product, Order, OrderItem, CartItem, Review, Coupon, Wishlist
 from flask_migrate import Migrate
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 
@@ -189,10 +189,24 @@ def logout():
     logout_user()
     return jsonify({"success": True}), 200
 
+@app.route('/api/auth/reset-password', methods=['POST'])
+def reset_password():
+    # Mock password reset
+    data = request.get_json()
+    email = data.get('email')
+    if not email:
+        return jsonify({"error": "Email required"}), 400
+    # In real app: generate token, send email
+    return jsonify({"success": True, "message": "Password reset link sent to email"}), 200
+
 @app.route('/api/auth/user', methods=['GET'])
 def get_user():
     if current_user.is_authenticated:
-        return jsonify({"user": current_user.email, "isAdmin": current_user.is_admin}), 200
+        return jsonify({
+            "user": current_user.email, 
+            "isAdmin": current_user.is_admin,
+            "id": current_user.id
+        }), 200
     return jsonify({"user": None}), 200
 
 # ==================== PRODUCTS ====================
@@ -448,7 +462,93 @@ def verify_payment():
         app.logger.error(f"Payment verification error: {str(e)}")
         return jsonify({"error": "Verification failed"}), 500
 
-# ==================== ORDERS ====================
+# ==================== WISHLIST ====================
+@app.route('/api/wishlist', methods=['GET'])
+@login_required
+def get_wishlist():
+    items = Wishlist.query.filter_by(user_id=current_user.id).all()
+    return jsonify([item.to_dict() for item in items])
+
+@app.route('/api/wishlist', methods=['POST'])
+@login_required
+def add_to_wishlist():
+    data = request.get_json()
+    product_id = data.get('product_id')
+    
+    if not product_id:
+        return jsonify({"error": "Product ID required"}), 400
+        
+    existing = Wishlist.query.filter_by(user_id=current_user.id, product_id=product_id).first()
+    if existing:
+        return jsonify({"message": "Already in wishlist"}), 200
+        
+    item = Wishlist(user_id=current_user.id, product_id=product_id)
+    db.session.add(item)
+    db.session.commit()
+    return jsonify({"success": True, "wishlist": [i.to_dict() for i in Wishlist.query.filter_by(user_id=current_user.id).all()]}), 201
+
+@app.route('/api/wishlist/<int:product_id>', methods=['DELETE'])
+@login_required
+def remove_from_wishlist(product_id):
+    item = Wishlist.query.filter_by(user_id=current_user.id, product_id=product_id).first()
+    if item:
+        db.session.delete(item)
+        db.session.commit()
+    return jsonify({"success": True, "wishlist": [i.to_dict() for i in Wishlist.query.filter_by(user_id=current_user.id).all()]})
+
+# ==================== REVIEWS ====================
+@app.route('/api/products/<int:product_id>/reviews', methods=['GET', 'POST'])
+def product_reviews(product_id):
+    if request.method == 'POST':
+        if not current_user.is_authenticated:
+            return jsonify({"error": "Login required"}), 401
+            
+        data = request.get_json()
+        rating = data.get('rating')
+        comment = data.get('comment')
+        
+        if not rating:
+            return jsonify({"error": "Rating required"}), 400
+            
+        review = Review(
+            user_id=current_user.id,
+            product_id=product_id,
+            rating=rating,
+            comment=comment
+        )
+        db.session.add(review)
+        db.session.commit()
+        return jsonify({"success": True}), 201
+
+    reviews = Review.query.filter_by(product_id=product_id).order_by(Review.created_at.desc()).all()
+    return jsonify([{
+        'id': r.id,
+        'user': r.user.email,
+        'rating': r.rating,
+        'comment': r.comment,
+        'date': r.created_at.isoformat()
+    } for r in reviews])
+
+# ==================== COUPONS ====================
+@app.route('/api/coupons/verify', methods=['POST'])
+def verify_coupon():
+    data = request.get_json()
+    code = data.get('code')
+    
+    coupon = Coupon.query.filter_by(code=code, is_active=True).first()
+    if not coupon:
+        return jsonify({"error": "Invalid coupon"}), 400
+        
+    if coupon.expiry_date and coupon.expiry_date < datetime.utcnow():
+        return jsonify({"error": "Coupon expired"}), 400
+        
+    return jsonify({
+        "success": True,
+        "code": coupon.code,
+        "discount_type": coupon.discount_type,
+        "discount_value": coupon.discount_value
+    })
+
 # ==================== ORDERS ====================
 @app.route('/api/orders', methods=['POST'])
 @login_required
@@ -519,6 +619,25 @@ def admin_get_orders():
         return jsonify({"error": "Unauthorized"}), 403
     orders = Order.query.order_by(Order.created_at.desc()).all()
     return jsonify([o.to_dict() for o in orders])
+
+@app.route('/api/admin/orders/<order_id>', methods=['PUT'])
+@login_required
+def update_order_status(order_id):
+    if not current_user.is_admin:
+        return jsonify({"error": "Unauthorized"}), 403
+        
+    data = request.get_json()
+    status = data.get('status')
+    
+    order = Order.query.get(order_id)
+    if not order:
+        return jsonify({"error": "Order not found"}), 404
+        
+    if status:
+        order.status = status
+        db.session.commit()
+        
+    return jsonify(order.to_dict())
 
 @app.route('/api/admin/products', methods=['GET', 'POST'])
 @login_required

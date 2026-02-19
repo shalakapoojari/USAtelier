@@ -137,3 +137,20 @@ class Coupon(db.Model):
     discount_value = db.Column(db.Float, nullable=False)
     expiry_date = db.Column(db.DateTime)
     is_active = db.Column(db.Boolean, default=True)
+
+class Wishlist(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    product = db.relationship('Product')
+
+    def to_dict(self):
+        return {
+            'id': self.product.id,
+            'name': self.product.name,
+            'price': self.product.price,
+            'image': json.loads(self.product.images)[0] if json.loads(self.product.images) else '',
+            'category': self.product.category
+        }

@@ -95,12 +95,44 @@ def test_cart_order():
     print(f"Old stock: {p['stock']}, New stock: {p_new['stock']}")
     assert p_new['stock'] == p['stock'] - 1
 
+def test_new_features():
+    print("\nTesting New Features (Wishlist, Reviews, Coupons)...")
+    products = SESSION.get(f"{BASE_URL}/api/products").json()
+    p_id = products[0]['id']
+
+    # Wishlist
+    print("Adding to wishlist...")
+    r = SESSION.post(f"{BASE_URL}/api/wishlist", json={"product_id": p_id})
+    print(r.status_code, r.json())
+    assert r.status_code == 201
+
+    print("Getting wishlist...")
+    r = SESSION.get(f"{BASE_URL}/api/wishlist")
+    assert len(r.json()) > 0
+    assert r.json()[0]['id'] == p_id
+
+    # Reviews
+    print("Adding review...")
+    r = SESSION.post(f"{BASE_URL}/api/products/{p_id}/reviews", json={"rating": 5, "comment": "Great product!"})
+    assert r.status_code == 201
+    
+    print("Getting reviews...")
+    r = SESSION.get(f"{BASE_URL}/api/products/{p_id}/reviews")
+    assert len(r.json()) > 0
+    assert r.json()[0]['rating'] == 5
+
+    # Password Reset
+    print("Testing Password Reset...")
+    r = SESSION.post(f"{BASE_URL}/api/auth/reset-password", json={"email": "test@example.com"})
+    assert r.status_code == 200
+
 if __name__ == "__main__":
     try:
         test_health()
         test_auth()
         test_products()
         test_cart_order()
+        test_new_features()
         print("\n✅ All tests passed!")
     except Exception as e:
         print(f"\n❌ Test failed: {e}")
