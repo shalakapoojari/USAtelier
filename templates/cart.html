@@ -3,13 +3,13 @@
 {% block title %}Shopping Cart - U.S ATELIER{% endblock %}
 
 {% block content %}
-    <div class="cart-container">
-        <h1 style="font-size: 2rem; margin-bottom: 2rem; font-weight: 400;">Shopping Cart</h1>
+<div class="cart-container">
+    <h1 style="font-size: 2rem; margin-bottom: 2rem; font-weight: 400;">Shopping Cart</h1>
 
-        <div id="cart-content">
-            <!-- Cart items loaded by JavaScript -->
-        </div>
+    <div id="cart-content">
+        <!-- Cart items loaded by JavaScript -->
     </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -70,7 +70,7 @@
                     <span>$${(CartModule.getTotal() + 15).toFixed(2)}</span>
                 </div>
                 <a href="/checkout" class="btn checkout-btn">Proceed to Checkout</a>
-                <a href="/shop" class="btn checkout-btn" style="background-color: transparent;">Continue Shopping</a>
+                <a href="/shop" class="btn checkout-btn secondary-btn">Continue Shopping</a>
             </div>
         `;
 

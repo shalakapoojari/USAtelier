@@ -1,767 +1,63 @@
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.exceptions import BadRequest
-from functools import wraps
-import json
-import re
-from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import os
+import json
 import razorpay
-from html import escape
+from datetime import datetime
+from bson.objectid import ObjectId
+from flask_pymongo import PyMongo
 
 load_dotenv()
 
-from models import db, User, Product, Order, OrderItem, CartItem, Review, Coupon, Wishlist
-from flask_migrate import Migrate
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+app = Flask(__name__)
+CORS(app)
 
+# Configuration
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'default-secret-key')
+app.config['MONGO_URI'] = "mongodb://localhost:27017/ecommerce_db"
 
-app = Flask(__name__, template_folder='templates', static_folder='static')
-app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+mongo = PyMongo(app)
+db = mongo.db
 
-# ==================== SECURITY CONFIG ====================
-app.config['SESSION_COOKIE_SECURE'] = True
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+# Razorpay Config
+RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID')
+RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET')
 
-# ==================== DATABASE CONFIG ====================
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ecommerce.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)) if RAZORPAY_KEY_ID else None
 
-db.init_app(app)
-migrate = Migrate(app, db)
-login_manager = LoginManager(app)
-login_manager.login_view = 'login_page'
+# Helper to serialize Mongo docs
+def serialize_doc(doc):
+    if not doc: return None
+    if '_id' in doc:
+        doc['id'] = str(doc.pop('_id'))
+    return doc
 
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
+# ==================== ROUTES ====================
 
-CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5000", "http://127.0.0.1:5000"]}})
-
-# ==================== SECURITY HEADERS ====================
-@app.after_request
-def set_security_headers(response):
-    """Add security headers to all responses"""
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['X-XSS-Protection'] = '1; mode=block'
-    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
-    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-    return response
-
-# ==================== SECURITY HELPERS ====================
-def sanitize_input(value):
-    """Sanitize user input to prevent XSS"""
-    if isinstance(value, str):
-        return escape(value.strip())
-    return value
-
-def validate_email(email):
-    """Validate email format"""
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return re.match(pattern, email) is not None
-
-def validate_product_data(data):
-    """Validate product data"""
-    required_fields = ['name', 'price', 'category', 'description']
-    for field in required_fields:
-        if field not in data or not str(data[field]).strip():
-            return False, f"Missing required field: {field}"
-    
-    try:
-        price = float(data['price'])
-        if price < 0 or price > 999999:
-            return False, "Price must be between 0 and 999999"
-    except (ValueError, TypeError):
-        return False, "Invalid price format"
-    
-    return True, "Valid"
-
-# ==================== RAZORPAY CONFIG ====================
-RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID', '')
-RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET', '')
-
-if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
-    razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
-else:
-    razorpay_client = None
-
-# ==================== MOCK DATA ====================
-# Mock data removed - using DB
-
-
-collections = [
-    {
-        "id": "essentials",
-        "name": "Essentials",
-        "description": "Timeless pieces for everyday elegance",
-    },
-    {
-        "id": "knitwear",
-        "name": "Knitwear",
-        "description": "Luxurious knits for every season",
-    },
-    {
-        "id": "tailoring",
-        "name": "Tailoring",
-        "description": "Precision-crafted suiting and trousers",
-    },
-]
-
-
-
-
-
-# ==================== AUTHENTICATION ====================
-@login_manager.unauthorized_handler
-def unauthorized():
-    return jsonify({"error": "Unauthorized"}), 401
-
-
-
-@app.route('/api/auth/login', methods=['POST'])
-def login():
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "No data provided"}), 400
-        
-        email = data.get('email', '').strip().lower()
-        password = data.get('password', '').strip()
-        
-        if not email or not password:
-            return jsonify({"error": "Email and password required"}), 400
-        
-        if not validate_email(email):
-            return jsonify({"error": "Invalid email format"}), 400
-        
-        user = User.query.filter_by(email=email).first()
-        
-        if user and check_password_hash(user.password_hash, password):
-            login_user(user, remember=True)
-            return jsonify({"success": True, "user": email, "isAdmin": user.is_admin}), 200
-        
-        return jsonify({"error": "Invalid credentials"}), 401
-    except Exception as e:
-        app.logger.error(f"Login error: {str(e)}")
-        return jsonify({"error": "Login failed"}), 500
-
-@app.route('/api/auth/signup', methods=['POST'])
-def signup():
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "No data provided"}), 400
-        
-        email = data.get('email', '').strip().lower()
-        password = data.get('password', '').strip()
-        
-        if not email or not password:
-            return jsonify({"error": "Email and password required"}), 400
-        
-        if not validate_email(email):
-            return jsonify({"error": "Invalid email format"}), 400
-        
-        if len(password) < 6:
-            return jsonify({"error": "Password must be at least 6 characters"}), 400
-        
-        if User.query.filter_by(email=email).first():
-            return jsonify({"error": "Email already registered"}), 400
-        
-        new_user = User(email=email, password_hash=generate_password_hash(password))
-        db.session.add(new_user)
-        db.session.commit()
-        
-        login_user(new_user, remember=True)
-        return jsonify({"success": True, "user": email}), 201
-    except Exception as e:
-        app.logger.error(f"Signup error: {str(e)}")
-        return jsonify({"error": "Signup failed"}), 500
-
-@app.route('/api/auth/logout', methods=['POST'])
-@login_required
-def logout():
-    logout_user()
-    return jsonify({"success": True}), 200
-
-@app.route('/api/auth/reset-password', methods=['POST'])
-def reset_password():
-    # Mock password reset
-    data = request.get_json()
-    email = data.get('email')
-    if not email:
-        return jsonify({"error": "Email required"}), 400
-    # In real app: generate token, send email
-    return jsonify({"success": True, "message": "Password reset link sent to email"}), 200
-
-@app.route('/api/auth/user', methods=['GET'])
-def get_user():
-    if current_user.is_authenticated:
-        return jsonify({
-            "user": current_user.email, 
-            "isAdmin": current_user.is_admin,
-            "id": current_user.id
-        }), 200
-    return jsonify({"user": None}), 200
-
-# ==================== PRODUCTS ====================
-@app.route('/api/products', methods=['GET'])
-def get_products():
-    search = request.args.get('search')
-    category = request.args.get('category')
-    min_price = request.args.get('min_price')
-    max_price = request.args.get('max_price')
-    sort = request.args.get('sort')
-    
-    query = Product.query
-    
-    if search:
-        search_term = f"%{search}%"
-        query = query.filter(db.or_(Product.name.ilike(search_term), Product.description.ilike(search_term)))
-    
-    if category and category != 'all':
-        query = query.filter(Product.category == category)
-    
-    if min_price:
-        try:
-            query = query.filter(Product.price >= float(min_price))
-        except:
-            pass
-            
-    if max_price:
-        try:
-            query = query.filter(Product.price <= float(max_price))
-        except:
-            pass
-            
-    if sort == 'price_asc':
-        query = query.order_by(Product.price.asc())
-    elif sort == 'price_desc':
-        query = query.order_by(Product.price.desc())
-    elif sort == 'newest':
-        query = query.order_by(Product.created_at.desc())
-        
-    products = query.all()
-    return jsonify([p.to_dict() for p in products])
-
-@app.route('/api/products/<int:product_id>', methods=['GET'])
-def get_product(product_id):
-    product = Product.query.get(product_id)
-    if product:
-        return jsonify(product.to_dict())
-    return jsonify({"error": "Product not found"}), 404
-
-@app.route('/api/products/category/<category>', methods=['GET'])
-def get_products_by_category(category):
-    products = Product.query.filter_by(category=category).all()
-    return jsonify([p.to_dict() for p in products])
-
-# ==================== COLLECTIONS ====================
-@app.route('/api/collections', methods=['GET'])
-def get_collections():
-    return jsonify(collections)
-
-@app.route('/api/collections/<collection_id>', methods=['GET'])
-def get_collection(collection_id):
-    collection = next((c for c in collections if c['id'] == collection_id), None)
-    if collection:
-        return jsonify(collection)
-    return jsonify({"error": "Collection not found"}), 404
-
-# ==================== CART ====================
-@app.route('/api/cart', methods=['GET'])
-def get_cart():
-    if current_user.is_authenticated:
-        cart_items = CartItem.query.filter_by(user_id=current_user.id).all()
-        return jsonify([item.to_dict() for item in cart_items])
-    else:
-        if 'cart' not in session:
-            session['cart'] = []
-        return jsonify(session['cart'])
-
-@app.route('/api/cart', methods=['POST'])
-def add_to_cart():
-    data = request.get_json()
-    
-    if current_user.is_authenticated:
-        # DB Cart logic
-        product_id = data.get('id')
-        size = data.get('size')
-        quantity = data.get('quantity', 1)
-        
-        existing_item = CartItem.query.filter_by(
-            user_id=current_user.id, 
-            product_id=product_id, 
-            size=size
-        ).first()
-        
-        if existing_item:
-            existing_item.quantity += quantity
-        else:
-            new_item = CartItem(
-                user_id=current_user.id,
-                product_id=product_id,
-                quantity=quantity,
-                size=size,
-                color=data.get('color')
-            )
-            db.session.add(new_item)
-        
-        db.session.commit()
-        return get_cart() # Return updated cart
-        
-    else:
-        # Session Cart Logic
-        if 'cart' not in session:
-            session['cart'] = []
-        
-        item = {
-            'id': data.get('id'),
-            'name': data.get('name'),
-            'price': data.get('price'),
-            'size': data.get('size'),
-            'quantity': data.get('quantity', 1),
-            'image': data.get('image')
-        }
-        
-        existing = next((i for i in session['cart'] if i['id'] == item['id'] and i['size'] == item['size']), None)
-        if existing:
-            existing['quantity'] += item['quantity']
-        else:
-            session['cart'].append(item)
-        
-        session.modified = True
-        return jsonify({"success": True, "cart": session['cart']})
-
-@app.route('/api/cart/<item_id>', methods=['DELETE'])
-def remove_from_cart(item_id):
-    if current_user.is_authenticated:
-        # item_id here refers to Product ID for simplicity in current frontend logic, 
-        # but ideally should be CartItem ID. For now assuming we delete by Product ID + User
-        # Wait, the interface sends item_id. 
-        # Let's assume item_id is passed as int.
-        try:
-            cart_items = CartItem.query.filter_by(user_id=current_user.id, product_id=item_id).all()
-            for item in cart_items:
-                db.session.delete(item)
-            db.session.commit()
-        except:
-            pass
-        return get_cart()
-    else:
-        if 'cart' in session:
-            session['cart'] = [i for i in session['cart'] if str(i['id']) != str(item_id)]
-            session.modified = True
-        return jsonify({"success": True, "cart": session.get('cart', [])})
-
-@app.route('/api/cart/update', methods=['PUT'])
-def update_cart():
-    data = request.get_json()
-    if current_user.is_authenticated:
-        product_id = data.get('id')
-        size = data.get('size')
-        quantity = data.get('quantity')
-        
-        item = CartItem.query.filter_by(user_id=current_user.id, product_id=product_id, size=size).first()
-        if item:
-            if quantity <= 0:
-                db.session.delete(item)
-            else:
-                item.quantity = quantity
-            db.session.commit()
-        return get_cart()
-    else:
-        if 'cart' in session:
-            item = next((i for i in session['cart'] if i['id'] == data.get('id') and i['size'] == data.get('size')), None)
-            if item:
-                item['quantity'] = data.get('quantity', 1)
-                if item['quantity'] <= 0:
-                    session['cart'].remove(item)
-            session.modified = True
-        return jsonify({"success": True, "cart": session.get('cart', [])})
-
-@app.route('/api/cart/clear', methods=['POST'])
-def clear_cart():
-    if current_user.is_authenticated:
-        CartItem.query.filter_by(user_id=current_user.id).delete()
-        db.session.commit()
-    else:
-        session['cart'] = []
-        session.modified = True
-    return jsonify({"success": True})
-
-# ==================== PAYMENT ====================
-@app.route('/api/payment/razorpay-key', methods=['GET'])
-def get_razorpay_key():
-    """Get Razorpay key status - only return key if configured"""
-    return jsonify({
-        "configured": bool(RAZORPAY_KEY_ID),
-        "key": RAZORPAY_KEY_ID if RAZORPAY_KEY_ID else None
-    })
-
-@app.route('/api/payment/create-order', methods=['POST'])
-@login_required
-def create_payment_order():
-    """Create Razorpay payment order"""
-    if not razorpay_client:
-        return jsonify({"error": "Payment gateway not configured"}), 503
-    
-    try:
-        data = request.get_json()
-        if not data or 'amount' not in data:
-            return jsonify({"error": "Missing amount"}), 400
-        
-        try:
-            amount = float(data['amount'])
-            if amount < 1 or amount > 999999:
-                return jsonify({"error": "Invalid amount"}), 400
-            amount_paise = int(amount * 100)
-        except (ValueError, TypeError):
-            return jsonify({"error": "Invalid amount format"}), 400
-        
-        razorpay_order = razorpay_client.order.create({
-            'amount': amount_paise,
-            'currency': 'INR',
-            'payment_capture': 1
-        })
-        return jsonify(razorpay_order), 201
-    except Exception as e:
-        app.logger.error(f"Razorpay order creation error: {str(e)}")
-        return jsonify({"error": "Payment processing error"}), 500
-
-@app.route('/api/payment/verify', methods=['POST'])
-@login_required
-def verify_payment():
-    """Verify Razorpay payment signature"""
-    if not razorpay_client:
-        return jsonify({"error": "Payment gateway not configured"}), 503
-    
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "Missing payment data"}), 400
-        
-        required_fields = ['razorpay_order_id', 'razorpay_payment_id', 'razorpay_signature']
-        if not all(field in data for field in required_fields):
-            return jsonify({"error": "Missing payment fields"}), 400
-        
-        razorpay_client.utility.verify_payment_signature({
-            'razorpay_order_id': data['razorpay_order_id'],
-            'razorpay_payment_id': data['razorpay_payment_id'],
-            'razorpay_signature': data['razorpay_signature']
-        })
-        return jsonify({"success": True}), 200
-    except razorpay.errors.SignatureVerificationError:
-        return jsonify({"error": "Invalid payment signature"}), 403
-    except Exception as e:
-        app.logger.error(f"Payment verification error: {str(e)}")
-        return jsonify({"error": "Verification failed"}), 500
-
-# ==================== WISHLIST ====================
-@app.route('/api/wishlist', methods=['GET'])
-@login_required
-def get_wishlist():
-    items = Wishlist.query.filter_by(user_id=current_user.id).all()
-    return jsonify([item.to_dict() for item in items])
-
-@app.route('/api/wishlist', methods=['POST'])
-@login_required
-def add_to_wishlist():
-    data = request.get_json()
-    product_id = data.get('product_id')
-    
-    if not product_id:
-        return jsonify({"error": "Product ID required"}), 400
-        
-    existing = Wishlist.query.filter_by(user_id=current_user.id, product_id=product_id).first()
-    if existing:
-        return jsonify({"message": "Already in wishlist"}), 200
-        
-    item = Wishlist(user_id=current_user.id, product_id=product_id)
-    db.session.add(item)
-    db.session.commit()
-    return jsonify({"success": True, "wishlist": [i.to_dict() for i in Wishlist.query.filter_by(user_id=current_user.id).all()]}), 201
-
-@app.route('/api/wishlist/<int:product_id>', methods=['DELETE'])
-@login_required
-def remove_from_wishlist(product_id):
-    item = Wishlist.query.filter_by(user_id=current_user.id, product_id=product_id).first()
-    if item:
-        db.session.delete(item)
-        db.session.commit()
-    return jsonify({"success": True, "wishlist": [i.to_dict() for i in Wishlist.query.filter_by(user_id=current_user.id).all()]})
-
-# ==================== REVIEWS ====================
-@app.route('/api/products/<int:product_id>/reviews', methods=['GET', 'POST'])
-def product_reviews(product_id):
-    if request.method == 'POST':
-        if not current_user.is_authenticated:
-            return jsonify({"error": "Login required"}), 401
-            
-        data = request.get_json()
-        rating = data.get('rating')
-        comment = data.get('comment')
-        
-        if not rating:
-            return jsonify({"error": "Rating required"}), 400
-            
-        review = Review(
-            user_id=current_user.id,
-            product_id=product_id,
-            rating=rating,
-            comment=comment
-        )
-        db.session.add(review)
-        db.session.commit()
-        return jsonify({"success": True}), 201
-
-    reviews = Review.query.filter_by(product_id=product_id).order_by(Review.created_at.desc()).all()
-    return jsonify([{
-        'id': r.id,
-        'user': r.user.email,
-        'rating': r.rating,
-        'comment': r.comment,
-        'date': r.created_at.isoformat()
-    } for r in reviews])
-
-# ==================== COUPONS ====================
-@app.route('/api/coupons/verify', methods=['POST'])
-def verify_coupon():
-    data = request.get_json()
-    code = data.get('code')
-    
-    coupon = Coupon.query.filter_by(code=code, is_active=True).first()
-    if not coupon:
-        return jsonify({"error": "Invalid coupon"}), 400
-        
-    if coupon.expiry_date and coupon.expiry_date < datetime.utcnow():
-        return jsonify({"error": "Coupon expired"}), 400
-        
-    return jsonify({
-        "success": True,
-        "code": coupon.code,
-        "discount_type": coupon.discount_type,
-        "discount_value": coupon.discount_value
-    })
-
-# ==================== ORDERS ====================
-@app.route('/api/orders', methods=['POST'])
-@login_required
-def create_order():
-    data = request.get_json()
-    order_id = f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-    
-    order = Order(
-        id=order_id,
-        user_id=current_user.id,
-        total_amount=data.get('total', 0),
-        status='Pending',
-        payment_status=data.get('paymentStatus', 'pending'),
-        payment_method=data.get('paymentMethod', 'razorpay'),
-        razorpay_order_id=data.get('razorpayOrderId'),
-        razorpay_payment_id=data.get('razorpayPaymentId'),
-        shipping_address=json.dumps(data.get('shippingAddress', {}))
-    )
-    
-    # Process items
-    items_data = data.get('items', [])
-    for item in items_data:
-        # Ideally we should verify price from DB
-        product = Product.query.get(item['id'])
-        if product:
-            order_item = OrderItem(
-                order_id=order_id,
-                product_id=product.id,
-                quantity=item['quantity'],
-                price_at_purchase=item['price'],
-                size=item.get('size'),
-                color=item.get('color')
-            )
-            db.session.add(order_item)
-            
-            # Update stock
-            if product.stock >= item['quantity']:
-                product.stock -= item['quantity']
-    
-    db.session.add(order)
-    
-    # Clear cart
-    CartItem.query.filter_by(user_id=current_user.id).delete()
-    
-    db.session.commit()
-    
-    return jsonify(order.to_dict()), 201
-
-@app.route('/api/orders', methods=['GET'])
-@login_required
-def get_orders():
-    user_orders = Order.query.filter_by(user_id=current_user.id).order_by(Order.created_at.desc()).all()
-    return jsonify([o.to_dict() for o in user_orders])
-
-@app.route('/api/orders/<order_id>', methods=['GET'])
-@login_required
-def get_order(order_id):
-    order = Order.query.filter_by(id=order_id, user_id=current_user.id).first()
-    if order:
-        return jsonify(order.to_dict())
-    return jsonify({"error": "Order not found"}), 404
-
-# ==================== ADMIN ====================
-@app.route('/api/admin/orders', methods=['GET'])
-@login_required
-def admin_get_orders():
-    if not current_user.is_admin:
-        return jsonify({"error": "Unauthorized"}), 403
-    orders = Order.query.order_by(Order.created_at.desc()).all()
-    return jsonify([o.to_dict() for o in orders])
-
-@app.route('/api/admin/orders/<order_id>', methods=['PUT'])
-@login_required
-def update_order_status(order_id):
-    if not current_user.is_admin:
-        return jsonify({"error": "Unauthorized"}), 403
-        
-    data = request.get_json()
-    status = data.get('status')
-    
-    order = Order.query.get(order_id)
-    if not order:
-        return jsonify({"error": "Order not found"}), 404
-        
-    if status:
-        order.status = status
-        db.session.commit()
-        
-    return jsonify(order.to_dict())
-
-@app.route('/api/admin/products', methods=['GET', 'POST'])
-@login_required
-def admin_products():
-    if not current_user.is_admin:
-        return jsonify({"error": "Unauthorized"}), 403
-    
-    if request.method == 'POST':
-        try:
-            data = request.get_json()
-            if not data:
-                return jsonify({"error": "No data provided"}), 400
-            
-            is_valid, error_msg = validate_product_data(data)
-            if not is_valid:
-                return jsonify({"error": error_msg}), 400
-            
-            product = Product(
-                name=sanitize_input(data['name']),
-                description=sanitize_input(data['description']),
-                category=sanitize_input(data['category']),
-                price=float(data['price']),
-                stock=int(data.get('countInStock', 0)), # frontend might send countInStock or stock
-                is_featured=bool(data.get('featured', False)),
-                is_bestseller=bool(data.get('bestseller', False)),
-                is_new=bool(data.get('newArrival', False)),
-                sizes=json.dumps([sanitize_input(s) for s in data.get('sizes', [])]),
-                images=json.dumps([sanitize_input(i) for i in data.get('images', [])])
-            )
-            
-            db.session.add(product)
-            db.session.commit()
-            return jsonify(product.to_dict()), 201
-        except Exception as e:
-            app.logger.error(f"Product creation error: {str(e)}")
-            return jsonify({"error": "Failed to create product"}), 500
-    
-    products = Product.query.all()
-    return jsonify([p.to_dict() for p in products]), 200
-
-@app.route('/api/admin/products/<int:product_id>', methods=['GET', 'PUT', 'DELETE'])
-@login_required
-def admin_product(product_id):
-    if not current_user.is_admin:
-        return jsonify({"error": "Unauthorized"}), 403
-    
-    product = Product.query.get(product_id)
-    if not product:
-        return jsonify({"error": "Product not found"}), 404
-
-    if request.method == 'GET':
-        return jsonify(product.to_dict()), 200
-    
-    elif request.method == 'PUT':
-        try:
-            data = request.get_json()
-            if not data:
-                return jsonify({"error": "No data provided"}), 400
-            
-            if 'name' in data:
-                product.name = sanitize_input(data['name'])
-            if 'description' in data:
-                product.description = sanitize_input(data['description'])
-            if 'category' in data:
-                product.category = sanitize_input(data['category'])
-            if 'price' in data:
-                try:
-                    price = float(data['price'])
-                    if price < 0 or price > 999999:
-                        return jsonify({"error": "Invalid price"}), 400
-                    product.price = price
-                except (ValueError, TypeError):
-                    return jsonify({"error": "Invalid price format"}), 400
-            if 'inStock' in data:
-                 # Logic for inStock flag if needed, usually derived from stock > 0
-                 pass
-            if 'countInStock' in data:
-                try:
-                    product.stock = int(data['countInStock'])
-                except:
-                    pass
-            if 'featured' in data:
-                product.is_featured = bool(data['featured'])
-            if 'bestseller' in data:
-                product.is_bestseller = bool(data['bestseller'])
-            if 'newArrival' in data:
-                product.is_new = bool(data['newArrival'])
-            if 'sizes' in data:
-                product.sizes = json.dumps([sanitize_input(s) for s in data.get('sizes', [])])
-            if 'images' in data:
-                product.images = json.dumps([sanitize_input(i) for i in data.get('images', [])])
-            
-            db.session.commit()
-            return jsonify(product.to_dict()), 200
-        except Exception as e:
-            app.logger.error(f"Product update error: {str(e)}")
-            return jsonify({"error": "Failed to update product"}), 500
-    
-    elif request.method == 'DELETE':
-        db.session.delete(product)
-        db.session.commit()
-        return jsonify({"success": True}), 200
-    
-    return jsonify({"error": "Method not allowed"}), 405
-
-# ==================== PAGES ====================
 @app.route('/')
-def index():
+def home():
     return render_template('index.html')
 
 @app.route('/shop')
 def shop():
     return render_template('shop.html')
 
+@app.route('/collections')
+def collections():
+    return render_template('shop.html')
+
 @app.route('/product/<product_id>')
-def product_detail(product_id):
+def product_page(product_id):
     return render_template('product.html', product_id=product_id)
 
 @app.route('/cart')
-def cart():
+def cart_page():
     return render_template('cart.html')
 
 @app.route('/checkout')
-def checkout():
+def checkout_page():
     return render_template('checkout.html')
 
 @app.route('/login')
@@ -773,41 +69,405 @@ def signup_page():
     return render_template('signup.html')
 
 @app.route('/account')
-def account():
+def account_page():
+    if 'user_id' not in session:
+        return redirect('/login')
     return render_template('account.html')
 
 @app.route('/admin')
-def admin():
+def admin_page():
+    # Helper to check if user is admin
+    if 'user_id' not in session or not session.get('is_admin'):
+        return redirect('/login')
     return render_template('admin.html')
 
-# ==================== ERROR HANDLERS ====================
-@app.errorhandler(404)
-def not_found(error):
-    return jsonify({"error": "Resource not found"}), 404
+@app.route('/health')
+def health():
+    try:
+        # Check DB connection
+        db.command('ping')
+        db_status = "connected"
+    except Exception as e:
+        db_status = f"disconnected: {str(e)}"
 
-@app.errorhandler(500)
-def internal_error(error):
-    app.logger.error(f"Internal server error: {str(error)}")
-    return jsonify({"error": "Internal server error"}), 500
-
-@app.errorhandler(403)
-def forbidden(error):
-    return jsonify({"error": "Access forbidden"}), 403
-
-@app.errorhandler(400)
-def bad_request(error):
-    return jsonify({"error": "Bad request"}), 400
-
-# ==================== HEALTH CHECK ====================
-@app.route('/health', methods=['GET'])
-def health_check():
     return jsonify({
         "status": "healthy",
-        "payment_configured": bool(RAZORPAY_KEY_ID)
+        "payment_configured": bool(RAZORPAY_KEY_ID),
+        "db": db_status
     }), 200
 
+# ==================== AUTH ====================
+
+@app.route('/api/auth/signup', methods=['POST'])
+def signup():
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
+    
+    if not email or not password:
+        return jsonify({"error": "Email and password required"}), 400
+        
+    if db.users.find_one({"email": email}):
+        return jsonify({"error": "Email already registered"}), 400
+        
+    user_id = db.users.insert_one({
+        "email": email,
+        "password_hash": generate_password_hash(password),
+        "is_admin": False,
+        "created_at": datetime.utcnow()
+    }).inserted_id
+    
+    session['user_id'] = str(user_id)
+    session['is_admin'] = False
+    
+    return jsonify({"success": True, "message": "Signup successful!", "user": email}), 201
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
+    
+    user = db.users.find_one({"email": email})
+    
+    if user and check_password_hash(user['password_hash'], password):
+        session['user_id'] = str(user['_id'])
+        session['is_admin'] = user.get('is_admin', False)
+        return jsonify({
+            "success": True, 
+            "message": "Login successful!",
+            "user": email, 
+            "isAdmin": user.get('is_admin', False)
+        }), 200
+        
+    return jsonify({"error": "Invalid credentials"}), 401
+
+@app.route('/api/auth/logout', methods=['POST'])
+def logout():
+    session.clear()
+    return jsonify({"success": True, "message": "Logged out successfully"}), 200
+
+@app.route('/api/auth/user', methods=['GET', 'PUT'])
+def user_profile():
+    if 'user_id' not in session:
+         return jsonify({"user": None}), 200
+
+    if request.method == 'GET':
+        user = db.users.find_one({"_id": ObjectId(session['user_id'])})
+        if user:
+            return jsonify({
+                "user": user['email'], 
+                "name": user.get('name', ''),
+                "phone": user.get('phone', ''),
+                "isAdmin": user.get('is_admin', False),
+                "id": str(user['_id']),
+                "addresses": user.get('addresses', [])
+            }), 200
+    
+    if request.method == 'PUT':
+        data = request.get_json()
+        update_fields = {}
+        if 'name' in data: update_fields['name'] = data['name']
+        if 'phone' in data: update_fields['phone'] = data['phone']
+        
+        if update_fields:
+            db.users.update_one(
+                {"_id": ObjectId(session['user_id'])},
+                {"$set": update_fields}
+            )
+        return jsonify({"success": True, "message": "Profile updated"}), 200
+
+    return jsonify({"user": None}), 200
+
+@app.route('/api/user/addresses', methods=['POST'])
+def add_address():
+    if 'user_id' not in session:
+        return jsonify({"error": "Login required"}), 401
+    
+    data = request.get_json()
+    address = {
+        "id": str(ObjectId()),
+        "street": data.get('street'),
+        "city": data.get('city'),
+        "state": data.get('state'),
+        "zip": data.get('zip'),
+        "country": data.get('country', 'US')
+    }
+    
+    db.users.update_one(
+        {"_id": ObjectId(session['user_id'])},
+        {"$push": {"addresses": address}}
+    )
+    
+    return jsonify({"success": True, "message": "Address added"}), 201
+
+# ==================== PRODUCTS ====================
+
+@app.route('/api/products', methods=['GET'])
+def get_products():
+    query = {}
+    
+    # Filtering
+    category = request.args.get('category')
+    if category and category != 'all':
+        query['category'] = category
+        
+    search = request.args.get('search')
+    if search:
+        query['$or'] = [
+            {'name': {'$regex': search, '$options': 'i'}},
+            {'description': {'$regex': search, '$options': 'i'}}
+        ]
+
+    # Price Filtering
+    min_price = request.args.get('min_price')
+    max_price = request.args.get('max_price')
+    price_query = {}
+    if min_price: price_query['$gte'] = float(min_price)
+    if max_price: price_query['$lte'] = float(max_price)
+    if price_query: query['price'] = price_query
+
+    # Sorting
+    sort_raw = request.args.get('sort')
+    sort_order = [('created_at', -1)] # Default new
+    if sort_raw == 'price_asc':
+        sort_order = [('price', 1)]
+    elif sort_raw == 'price_desc':
+        sort_order = [('price', -1)]
+
+    products = list(db.products.find(query).sort(sort_order))
+    return jsonify([serialize_doc(p) for p in products])
+
+@app.route('/api/products/<product_id>', methods=['GET'])
+def get_product(product_id):
+    try:
+        product = db.products.find_one({"_id": ObjectId(product_id)})
+        if product:
+            return jsonify(serialize_doc(product))
+        return jsonify({"error": "Product not found"}), 404
+    except:
+        return jsonify({"error": "Invalid ID"}), 400
+
+# ==================== CART ====================
+
+@app.route('/api/cart', methods=['GET'])
+def get_cart():
+    if 'user_id' in session:
+        # DB Cart
+        cart_items = list(db.cart.find({"user_id": session['user_id']}))
+        results = []
+        for item in cart_items:
+            product = db.products.find_one({"_id": ObjectId(item['product_id'])})
+            if product:
+                results.append({
+                    "id": str(product['_id']),
+                    "name": product['name'],
+                    "price": product['price'],
+                    "image": json.loads(product['images'])[0] if product.get('images') and product['images'] != '[]' else '',
+                    "quantity": item['quantity'],
+                    "size": item.get('size'),
+                })
+        return jsonify(results)
+    else:
+        return jsonify(session.get('cart', []))
+
+@app.route('/api/cart', methods=['POST'])
+def add_to_cart():
+    data = request.get_json()
+    product_id = data.get('id')
+    quantity = data.get('quantity', 1)
+    size = data.get('size')
+    
+    if 'user_id' in session:
+        # DB Cart
+        existing = db.cart.find_one({
+            "user_id": session['user_id'],
+            "product_id": product_id,
+            "size": size
+        })
+        
+        if existing:
+            db.cart.update_one(
+                {"_id": existing['_id']},
+                {"$inc": {"quantity": quantity}}
+            )
+        else:
+            db.cart.insert_one({
+                "user_id": session['user_id'],
+                "product_id": product_id,
+                "quantity": quantity,
+                "size": size
+            })
+    else:
+        # Session Cart
+        cart = session.get('cart', [])
+        # Find if item exists
+        found = False
+        for item in cart:
+            if item['id'] == product_id and item['size'] == size:
+                item['quantity'] += quantity
+                found = True
+                break
+        if not found:
+            cart.append({
+                "id": product_id,
+                "quantity": quantity,
+                "size": size
+            })
+        session['cart'] = cart
+        
+    return jsonify({"success": True, "message": "Added to cart"})
+
+# ==================== WISHLIST ====================
+
+@app.route('/api/wishlist', methods=['GET'])
+def get_wishlist():
+    if 'user_id' not in session:
+        return jsonify({"error": "Login required"}), 401
+    
+    items = list(db.wishlist.find({"user_id": session['user_id']}))
+    results = []
+    for item in items:
+        product = db.products.find_one({"_id": ObjectId(item['product_id'])})
+        if product:
+            results.append({
+                'id': str(product['_id']),
+                'name': product['name'],
+                'price': product['price'],
+                'image': json.loads(product['images'])[0] if product.get('images') and product['images'] != '[]' else '',
+                'category': product['category']
+            })
+    return jsonify(results)
+
+@app.route('/api/wishlist', methods=['POST'])
+def add_to_wishlist():
+    if 'user_id' not in session:
+        return jsonify({"error": "Login required"}), 401
+        
+    data = request.get_json()
+    product_id = data.get('product_id')
+    
+    if not product_id:
+        return jsonify({"error": "Product ID required"}), 400
+        
+    existing = db.wishlist.find_one({
+        "user_id": session['user_id'],
+        "product_id": product_id
+    })
+    
+    if existing:
+        return jsonify({"message": "Already in wishlist"}), 200
+        
+    db.wishlist.insert_one({
+        "user_id": session['user_id'],
+        "product_id": product_id,
+        "created_at": datetime.utcnow()
+    })
+    
+    return jsonify({"success": True}), 201
+
+@app.route('/api/wishlist/<product_id>', methods=['DELETE'])
+def remove_from_wishlist(product_id):
+    if 'user_id' not in session:
+        return jsonify({"error": "Login required"}), 401
+        
+    db.wishlist.delete_one({
+        "user_id": session['user_id'],
+        "product_id": product_id
+    })
+    return jsonify({"success": True})
+
+# ==================== REVIEWS ====================
+
+@app.route('/api/products/<product_id>/reviews', methods=['GET', 'POST'])
+def product_reviews(product_id):
+    if request.method == 'POST':
+        if 'user_id' not in session:
+            return jsonify({"error": "Login required"}), 401
+            
+        data = request.get_json()
+        rating = data.get('rating')
+        comment = data.get('comment')
+        
+        if not rating:
+            return jsonify({"error": "Rating required"}), 400
+            
+        user = db.users.find_one({"_id": ObjectId(session['user_id'])})
+        
+        db.reviews.insert_one({
+            "user_id": session['user_id'],
+            "user_email": user['email'] if user else "Anonymous",
+            "product_id": product_id,
+            "rating": rating,
+            "comment": comment,
+            "created_at": datetime.utcnow()
+        })
+        return jsonify({"success": True}), 201
+
+    reviews = list(db.reviews.find({"product_id": product_id}).sort("created_at", -1))
+    return jsonify([{
+        'id': str(r['_id']),
+        'user': r.get('user_email', 'Anonymous'),
+        'rating': r.get('rating'),
+        'comment': r.get('comment'),
+        'date': r.get('created_at').isoformat() if r.get('created_at') else ''
+    } for r in reviews])
+
+# ==================== PASS RESET ====================
+
+@app.route('/api/auth/reset-password', methods=['POST'])
+def reset_password():
+    data = request.get_json()
+    email = data.get('email')
+    if not email:
+        return jsonify({"error": "Email required"}), 400
+    # Mock logic
+    return jsonify({"success": True, "message": "Password reset link sent to email"}), 200
+
+# ==================== ORDERS ====================
+
+@app.route('/api/orders', methods=['POST'])
+def create_order():
+    if 'user_id' not in session:
+        return jsonify({"error": "Login required"}), 401
+        
+    data = request.get_json()
+    
+    order_doc = {
+        "id": f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+        "user_id": session['user_id'],
+        "total": data.get('total'),
+        "status": "Pending",
+        "payment_status": data.get('paymentStatus', 'Pending'),
+        "created_at": datetime.utcnow(),
+        "items": data.get('items', []),
+        "shipping_address": data.get('shippingAddress', {})
+    }
+    
+    db.orders.insert_one(order_doc)
+    db.cart.delete_many({"user_id": session['user_id']})
+    
+    # Update Stock
+    for item in data.get('items', []):
+        db.products.update_one(
+            {"_id": ObjectId(item['id'])},
+            {"$inc": {"stock": -item['quantity']}}
+        )
+    
+    return jsonify({"success": True, "orderId": order_doc['id']}), 201
+
+@app.route('/api/orders', methods=['GET'])
+def get_orders():
+    if 'user_id' not in session:
+        return jsonify({"error": "Login required"}), 401
+        
+    orders = list(db.orders.find({"user_id": session['user_id']}).sort("created_at", -1))
+    return jsonify([serialize_doc(o) for o in orders])
+
+# ==================== SEEDING ====================
+
 def seed_database():
-    if Product.query.first():
+    if db.products.count_documents({}) > 0:
         return
 
     products_data = [
@@ -820,7 +480,7 @@ def seed_database():
             "sizes": json.dumps(["XS", "S", "M", "L", "XL"]),
             "stock": 100,
             "is_featured": True,
-            "is_bestseller": True
+            "created_at": datetime.utcnow()
         },
         {
             "name": "Tailored Wool Trousers",
@@ -830,7 +490,8 @@ def seed_database():
             "images": json.dumps(["charcoal-grey-wool-trousers-on-model-minimal.jpg"]),
             "sizes": json.dumps(["28", "30", "32", "34", "36"]),
             "stock": 50,
-            "is_featured": True
+            "is_featured": True,
+            "created_at": datetime.utcnow()
         },
         {
             "name": "Organic Cotton Tee",
@@ -840,7 +501,8 @@ def seed_database():
             "images": json.dumps(["white-cotton-t-shirt-on-model-minimal-clean.jpg"]),
             "sizes": json.dumps(["XS", "S", "M", "L", "XL"]),
             "stock": 200,
-            "is_new": True
+            "is_new": True,
+            "created_at": datetime.utcnow()
         },
         {
             "name": "Silk Button-Down Shirt",
@@ -850,7 +512,8 @@ def seed_database():
             "images": json.dumps(["ivory-silk-shirt-on-model-minimal-elegant.jpg"]),
             "sizes": json.dumps(["XS", "S", "M", "L"]),
             "stock": 30,
-            "is_new": True
+            "is_new": True,
+            "created_at": datetime.utcnow()
         },
         {
             "name": "Merino Wool Cardigan",
@@ -860,7 +523,8 @@ def seed_database():
             "images": json.dumps(["navy-merino-wool-cardigan-on-model.jpg"]),
             "sizes": json.dumps(["S", "M", "L", "XL"]),
             "stock": 60,
-            "is_featured": True
+            "is_featured": True,
+            "created_at": datetime.utcnow()
         },
         {
             "name": "Linen Wide-Leg Pants",
@@ -869,7 +533,8 @@ def seed_database():
             "category": "Trousers",
             "images": json.dumps(["natural-linen-wide-leg-pants-on-model.jpg"]),
             "sizes": json.dumps(["XS", "S", "M", "L"]),
-            "stock": 0
+            "stock": 40,
+            "created_at": datetime.utcnow()
         },
         {
             "name": "Leather Minimal Tote",
@@ -880,7 +545,8 @@ def seed_database():
             "sizes": json.dumps(["One Size"]),
             "stock": 15,
             "is_featured": True,
-            "is_bestseller": True
+            "is_bestseller": True,
+            "created_at": datetime.utcnow()
         },
         {
             "name": "Cashmere Scarf",
@@ -890,28 +556,28 @@ def seed_database():
             "images": json.dumps(["beige-cashmere-scarf-styled.jpg"]),
             "sizes": json.dumps(["One Size"]),
             "stock": 40,
-            "is_new": True
+            "is_new": True,
+            "created_at": datetime.utcnow()
         }
     ]
-
-    for p_data in products_data:
-        product = Product(**p_data)
-        db.session.add(product)
     
-    # Create Admin User
-    if not User.query.filter_by(email='admin@example.com').first():
-        admin = User(
-            email='admin@example.com',
-            password_hash=generate_password_hash('password123'),
-            is_admin=True
-        )
-        db.session.add(admin)
-
-    db.session.commit()
-    print("Database seeded!")
+    db.products.insert_many(products_data)
+    
+    # Admin
+    if not db.users.find_one({"email": "admin@example.com"}):
+        db.users.insert_one({
+            "email": "admin@example.com",
+            "password_hash": generate_password_hash("password123"),
+            "is_admin": True,
+            "created_at": datetime.utcnow()
+        })
+    print("MongoDB Seeded with new images!")
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
-        seed_database()
+        try:
+            seed_database()
+        except Exception as e:
+            print(f"Seeding failed (is MongoDB running?): {e}")
+            
     app.run(debug=True)

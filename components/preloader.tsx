@@ -17,7 +17,7 @@ export function Preloader() {
       onComplete: () => {
         document.body.style.overflow = "auto"
         try {
-          ;(window as any).__PRELOADER_DONE__ = true
+          ; (window as any).__PRELOADER_DONE__ = true
           window.dispatchEvent(new CustomEvent("preloader:done"))
         } catch (e) {
           /* ignore */

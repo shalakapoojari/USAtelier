@@ -1,57 +1,100 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <!-- HERO SECTION -->
-    <section class="hero">
-        <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=2564&auto=format&fit=crop" 
-             alt="Hero" class="hero-bg">
-        
-        <div class="hero-content">
-            <p class="hero-subtitle">Fall Winter 2025</p>
-            
-            <div class="hero-title">
-                <span>ETHEREAL</span>
-                <span class="italic">SHADOWS</span>
-            </div>
+<!-- HERO SECTION -->
+<section class="hero">
+    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=2564&auto=format&fit=crop" alt="Hero"
+        class="hero-bg">
 
-            <div class="hero-cta">
-                <a href="/shop" class="btn">View The Lookbook</a>
-            </div>
+    <div class="hero-content">
+        <p class="hero-subtitle">Fall Winter 2025</p>
+
+        <div class="hero-title">
+            <span>ETHEREAL</span>
+            <span class="italic">SHADOWS</span>
         </div>
 
-        <div style="position: absolute; bottom: 40px; left: 40px; display: none;">
-            <p style="font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.6; max-width: 130px;">
-                Designed in Paris.<br>
-                Crafted in Milan.<br>
-                Worn in Darkness.
-            </p>
+        <div class="hero-cta">
+            <a href="/shop" class="btn">View The Lookbook</a>
         </div>
-    </section>
+    </div>
 
-    <!-- MANIFESTO SECTION -->
-    <section class="manifesto-section">
-        <p class="manifesto-text">
-            We believe in the quiet power of silence. In a world of noise, U.S ATELIER is the absence of it. 
-            We strip away the unnecessary to reveal the essential structure of the human form. 
-            This is not just clothing; this is architecture for the soul.
+    <div style="position: absolute; bottom: 40px; left: 40px; display: none;">
+        <p
+            style="font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.6; max-width: 130px;">
+            Designed in Paris.<br>
+            Crafted in Milan.<br>
+            Worn in Darkness.
         </p>
-    </section>
+    </div>
+</section>
 
-    <!-- FEATURED PRODUCTS -->
-    <section class="products-section">
-        <div class="products-header">
-            <h2>Featured Collection</h2>
-            <p>Carefully curated pieces for the discerning individual</p>
-        </div>
+<!-- MANIFESTO SECTION -->
+<section class="manifesto-section">
+    <p class="manifesto-text">
+        We believe in the quiet power of silence. In a world of noise, U.S ATELIER is the absence of it.
+        We strip away the unnecessary to reveal the essential structure of the human form.
+        This is not just clothing; this is architecture for the soul.
+    </p>
+</section>
 
-        <div class="products-grid" id="featured-products">
-            <!-- Products loaded by JavaScript -->
+<!-- CATEGORIES SECTION -->
+<section class="products-section" style="padding-bottom: 0;">
+    <div class="products-header">
+        <h2>Collections</h2>
+        <p>Explore by category</p>
+    </div>
+    <div class="products-grid" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">
+        <div class="product-card" onclick="window.location.href='/shop?category=Knitwear'">
+            <div class="product-image">
+                <img src="/static/images/minimal-beige-cashmere-sweater-on-model.jpg" alt="Knitwear">
+                <div
+                    style="position: absolute; bottom: 20px; left: 20px; color: white; font-size: 1.5rem; font-weight: 300; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                    KNITWEAR</div>
+            </div>
         </div>
+        <div class="product-card" onclick="window.location.href='/shop?category=Trousers'">
+            <div class="product-image">
+                <img src="/static/images/charcoal-grey-wool-trousers-on-model-minimal.jpg" alt="Trousers">
+                <div
+                    style="position: absolute; bottom: 20px; left: 20px; color: white; font-size: 1.5rem; font-weight: 300; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                    TROUSERS</div>
+            </div>
+        </div>
+        <div class="product-card" onclick="window.location.href='/shop?category=Shirts'">
+            <div class="product-image">
+                <img src="/static/images/ivory-silk-shirt-on-model-minimal-elegant.jpg" alt="Shirts">
+                <div
+                    style="position: absolute; bottom: 20px; left: 20px; color: white; font-size: 1.5rem; font-weight: 300; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                    SHIRTS</div>
+            </div>
+        </div>
+        <div class="product-card" onclick="window.location.href='/shop?category=Accessories'">
+            <div class="product-image">
+                <img src="/static/images/tan-leather-tote-bag-minimal.jpg" alt="Accessories">
+                <div
+                    style="position: absolute; bottom: 20px; left: 20px; color: white; font-size: 1.5rem; font-weight: 300; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                    ACCESSORIES</div>
+            </div>
+        </div>
+    </div>
+</section>
 
-        <div style="text-align: center;">
-            <a href="/shop" class="btn">View All Products</a>
-        </div>
-    </section>
+<!-- FEATURED PRODUCTS -->
+<section class="products-section">
+    <div class="products-header">
+        <h2>Featured Collection</h2>
+        <p>Carefully curated pieces for the discerning individual</p>
+    </div>
+
+    <div class="products-grid" id="featured-products">
+        <!-- Products loaded by JavaScript -->
+    </div>
+
+    <div style="text-align: center;">
+        <a href="/shop" class="btn">View All Products</a>
+    </div>
+</section>
 {% endblock %}
 
 {% block extra_js %}
@@ -61,7 +104,7 @@
             const res = await fetch('/api/products');
             const products = await res.json();
             const featured = products.filter(p => p.featured).slice(0, 4);
-            
+
             const grid = document.getElementById('featured-products');
             grid.innerHTML = featured.map(product => `
                 <div class="product-card" onclick="window.location.href='/product/${product.id}'">

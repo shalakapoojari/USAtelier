@@ -2,15 +2,82 @@
 
 {% block title %}Product - U.S ATELIER{% endblock %}
 
+{% block extra_css %}
+<style>
+    .product-layout {
+        display: grid;
+        grid-template-columns: 1fr 1.2fr 0.8fr;
+        gap: 2rem;
+        max-width: 1500px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+
+    .buy-box {
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1.5rem;
+        background-color: var(--hover-dark);
+        height: fit-content;
+        position: sticky;
+        top: 100px;
+    }
+
+    .info-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 2rem;
+    }
+
+    .info-table th,
+    .info-table td {
+        padding: 0.8rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.9rem;
+    }
+
+    .info-table th {
+        color: var(--accent-gray);
+        font-weight: 400;
+        width: 40%;
+    }
+
+    @media (max-width: 1024px) {
+        .product-layout {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .buy-box {
+            grid-column: 2;
+            grid-row: 1;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .product-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .buy-box {
+            grid-column: 1;
+            grid-row: auto;
+            position: static;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-    <div class="product-detail" id="product-container">
-        <!-- Loaded by JavaScript -->
-    </div>
+<div id="product-root">
+    <!-- Loaded by JS -->
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
     const productId = new URLSearchParams(window.location.search).get('id') || '{{ product_id }}';
+    let productData = null;
 
     async function loadProduct() {
         try {
@@ -18,94 +85,215 @@
             const product = await res.json();
 
             if (product.error) {
-                document.getElementById('product-container').innerHTML = '<p>Product not found</p>';
+                document.getElementById('product-root').innerHTML = '<p style="padding: 2rem;">Product not found</p>';
                 return;
             }
+            productData = product;
 
-            let selectedSize = '';
+            const reviewsRes = await fetch(`/api/products/${productId}/reviews`);
+            const reviews = await reviewsRes.json();
 
-            const html = `
-                <div class="product-detail-image">
-                    <img src="/static/images/${product.images?.[0] || 'placeholder.svg'}" 
-                         alt="${product.name}"
-                         onerror="this.src='/static/images/placeholder.svg'">
+            renderProduct(product, reviews);
+        } catch (error) {
+            console.log("Error loading product:", error);
+        }
+    }
+
+    function renderProduct(product, reviews) {
+        const avgRating = reviews.length ? (reviews.reduce((a, b) => a + b.rating, 0) / reviews.length).toFixed(1) : 'New';
+
+        const html = `
+            <div class="product-layout">
+                <!-- 1. Left: Images -->
+                <div class="product-gallery">
+                    <div style="background: var(--hover-dark); border-radius: 8px; overflow: hidden; margin-bottom: 1rem;">
+                        <img src="/static/images/${product.images?.[0] || 'placeholder.svg'}" 
+                             alt="${product.name}"
+                             style="width: 100%; height: auto; display: block;"
+                             onerror="this.src='/static/images/placeholder.svg'">
+                    </div>
                 </div>
 
-                <div class="product-detail-info">
-                    <h1>${product.name}</h1>
-                    <div class="product-detail-price">$${product.price}</div>
+                <!-- 2. Center: Details -->
+                <div class="product-center">
+                    <h1 style="font-size: 2rem; line-height: 1.2; margin-bottom: 0.5rem;">${product.name}</h1>
+                    <div style="margin-bottom: 1rem; font-size: 0.9rem;">
+                        <span style="color: #facc15;">${'★'.repeat(Math.round(avgRating))}</span> 
+                        <span style="color: #666; margin-left: 0.5rem;">${reviews.length} ratings</span>
+                    </div>
                     
-                    <p class="product-detail-description">
-                        ${product.description}
-                    </p>
-
-                    <div class="size-selector">
-                        <label>Select Size:</label>
-                        <div class="size-options">
-                            ${product.sizes.map(size => `
-                                <button class="size-option" onclick="document.querySelectorAll('.size-option').forEach(s => s.classList.remove('selected')); this.classList.add('selected'); selectedSize = '${size}';">
-                                    ${size}
-                                </button>
-                            `).join('')}
-                        </div>
+                    <div style="border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); padding: 1rem 0; margin-bottom: 1rem;">
+                        <div style="font-size: 1.5rem; font-weight: 500;">$${product.price}</div>
+                        <div style="font-size: 0.85rem; color: #888;">Inclusive of all taxes</div>
                     </div>
 
-                    <div class="quantity-selector">
-                        <label style="margin-right: 0.5rem;">Quantity:</label>
-                        <button class="quantity-btn" onclick="updateQuantity(-1)">-</button>
-                        <input type="number" id="quantity-input" class="quantity-input" value="1" min="1">
-                        <button class="quantity-btn" onclick="updateQuantity(1)">+</button>
+                    <div style="margin-bottom: 2rem;">
+                         <h3 style="font-size: 1rem; margin-bottom: 0.5rem;">About this item</h3>
+                         <ul style="padding-left: 1.2rem; font-size: 0.9rem; line-height: 1.6; color: #ccc;">
+                            <li>${product.description}</li>
+                            <li>Premium material tailored for a perfect fit.</li>
+                            <li>Designed for versatility and enduring style.</li>
+                            <li>Carefully inspected to ensure highest quality.</li>
+                         </ul>
                     </div>
 
-                    <button class="btn" style="width: 100%; font-weight: 600;" onclick="addProductToCart()">
+                    <h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Product Information</h3>
+                    <table class="info-table">
+                        <tr><th>Category</th><td>${product.category}</td></tr>
+                        <tr><th>Fabric</th><td>${product.fabric || 'Premium Blend'}</td></tr>
+                        <tr><th>Care</th><td>${product.care || 'Machine Wash'}</td></tr>
+                        <tr><th>Origin</th><td>Imported</td></tr>
+                    </table>
+                </div>
+
+                <!-- 3. Right: Buy Box -->
+                <div class="buy-box">
+                    <div style="font-size: 1.5rem; font-weight: 500; margin-bottom: 1rem;">$${product.price}</div>
+                     <div style="font-size: 0.9rem; color: #4ade80; margin-bottom: 1rem;">In Stock</div>
+                     <div style="font-size: 0.85rem; color: #888; margin-bottom: 1.5rem;">
+                        FREE delivery <strong>Wednesday, Feb 26</strong>.
+                     </div>
+
+                    <div class="size-selector" style="margin-bottom: 1.5rem;">
+                        <label style="display: block; font-size: 0.8rem; margin-bottom: 0.5rem;">Size:</label>
+                        <select id="size-select" style="width: 100%; padding: 0.5rem; background: rgba(0,0,0,0.2); color: white; border: 1px solid var(--border-color); border-radius: 4px;">
+                            <option value="">Select Size</option>
+                            ${product.sizes.map(s => `<option value="${s}">${s}</option>`).join('')}
+                        </select>
+                    </div>
+
+                    <div class="quantity-selector" style="margin-bottom: 1.5rem;">
+                         <label style="display: block; font-size: 0.8rem; margin-bottom: 0.5rem;">Quantity:</label>
+                        <select id="quantity-select" style="width: 100%; padding: 0.5rem; background: rgba(0,0,0,0.2); color: white; border: 1px solid var(--border-color); border-radius: 4px;">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                        </select>
+                    </div>
+
+                    <button class="btn" style="width: 100%; margin-bottom: 0.8rem; background-color: #facc15; color: black; border: none; font-weight: 600;" onclick="addToCart()">
                         Add to Cart
                     </button>
+                    <button class="btn" style="width: 100%; margin-bottom: 1.5rem; background-color: #ea580c; color: white; border: none; font-weight: 600;" onclick="buyNow()">
+                        Buy Now
+                    </button>
 
-                    ${product.fabric ? `<p style="margin-top: 2rem; font-size: 0.9rem; color: var(--accent-gray);"><strong>Fabric:</strong> ${product.fabric}</p>` : ''}
-                    ${product.care ? `<p style="font-size: 0.9rem; color: var(--accent-gray);"><strong>Care:</strong> ${product.care}</p>` : ''}
+                    <div style="font-size: 0.8rem; color: #888;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.2rem;">
+                            <span>Ships from</span> <span>U.S ATELIER</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Sold by</span> <span>U.S ATELIER</span>
+                        </div>
+                    </div>
+                    
+                    <button class="btn" style="width: 100%; margin-top: 1.5rem; font-size: 0.8rem; padding: 0.5rem;" onclick="addToWishlist()">
+                        Add to Wishlist
+                    </button>
                 </div>
-            `;
+            </div>
+            
+            <!-- Reviews Section (Full Width Below) -->
+            <div style="max-width: 1000px; margin: 0 auto 4rem; padding: 0 2rem;">
+                <h2 style="font-size: 1.5rem; margin-bottom: 2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">Customer Reviews</h2>
+                 <div style="margin-bottom: 2rem; background: var(--hover-dark); padding: 1.5rem; border-radius: 8px;">
+                    <h3 style="font-size: 1rem; margin-bottom: 1rem;">Write a Review</h3>
+                    <form onsubmit="submitReview(event)">
+                        <select id="review-rating" class="input-field" style="max-width: 100px; margin-bottom: 1rem;">
+                            <option value="5">★★★★★</option>
+                            <option value="4">★★★★</option>
+                            <option value="3">★★★</option>
+                            <option value="2">★★</option>
+                            <option value="1">★</option>
+                        </select>
+                        <textarea id="review-comment" class="input-field" placeholder="Share your thoughts..." rows="3"></textarea>
+                        <button type="submit" class="btn" style="font-size: 0.8rem;">Submit Review</button>
+                    </form>
+                </div>
+                 <div id="reviews-list">
+                    ${reviews.length ? reviews.map(r => `
+                        <div style="margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+                            <div style="display: flex; margin-bottom: 0.5rem; align-items: center; gap: 0.5rem;">
+                                <div style="width: 30px; height: 30px; background: #444; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;">${r.user[0].toUpperCase()}</div>
+                                <strong style="font-size: 0.9rem;">${r.user}</strong>
+                            </div>
+                            <div style="color: #facc15; font-size: 0.9rem; margin-bottom: 0.5rem;">${'★'.repeat(r.rating)}</div>
+                            <p style="font-size: 0.9rem; color: #ccc;">${r.comment}</p>
+                            <small style="color: #666;">${new Date(r.date).toLocaleDateString()}</small>
+                        </div>
+                    `).join('') : '<p style="color: #888;">No reviews yet.</p>'}
+                </div>
+            </div>
+        `;
 
-            document.getElementById('product-container').innerHTML = html;
-        } catch (error) {
-            console.log("[v0] Error loading product:", error);
-        }
+        document.getElementById('product-root').innerHTML = html;
     }
 
-    function updateQuantity(change) {
-        const input = document.getElementById('quantity-input');
-        const newValue = parseInt(input.value) + change;
-        if (newValue > 0) {
-            input.value = newValue;
-        }
-    }
-
-    async function addProductToCart() {
-        const res = await fetch(`/api/products/${productId}`);
-        const product = await res.json();
-
-        const sizeOption = document.querySelector('.size-option.selected');
-        if (!sizeOption) {
-            alert('Please select a size');
+    async function addToCart() {
+        const size = document.getElementById('size-select').value;
+        if (!size) {
+            AuthModule.showToast('Please select a size', 'error');
             return;
         }
+        const quantity = parseInt(document.getElementById('quantity-select').value);
 
-        const quantity = parseInt(document.getElementById('quantity-input').value);
-
-        const cartItem = {
-            id: product.id,
-            name: product.name,
-            price: product.price,
-            size: sizeOption.textContent,
+        await CartModule.addToCart({
+            id: productData.id,
+            name: productData.name,
+            price: productData.price,
+            size: size,
             quantity: quantity,
-            image: product.images?.[0] || 'placeholder.svg'
-        };
+            image: productData.images?.[0]
+        });
+        AuthModule.showToast('Added to Cart');
+    }
 
-        const result = await CartModule.addToCart(cartItem);
-        if (result.success) {
-            alert('Added to cart!');
-            document.getElementById('quantity-input').value = 1;
+    async function buyNow() {
+        const size = document.getElementById('size-select').value;
+        if (!size) {
+            AuthModule.showToast('Please select a size', 'error');
+            return;
         }
+        await addToCart();
+        window.location.href = '/checkout';
+    }
+
+    async function addToWishlist() {
+        try {
+            const res = await fetch('/api/wishlist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ product_id: productData.id })
+            });
+            const data = await res.json();
+            if (data.success || data.message) {
+                AuthModule.showToast('Added to Wishlist');
+            } else {
+                AuthModule.showToast(data.error || 'Login required', 'error');
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function submitReview(e) {
+        e.preventDefault();
+        const rating = document.getElementById('review-rating').value;
+        const comment = document.getElementById('review-comment').value;
+
+        try {
+            const res = await fetch(`/api/products/${productId}/reviews`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rating: parseInt(rating), comment })
+            });
+            if (res.ok) {
+                AuthModule.showToast('Review Submitted');
+                loadProduct();
+            } else {
+                AuthModule.showToast('Login required to review', 'error');
+            }
+        } catch (e) { console.error(e); }
     }
 
     document.addEventListener('DOMContentLoaded', loadProduct);

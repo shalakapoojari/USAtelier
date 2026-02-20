@@ -3,34 +3,35 @@
 {% block title %}Sign Up - U.S ATELIER{% endblock %}
 
 {% block content %}
-    <div class="form-container">
-        <h1 style="font-size: 1.8rem; margin-bottom: 2rem; text-align: center;">Create Account</h1>
+<div class="form-container">
+    <h1 style="font-size: 1.8rem; margin-bottom: 2rem; text-align: center;">Create Account</h1>
 
-        <form id="signup-form" onsubmit="handleSignup(event)">
-            <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" required>
-            </div>
+    <form id="signup-form" onsubmit="handleSignup(event)">
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required>
+        </div>
 
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" required>
-            </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required>
+        </div>
 
-            <div class="form-group">
-                <label for="confirm-password">Confirm Password</label>
-                <input type="password" id="confirm-password" name="confirm-password" required>
-            </div>
+        <div class="form-group">
+            <label for="confirm-password">Confirm Password</label>
+            <input type="password" id="confirm-password" name="confirm-password" required>
+        </div>
 
-            <button type="submit" class="btn form-submit">Create Account</button>
-        </form>
+        <button type="submit" class="btn form-submit">Create Account</button>
+    </form>
 
-        <p style="text-align: center; margin-top: 1.5rem; color: var(--accent-gray);">
-            Already have an account? <a href="/login" style="color: var(--primary-light); text-decoration: underline;">Login</a>
-        </p>
+    <p style="text-align: center; margin-top: 1.5rem; color: var(--accent-gray);">
+        Already have an account? <a href="/login"
+            style="color: var(--primary-light); text-decoration: underline;">Login</a>
+    </p>
 
-        <div id="error-message" style="color: #ff6b6b; margin-top: 1rem; text-align: center; display: none;"></div>
-    </div>
+    <div id="error-message" style="color: #ff6b6b; margin-top: 1rem; text-align: center; display: none;"></div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -40,23 +41,30 @@
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
         const confirmPassword = document.getElementById('confirm-password').value;
+        const submitBtn = event.target.querySelector('button[type="submit"]');
 
         if (password !== confirmPassword) {
-            const errorDiv = document.getElementById('error-message');
-            errorDiv.textContent = 'Passwords do not match';
-            errorDiv.style.display = 'block';
+            AuthModule.showToast('Passwords do not match', 'error');
             return;
         }
 
-        const result = await AuthModule.signup(email, password);
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creating Account...';
 
-        if (result.success) {
-            AuthModule.checkAuth();
-            window.location.href = '/account';
-        } else {
-            const errorDiv = document.getElementById('error-message');
-            errorDiv.textContent = result.error || 'Signup failed';
-            errorDiv.style.display = 'block';
+        try {
+            const result = await AuthModule.signup(email, password);
+
+            if (result.success) {
+                AuthModule.checkAuth();
+                setTimeout(() => {
+                    window.location.href = '/account';
+                }, 1500);
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Create Account';
         }
     }
 </script>
