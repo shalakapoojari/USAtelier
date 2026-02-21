@@ -66,18 +66,16 @@ export function AccountSidebar({ children }: SidebarProps) {
                             </Link>
                         )
                     })}
-                </nav>
 
-                {/* Logout at bottom */}
-                <div className="p-4 border-t border-white/10">
+                    {/* Sign Out — directly below Settings */}
                     <button
                         onClick={handleLogout}
-                        className="flex items-center gap-3 w-full px-2 py-2.5 text-xs uppercase tracking-widest text-gray-600 hover:text-white transition-colors"
+                        className="flex items-center gap-3 w-full px-6 py-3.5 text-xs uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all"
                     >
                         <LogOut size={14} strokeWidth={1.5} />
-                        Sign Out
+                        <span>Sign Out</span>
                     </button>
-                </div>
+                </nav>
             </aside>
 
             {/* ── MAIN CONTENT ── */}

@@ -19,18 +19,19 @@ type CartContextType = {
   updateQuantity: (id: string, size: string, quantity: number) => void
   clearCart: () => void
   total: number
+  // "Unseen" badge — clears when user visits /cart
+  unseenCount: number
+  clearUnseen: () => void
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
-  // isHydrated as STATE (not ref) means the save effect
-  // only re-runs after this flips to true via a re-render —
-  // guaranteeing items are already populated before we ever save.
   const [isHydrated, setIsHydrated] = useState(false)
+  const [unseenCount, setUnseenCount] = useState(0)
 
-  // STEP 1 — Load from localStorage exactly once after mount
+  // Load from localStorage once after mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem("cart")
@@ -41,16 +42,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setIsHydrated(true)
   }, [])
 
-  // STEP 2 — Persist to localStorage, but ONLY after hydration is done.
-  // Because isHydrated is in the deps array, this effect re-runs when it
-  // flips to true (after the load effect). At that point items already has
-  // the loaded values, so we never accidentally save an empty array.
+  // Persist to localStorage — only after hydration
   useEffect(() => {
     if (!isHydrated) return
     localStorage.setItem("cart", JSON.stringify(items))
   }, [items, isHydrated])
 
   const addItem = (newItem: Omit<CartItem, "quantity">) => {
+    // Every addItem call is an addition — increment badge
+    setUnseenCount((c) => c + 1)
     setItems((prev) => {
       const existing = prev.find(
         (i) => i.id === newItem.id && i.size === newItem.size
@@ -84,11 +84,22 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = () => setItems([])
 
+  const clearUnseen = () => setUnseenCount(0)
+
   const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0)
 
   return (
     <CartContext.Provider
-      value={{ items, addItem, removeItem, updateQuantity, clearCart, total }}
+      value={{
+        items,
+        addItem,
+        removeItem,
+        updateQuantity,
+        clearCart,
+        total,
+        unseenCount,
+        clearUnseen,
+      }}
     >
       {children}
     </CartContext.Provider>

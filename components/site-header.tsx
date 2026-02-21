@@ -12,47 +12,14 @@ import { useWishlist } from "@/lib/wishlist-context"
 export function SiteHeader() {
   const navRef = useRef<HTMLDivElement | null>(null)
   const { user, logout } = useAuth()
-  const { items } = useCart()
-  const { count: wishlistCount } = useWishlist()
+  // Read unseen counts directly from contexts — they live in providers
+  // (mounted at layout level) so they never reset on navigation
+  const { unseenCount: cartUnseen, clearUnseen: clearCartUnseen } = useCart()
+  const { unseenCount: wishlistUnseen, clearUnseen: clearWishlistUnseen } = useWishlist()
   const router = useRouter()
-
-  // Smart "unseen" cart badge
-  const [unseenCount, setUnseenCount] = useState(0)
-  const [lastSeenCartTotal, setLastSeenCartTotal] = useState(0)
-
-  // Smart "unseen" wishlist badge
-  const [unseenWishlist, setUnseenWishlist] = useState(0)
-  const [lastSeenWishlistTotal, setLastSeenWishlistTotal] = useState(0)
 
   const [profileOpen, setProfileOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
-
-  const cartTotal = items.reduce((sum, i) => sum + i.quantity, 0)
-
-  // Accumulate unseen cart items
-  useEffect(() => {
-    if (cartTotal > lastSeenCartTotal) {
-      setUnseenCount((prev) => prev + (cartTotal - lastSeenCartTotal))
-    }
-    setLastSeenCartTotal(cartTotal)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartTotal])
-
-  // Accumulate unseen wishlist items
-  useEffect(() => {
-    if (wishlistCount > lastSeenWishlistTotal) {
-      setUnseenWishlist((prev) => prev + (wishlistCount - lastSeenWishlistTotal))
-    }
-    setLastSeenWishlistTotal(wishlistCount)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wishlistCount])
-
-  // Clear cart badge when on /cart
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    if (window.location.pathname === "/cart") setUnseenCount(0)
-    if (window.location.pathname === "/favourites") setUnseenWishlist(0)
-  })
 
   // Close profile dropdown on outside click
   useEffect(() => {
@@ -75,12 +42,12 @@ export function SiteHeader() {
   }, [])
 
   const handleCartClick = () => {
-    setUnseenCount(0)
+    clearCartUnseen()
     router.push("/cart")
   }
 
   const handleFavouritesClick = () => {
-    setUnseenWishlist(0)
+    clearWishlistUnseen()
     router.push("/favourites")
   }
 
@@ -102,18 +69,10 @@ export function SiteHeader() {
 
       {/* ── CENTER NAV ── */}
       <div className="hidden md:flex gap-12 text-xs uppercase tracking-[0.25em] font-medium">
-        <Link href="/collections" className="hover:text-gray-400 transition-colors">
-          Collections
-        </Link>
-        <Link href="/campaign" className="hover:text-gray-400 transition-colors">
-          Campaign
-        </Link>
-        <Link href="/maison" className="hover:text-gray-400 transition-colors">
-          Maison
-        </Link>
-        <Link href="/shop" className="hover:text-gray-400 transition-colors">
-          Shop
-        </Link>
+        <Link href="/collections" className="hover:text-gray-400 transition-colors">Collections</Link>
+        <Link href="/campaign" className="hover:text-gray-400 transition-colors">Campaign</Link>
+        <Link href="/maison" className="hover:text-gray-400 transition-colors">Maison</Link>
+        <Link href="/shop" className="hover:text-gray-400 transition-colors">Shop</Link>
       </div>
 
       {/* ── RIGHT ICONS ── */}
@@ -122,17 +81,17 @@ export function SiteHeader() {
         {/* Favourites icon */}
         <button
           onClick={handleFavouritesClick}
-          className="relative group flex items-center justify-center w-9 h-9 text-gray-400 hover:text-white transition-colors"
+          className="relative flex items-center justify-center w-9 h-9 text-gray-400 hover:text-white transition-colors"
           title="Favourites"
         >
           <Heart
             size={18}
             strokeWidth={1.5}
-            className={unseenWishlist > 0 ? "fill-red-400 text-red-400" : ""}
+            className={wishlistUnseen > 0 ? "fill-red-400 text-red-400" : ""}
           />
-          {unseenWishlist > 0 && (
+          {wishlistUnseen > 0 && (
             <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 text-white rounded-full text-[8px] flex items-center justify-center font-medium leading-none animate-bounce">
-              {unseenWishlist > 9 ? "9+" : unseenWishlist}
+              {wishlistUnseen > 9 ? "9+" : wishlistUnseen}
             </span>
           )}
         </button>
@@ -140,13 +99,13 @@ export function SiteHeader() {
         {/* Cart icon */}
         <button
           onClick={handleCartClick}
-          className="relative group flex items-center justify-center w-9 h-9 text-gray-400 hover:text-white transition-colors"
+          className="relative flex items-center justify-center w-9 h-9 text-gray-400 hover:text-white transition-colors"
           title="Cart"
         >
           <ShoppingBag size={18} strokeWidth={1.5} />
-          {unseenCount > 0 && (
+          {cartUnseen > 0 && (
             <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-white text-black rounded-full text-[8px] flex items-center justify-center font-medium leading-none animate-bounce">
-              {unseenCount > 9 ? "9+" : unseenCount}
+              {cartUnseen > 9 ? "9+" : cartUnseen}
             </span>
           )}
         </button>
@@ -179,13 +138,11 @@ export function SiteHeader() {
             {/* Dropdown */}
             {profileOpen && (
               <div className="absolute right-0 top-full mt-3 w-52 bg-[#0e0e0e] border border-white/10 shadow-2xl z-50">
-                {/* User info */}
                 <div className="px-4 py-3 border-b border-white/10">
                   <p className="text-xs uppercase tracking-widest text-gray-400 truncate">
                     {user.email}
                   </p>
                 </div>
-
                 <div className="py-1">
                   <Link
                     href="/account"
@@ -204,7 +161,6 @@ export function SiteHeader() {
                     Orders
                   </Link>
                 </div>
-
                 <div className="border-t border-white/10 py-1">
                   <button
                     onClick={handleLogout}

@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect, useRef } from "react"
 
 type WishlistItem = {
     id: string
@@ -18,6 +18,9 @@ type WishlistContextType = {
     toggleItem: (item: WishlistItem) => void
     isWishlisted: (id: string) => boolean
     count: number
+    // "Unseen" badge — clears when user visits /favourites
+    unseenCount: number
+    clearUnseen: () => void
 }
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined)
@@ -25,6 +28,12 @@ const WishlistContext = createContext<WishlistContextType | undefined>(undefined
 export function WishlistProvider({ children }: { children: React.ReactNode }) {
     const [items, setItems] = useState<WishlistItem[]>([])
     const [isHydrated, setIsHydrated] = useState(false)
+    const [unseenCount, setUnseenCount] = useState(0)
+
+    // Keep a ref to the latest items so toggleItem can check synchronously
+    // without needing to call setState inside another setState updater
+    const latestItems = useRef(items)
+    latestItems.current = items
 
     // Load from localStorage once after mount
     useEffect(() => {
@@ -55,6 +64,12 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     }
 
     const toggleItem = (item: WishlistItem) => {
+        // Check BEFORE the state update using the ref (always current)
+        const alreadySaved = latestItems.current.some((i) => i.id === item.id)
+        if (!alreadySaved) {
+            // Adding a new favourite → increment unseen badge
+            setUnseenCount((c) => c + 1)
+        }
         setItems((prev) => {
             const exists = prev.find((i) => i.id === item.id)
             return exists ? prev.filter((i) => i.id !== item.id) : [...prev, item]
@@ -63,9 +78,20 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
 
     const isWishlisted = (id: string) => items.some((i) => i.id === id)
 
+    const clearUnseen = () => setUnseenCount(0)
+
     return (
         <WishlistContext.Provider
-            value={{ items, addItem, removeItem, toggleItem, isWishlisted, count: items.length }}
+            value={{
+                items,
+                addItem,
+                removeItem,
+                toggleItem,
+                isWishlisted,
+                count: items.length,
+                unseenCount,
+                clearUnseen,
+            }}
         >
             {children}
         </WishlistContext.Provider>

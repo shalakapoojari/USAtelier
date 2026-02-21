@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { useCart } from "@/lib/cart-context"
@@ -8,7 +9,11 @@ import Link from "next/link"
 import { Minus, Plus, X } from "lucide-react"
 
 export default function CartPage() {
-  const { items, removeItem, updateQuantity, total } = useCart()
+  const { items, removeItem, updateQuantity, total, clearUnseen } = useCart()
+
+  // Clear the navbar badge as soon as the user lands here
+  useEffect(() => { clearUnseen() }, [])
+
   const shipping = items.length > 0 ? 1245 : 0
   const grandTotal = total + shipping
 

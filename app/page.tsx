@@ -261,10 +261,11 @@ export default function HomePage() {
             <div className="panel w-screen h-full flex items-center justify-center">
               <div className="relative w-[400px] h-[600px]">
                 <Image
-                  src="https://images.unsplash.com/photo-1529139574466-a302c2d56aee?q=80&w=2576"
-                  alt=""
+                  src="https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=2574&auto=format&fit=crop"
+                  alt="Marble Silk"
                   fill
-                  className="object-cover"
+                  sizes="400px"
+                  className="object-cover z-0"
                 />
                 <div className="absolute bottom-6 left-6">
                   <h3 className="text-3xl font-serif italic">

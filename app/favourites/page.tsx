@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Heart, ShoppingBag, X } from "lucide-react"
@@ -11,9 +12,12 @@ import { useCart } from "@/lib/cart-context"
 import { useToast } from "@/lib/toast-context"
 
 export default function FavouritesPage() {
-    const { items, removeItem } = useWishlist()
+    const { items, removeItem, clearUnseen } = useWishlist()
     const { addItem } = useCart()
     const { showToast } = useToast()
+
+    // Clear the navbar badge as soon as the user lands here
+    useEffect(() => { clearUnseen() }, [])
 
     const handleAddToCart = (item: typeof items[0]) => {
         // Add with default size — user can pick on product page
