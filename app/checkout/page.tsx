@@ -27,7 +27,8 @@ export default function CheckoutPage() {
     city: "",
     state: "",
     zip: "",
-    country: "USA",
+    country: "India",
+    phone: "",
   })
 
   if (items.length === 0) {
@@ -92,6 +93,15 @@ export default function CheckoutPage() {
                   name="email"
                   placeholder="Email"
                   value={formData.email}
+                  onChange={handleInputChange}
+                  required
+                  className="bg-transparent border-white/20 text-white placeholder:text-gray-600"
+                />
+
+                <Input
+                  name="phone"
+                  placeholder="Mobile Number"
+                  value={formData.phone}
                   onChange={handleInputChange}
                   required
                   className="bg-transparent border-white/20 text-white placeholder:text-gray-600"
@@ -183,6 +193,8 @@ export default function CheckoutPage() {
                     {formData.address}
                     <br />
                     {formData.city}, {formData.state} {formData.zip}
+                    <br />
+                    Phone: {formData.phone}
                   </p>
                 </div>
 

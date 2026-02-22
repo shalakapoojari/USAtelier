@@ -22,7 +22,7 @@ const campaignImages = [
         label: "02 — The Form",
     },
     {
-        src: "https://images.unsplash.com/photo-1529139574466-a302c2d56aee?q=80&w=2576",
+        src: "https://images.unsplash.com/photo-1496747611176-843222e1e57c?q=80&w=2573",
         alt: "Campaign III",
         label: "03 — The Drape",
     },

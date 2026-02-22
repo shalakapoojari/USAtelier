@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { ProductCard } from "@/components/product-card"
@@ -13,31 +13,28 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Slider } from "@/components/ui/slider"
 import { Checkbox } from "@/components/ui/checkbox"
 import { SlidersHorizontal } from "lucide-react"
 
 export default function ShopPage() {
-  const [priceRange, setPriceRange] = useState([0, 50000])
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [selectedSizes, setSelectedSizes] = useState<string[]>([])
 
-  const categories = Array.from(new Set(products.map((p) => p.category)))
-  const allSizes = Array.from(new Set(products.flatMap((p) => p.sizes)))
+  const categories = useMemo(() => Array.from(new Set(products.map((p) => p.category))), [])
+  const allSizes = useMemo(() => Array.from(new Set(products.flatMap((p) => p.sizes))), [])
 
-  const filteredProducts = products.filter((product) => {
-    const priceMatch =
-      product.price >= priceRange[0] &&
-      product.price <= priceRange[1]
-    const categoryMatch =
-      selectedCategories.length === 0 ||
-      selectedCategories.includes(product.category)
-    const sizeMatch =
-      selectedSizes.length === 0 ||
-      product.sizes.some((size) => selectedSizes.includes(size))
+  const filteredProducts = useMemo(() => {
+    return products.filter((product) => {
+      const categoryMatch =
+        selectedCategories.length === 0 ||
+        selectedCategories.includes(product.category)
+      const sizeMatch =
+        selectedSizes.length === 0 ||
+        product.sizes.some((size) => selectedSizes.includes(size))
 
-    return priceMatch && categoryMatch && sizeMatch
-  })
+      return categoryMatch && sizeMatch
+    })
+  }, [selectedCategories, selectedSizes])
 
   /* ================= FILTER UI ================= */
   const FilterContent = () => (
@@ -74,27 +71,6 @@ export default function ShopPage() {
         </div>
       </div>
 
-      {/* Price */}
-      <div>
-        <h3 className="text-white mb-3">
-          Price Range
-        </h3>
-        <p className="text-xs text-gray-500 mb-5">
-          ₹{priceRange[0].toLocaleString('en-IN')} — ₹{priceRange[1].toLocaleString('en-IN')}
-        </p>
-        <Slider
-          value={priceRange}
-          onValueChange={setPriceRange}
-          min={0}
-          max={50000}
-          step={100}
-          className="w-full"
-        />
-        <div className="flex justify-between text-[10px] text-gray-600 mt-2">
-          <span>₹0</span>
-          <span>₹50,000</span>
-        </div>
-      </div>
 
       {/* Size */}
       <div>
@@ -128,7 +104,7 @@ export default function ShopPage() {
       <SiteHeader />
 
       {/* ================= PAGE HEADER ================= */}
-      <section className="pt-48 pb-24 text-center px-6">
+      <section className="pt-24 pb-16 text-center px-6">
         <p className="uppercase tracking-[0.5em] text-xs text-gray-400 mb-6">
           The Collection
         </p>
@@ -196,7 +172,6 @@ export default function ShopPage() {
                   variant="outline"
                   className="border-white/20 text-white"
                   onClick={() => {
-                    setPriceRange([0, 50000])
                     setSelectedCategories([])
                     setSelectedSizes([])
                   }}

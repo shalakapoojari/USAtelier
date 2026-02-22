@@ -2,7 +2,9 @@
 
 import type React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { useAuth } from "@/lib/auth-context"
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -28,6 +30,28 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { user, isAuthenticated } = useAuth()
+  const [isAuthorizing, setIsAuthorizing] = useState(true)
+
+  useEffect(() => {
+    // Wait for auth to initialize
+    if (isAuthenticated !== undefined) {
+      if (!isAuthenticated || user?.role !== "admin") {
+        router.push("/login")
+      } else {
+        setIsAuthorizing(false)
+      }
+    }
+  }, [isAuthenticated, user, router])
+
+  if (isAuthorizing) {
+    return (
+      <div className="bg-[#030303] min-h-screen flex items-center justify-center text-white font-light tracking-[0.2em] uppercase text-xs">
+        Verifying Admin Access...
+      </div>
+    )
+  }
 
   return (
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen flex">
@@ -48,8 +72,8 @@ export default function AdminLayout({
                 key={href}
                 href={href}
                 className={`flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest rounded-sm transition-all ${isActive
-                    ? "bg-white text-black"
-                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                  ? "bg-white text-black"
+                  : "text-gray-400 hover:text-white hover:bg-white/5"
                   }`}
               >
                 <Icon className="w-4 h-4" />

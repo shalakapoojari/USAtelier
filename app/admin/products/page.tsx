@@ -98,6 +98,16 @@ export default function ProductsPage() {
                 </td>
               </tr>
             ))}
+            {products.length === 0 && (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="px-8 py-24 text-center text-sm tracking-widest text-gray-500"
+                >
+                  No products in catalog.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

@@ -90,9 +90,7 @@ export function SiteHeader() {
             className={wishlistUnseen > 0 ? "fill-red-400 text-red-400" : ""}
           />
           {wishlistUnseen > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 text-white rounded-full text-[8px] flex items-center justify-center font-medium leading-none animate-bounce">
-              {wishlistUnseen > 9 ? "9+" : wishlistUnseen}
-            </span>
+            <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border border-black animate-pulse" />
           )}
         </button>
 
@@ -104,9 +102,7 @@ export function SiteHeader() {
         >
           <ShoppingBag size={18} strokeWidth={1.5} />
           {cartUnseen > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-white text-black rounded-full text-[8px] flex items-center justify-center font-medium leading-none animate-bounce">
-              {cartUnseen > 9 ? "9+" : cartUnseen}
-            </span>
+            <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-white rounded-full border border-black animate-pulse" />
           )}
         </button>
 
@@ -114,10 +110,9 @@ export function SiteHeader() {
         {!user ? (
           <Link
             href="/login"
-            className="flex items-center justify-center w-9 h-9 text-gray-400 hover:text-white transition-colors"
-            title="Login"
+            className="text-[10px] uppercase tracking-[0.2em] text-gray-400 hover:text-white transition-colors ml-2"
           >
-            <User size={18} strokeWidth={1.5} />
+            Login
           </Link>
         ) : (
           <div className="relative" ref={profileRef}>

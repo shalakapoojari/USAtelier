@@ -28,7 +28,7 @@ export default function LoginPage() {
     if (result.success && result.user) {
       router.push(result.user.role === "admin" ? "/admin" : "/account")
     } else {
-      setError("Invalid email or password")
+      setError(result.message || "Invalid email or password")
     }
 
     setLoading(false)
@@ -39,10 +39,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Brand */}
         <div className="text-center mb-12">
-          <Link
-            href="/"
-            className="text-4xl font-serif font-light tracking-[0.25em]"
-          >
+          <Link href="/" className="text-4xl font-serif font-light tracking-[0.25em]">
             U.S ATELIER
           </Link>
           <p className="mt-4 text-xs uppercase tracking-widest text-gray-500">
@@ -51,10 +48,7 @@ export default function LoginPage() {
         </div>
 
         {/* Login Form */}
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-10 border border-white/10 p-10"
-        >
+        <form onSubmit={handleSubmit} className="space-y-10 border border-white/10 p-10">
           <div>
             <label className="block mb-2 text-xs uppercase tracking-widest text-gray-400">
               Email
@@ -84,9 +78,7 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <p className="text-xs uppercase tracking-widest text-red-500">
-              {error}
-            </p>
+            <p className="text-xs uppercase tracking-widest text-red-500">{error}</p>
           )}
 
           <Button
@@ -98,7 +90,7 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        {/* Signup subtle link */}
+        {/* Sign up link */}
         <div className="mt-8 text-center text-xs tracking-widest text-gray-500">
           New to U.S ATELIER?{" "}
           <Link
@@ -109,15 +101,8 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        {/* Demo creds */}
-        <div className="mt-10 border border-white/5 p-6 text-xs tracking-widest text-gray-500 space-y-2">
-          <p className="uppercase text-gray-400">Demo Credentials</p>
-          <p>User — user@example.com / user123</p>
-          <p>Admin — admin@atelier.com / admin123</p>
-        </div>
-
         {/* Back */}
-        <div className="mt-10 text-center">
+        <div className="mt-6 text-center">
           <Link
             href="/"
             className="text-xs uppercase tracking-widest text-gray-500 hover:text-white transition-colors"

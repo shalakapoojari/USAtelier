@@ -27,7 +27,7 @@ export default function AccountPage() {
             {/* Page Title */}
             <div className="mb-10 pb-8 border-b border-white/10">
               <p className="uppercase tracking-[0.4em] text-xs text-gray-500 mb-2">Dashboard</p>
-              <h1 className="font-serif text-4xl font-light">Welcome back{user?.name ? `, ${user.name.split(" ")[0]}` : ""}</h1>
+              <h1 className="font-serif text-4xl font-light">Welcome back{user?.firstName ? `, ${user.firstName}` : ""}</h1>
             </div>
 
             {/* Stats Row */}

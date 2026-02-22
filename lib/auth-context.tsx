@@ -2,17 +2,22 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 
+const API_BASE = "http://localhost:5000"
+
 type User = {
   id: string
   email: string
-  name: string
+  firstName: string
+  lastName: string
+  phone: string
   role: "user" | "admin"
 }
 
 type AuthContextType = {
   user: User | null
-  login: (email: string, password: string) => Promise<{ success: boolean; user?: User }>
-  signup: (email: string, password: string) => Promise<{ success: boolean; user?: User; message?: string }>
+  login: (email: string, password: string) => Promise<{ success: boolean; user?: User; message?: string }>
+  signup: (email: string, password: string, firstName: string, lastName: string, phone: string) => Promise<{ success: boolean; user?: User; message?: string }>
+  updateProfile: (data: { firstName: string; lastName: string; phone: string }) => Promise<{ success: boolean; message: string }>
   logout: () => void
   isAuthenticated: boolean
   isAdmin: boolean
@@ -23,62 +28,142 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
 
-  // Load user from localStorage on mount
+  // On mount: restore session from Flask server
   useEffect(() => {
-    const savedUser = localStorage.getItem("user")
-    if (savedUser) {
-      setUser(JSON.parse(savedUser))
+    const restore = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/user`, {
+          credentials: "include",
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.user) {
+            const restored: User = {
+              id: data.id || "",
+              email: data.user,
+              firstName: data.firstName || data.user.split("@")[0],
+              lastName: data.lastName || "",
+              phone: data.phone || "",
+              role: data.isAdmin ? "admin" : "user",
+            }
+            setUser(restored)
+          }
+        }
+      } catch {
+        // Flask not reachable — stay logged out
+      }
     }
+    restore()
   }, [])
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; user?: User }> => {
-    // Mock authentication - will be replaced with real API in integration phase
-    if (email === "admin@atelier.com" && password === "admin123") {
-      const adminUser = { id: "1", email, name: "Admin User", role: "admin" as const }
-      setUser(adminUser)
-      localStorage.setItem("user", JSON.stringify(adminUser))
-      return { success: true, user: adminUser }
-    } else if (email === "user@example.com" && password === "user123") {
-      const regularUser = { id: "2", email, name: "John Doe", role: "user" as const }
-      setUser(regularUser)
-      localStorage.setItem("user", JSON.stringify(regularUser))
-      return { success: true, user: regularUser }
+  const login = async (
+    email: string,
+    password: string
+  ): Promise<{ success: boolean; user?: User; message?: string }> => {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok && data.success) {
+        const loggedIn: User = {
+          id: data.id || "",
+          email: data.user || email,
+          firstName: data.firstName || email.split("@")[0],
+          lastName: data.lastName || "",
+          phone: data.phone || "",
+          role: data.isAdmin ? "admin" : "user",
+        }
+        setUser(loggedIn)
+        return { success: true, user: loggedIn }
+      }
+
+      return { success: false, message: data.error || "Invalid credentials" }
+    } catch {
+      return { success: false, message: "Cannot reach server. Is the Flask app running?" }
     }
-    return { success: false }
   }
 
   const signup = async (
     email: string,
-    password: string
+    password: string,
+    firstName: string,
+    lastName: string,
+    phone: string
   ): Promise<{ success: boolean; user?: User; message?: string }> => {
     if (!email || !password) {
       return { success: false, message: "Email and password are required" }
     }
-
     if (password.length < 6) {
       return { success: false, message: "Password must be at least 6 characters" }
     }
 
-    const existingEmails = ["admin@atelier.com", "user@example.com"]
-    if (existingEmails.includes(email)) {
-      return { success: false, message: "An account with this email already exists" }
-    }
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password, firstName, lastName, phone }),
+      })
 
-    const newUser: User = {
-      id: Date.now().toString(),
-      email,
-      name: email.split("@")[0],
-      role: "user",
-    }
+      const data = await res.json()
 
-    setUser(newUser)
-    localStorage.setItem("user", JSON.stringify(newUser))
-    return { success: true, user: newUser }
+      if (res.ok && data.success) {
+        const newUser: User = {
+          id: data.id || "",
+          email: data.user || email,
+          firstName: firstName,
+          lastName: lastName,
+          phone: phone || data.phone || "",
+          role: "user",
+        }
+        setUser(newUser)
+        return { success: true, user: newUser }
+      }
+
+      return { success: false, message: data.error || "Unable to create account" }
+    } catch {
+      return { success: false, message: "Cannot reach server. Is the Flask app running?" }
+    }
   }
 
-  const logout = () => {
+  const updateProfile = async (data: { firstName: string; lastName: string; phone: string }): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/user`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      })
+
+      const json = await res.json()
+      if (res.ok && json.success) {
+        if (user) {
+          setUser({ ...user, ...data })
+        }
+        return { success: true, message: json.message }
+      }
+      return { success: false, message: json.error || "Update failed" }
+    } catch {
+      return { success: false, message: "Network error" }
+    }
+  }
+
+  const logout = async () => {
+    try {
+      await fetch(`${API_BASE}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      })
+    } catch {
+      // Ignore network errors on logout
+    }
     setUser(null)
-    localStorage.removeItem("user")
   }
 
   return (
@@ -87,6 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         login,
         signup,
+        updateProfile,
         logout,
         isAuthenticated: !!user,
         isAdmin: user?.role === "admin",

@@ -12,7 +12,7 @@ from flask_pymongo import PyMongo
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://127.0.0.1:3000"])
 
 # Configuration
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'default-secret-key')
@@ -103,6 +103,9 @@ def signup():
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
+    first_name = data.get('firstName', '').strip()
+    last_name = data.get('lastName', '').strip()
+    phone = data.get('phone', '').strip()
     
     if not email or not password:
         return jsonify({"error": "Email and password required"}), 400
@@ -112,6 +115,9 @@ def signup():
         
     user_id = db.users.insert_one({
         "email": email,
+        "first_name": first_name,
+        "last_name": last_name,
+        "phone": phone,
         "password_hash": generate_password_hash(password),
         "is_admin": False,
         "created_at": datetime.utcnow()
@@ -120,7 +126,15 @@ def signup():
     session['user_id'] = str(user_id)
     session['is_admin'] = False
     
-    return jsonify({"success": True, "message": "Signup successful!", "user": email}), 201
+    return jsonify({
+        "success": True,
+        "message": "Signup successful!",
+        "user": email,
+        "firstName": first_name,
+        "lastName": last_name,
+        "phone": phone,
+        "id": str(user_id)
+    }), 201
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
@@ -134,9 +148,13 @@ def login():
         session['user_id'] = str(user['_id'])
         session['is_admin'] = user.get('is_admin', False)
         return jsonify({
-            "success": True, 
+            "success": True,
             "message": "Login successful!",
-            "user": email, 
+            "user": email,
+            "firstName": user.get('first_name', user.get('name', email.split('@')[0])),
+            "lastName": user.get('last_name', ''),
+            "phone": user.get('phone', ''),
+            "id": str(user['_id']),
             "isAdmin": user.get('is_admin', False)
         }), 200
         
@@ -145,6 +163,33 @@ def login():
 @app.route('/api/auth/logout', methods=['POST'])
 def logout():
     session.clear()
+    return jsonify({"success": True, "message": "Logged out"}), 200
+
+@app.route('/api/auth/change-password', methods=['POST'])
+def change_password():
+    if 'user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json()
+    current_password = data.get('currentPassword')
+    new_password = data.get('newPassword')
+    
+    if not current_password or not new_password:
+        return jsonify({"error": "Current and new password required"}), 400
+        
+    user = db.users.find_one({"_id": ObjectId(session['user_id'])})
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+        
+    if not check_password_hash(user['password_hash'], current_password):
+        return jsonify({"error": "Incorrect current password"}), 400
+        
+    db.users.update_one(
+        {"_id": ObjectId(session['user_id'])},
+        {"$set": {"password_hash": generate_password_hash(new_password)}}
+    )
+    
+    return jsonify({"success": True, "message": "Password updated successfully"}), 200
     return jsonify({"success": True, "message": "Logged out successfully"}), 200
 
 @app.route('/api/auth/user', methods=['GET', 'PUT'])
@@ -157,7 +202,8 @@ def user_profile():
         if user:
             return jsonify({
                 "user": user['email'], 
-                "name": user.get('name', ''),
+                "firstName": user.get('first_name', user.get('name', user['email'].split('@')[0])),
+                "lastName": user.get('last_name', ''),
                 "phone": user.get('phone', ''),
                 "isAdmin": user.get('is_admin', False),
                 "id": str(user['_id']),
@@ -167,7 +213,8 @@ def user_profile():
     if request.method == 'PUT':
         data = request.get_json()
         update_fields = {}
-        if 'name' in data: update_fields['name'] = data['name']
+        if 'firstName' in data: update_fields['first_name'] = data['firstName']
+        if 'lastName' in data: update_fields['last_name'] = data['lastName']
         if 'phone' in data: update_fields['phone'] = data['phone']
         
         if update_fields:
@@ -467,6 +514,34 @@ def get_orders():
 # ==================== SEEDING ====================
 
 def seed_database():
+    # ── ALWAYS SYNC ADMIN CREDENTIALS ──
+    admin_email = "admin@123.com"
+    admin_data = {
+        "email": admin_email,
+        "password_hash": generate_password_hash("admin123"),
+        "is_admin": True,
+        "first_name": "Admin",
+        "last_name": "User",
+        "created_at": datetime.utcnow()
+    }
+    
+    if not db.users.find_one({"email": admin_email}):
+        db.users.insert_one(admin_data)
+        print(f"Created new admin: {admin_email}")
+    else:
+        db.users.update_one(
+            {"email": admin_email},
+            {"$set": {
+                "password_hash": admin_data["password_hash"],
+                "is_admin": True
+            }}
+        )
+        print(f"Synced credentials for admin: {admin_email}")
+
+    # Cleanup old experiments if they exist
+    db.users.delete_many({"email": {"$in": ["admin@example.com", "admin.com"]}})
+
+    # ── SEED PRODUCTS ONLY IF EMPTY ──
     if db.products.count_documents({}) > 0:
         return
 
@@ -562,22 +637,13 @@ def seed_database():
     ]
     
     db.products.insert_many(products_data)
-    
-    # Admin
-    if not db.users.find_one({"email": "admin@example.com"}):
-        db.users.insert_one({
-            "email": "admin@example.com",
-            "password_hash": generate_password_hash("password123"),
-            "is_admin": True,
-            "created_at": datetime.utcnow()
-        })
-    print("MongoDB Seeded with new images!")
+    print("MongoDB Products Seeded!")
 
 if __name__ == '__main__':
     with app.app_context():
         try:
             seed_database()
         except Exception as e:
-            print(f"Seeding failed (is MongoDB running?): {e}")
+            print(f"Seeding failed: {e}")
             
     app.run(debug=True)

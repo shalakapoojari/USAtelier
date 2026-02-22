@@ -51,6 +51,7 @@ export type Order = {
 }
 
 // Mock Products Data
+// Mock Products Data
 export const products: Product[] = [
   {
     id: "1",
@@ -161,6 +162,7 @@ export const products: Product[] = [
 ]
 
 // Mock Collections Data
+// Mock Collections Data
 export const collections: Collection[] = [
   {
     id: "essentials",
@@ -183,109 +185,9 @@ export const collections: Collection[] = [
 ]
 
 // Mock Orders Data
-export const orders: Order[] = [
-  {
-    id: "ORD-2024-001",
-    customerId: "CUST-001",
-    customerName: "Emma Thompson",
-    customerEmail: "emma.t@example.com",
-    date: "2024-01-15",
-    status: "delivered",
-    paymentStatus: "completed",
-    paymentMethod: "Credit Card",
-    items: [
-      {
-        productId: "1",
-        productName: "Essential Cashmere Sweater",
-        size: "M",
-        quantity: 1,
-        price: 24485,
-      },
-    ],
-    subtotal: 24485,
-    shipping: 1245,
-    total: 25730,
-    shippingAddress: {
-      street: "123 Main St",
-      city: "New York",
-      state: "NY",
-      zip: "10001",
-      country: "USA",
-    },
-  },
-  {
-    id: "ORD-2024-002",
-    customerId: "CUST-002",
-    customerName: "James Wilson",
-    customerEmail: "james.w@example.com",
-    date: "2024-01-18",
-    status: "shipped",
-    paymentStatus: "completed",
-    paymentMethod: "PayPal",
-    items: [
-      {
-        productId: "2",
-        productName: "Tailored Wool Trousers",
-        size: "32",
-        quantity: 2,
-        price: 20335,
-      },
-      {
-        productId: "3",
-        productName: "Organic Cotton Tee",
-        size: "L",
-        quantity: 3,
-        price: 7055,
-      },
-    ],
-    subtotal: 61835,
-    shipping: 1245,
-    total: 63080,
-    shippingAddress: {
-      street: "456 Oak Ave",
-      city: "Los Angeles",
-      state: "CA",
-      zip: "90001",
-      country: "USA",
-    },
-  },
-  {
-    id: "ORD-2024-003",
-    customerId: "CUST-003",
-    customerName: "Sophia Martinez",
-    customerEmail: "sophia.m@example.com",
-    date: "2024-01-20",
-    status: "pending",
-    paymentStatus: "pending",
-    paymentMethod: "Credit Card",
-    items: [
-      {
-        productId: "4",
-        productName: "Silk Button-Down Shirt",
-        size: "S",
-        quantity: 1,
-        price: 26975,
-      },
-    ],
-    subtotal: 26975,
-    shipping: 1245,
-    total: 28220,
-    shippingAddress: {
-      street: "789 Pine Rd",
-      city: "Chicago",
-      state: "IL",
-      zip: "60601",
-      country: "USA",
-    },
-  },
-]
+export const orders: Order[] = []
 
-export let customCategories: string[] = [
-  "Spring Collection",
-  "Summer Collection",
-  "Fall Collection",
-  "Winter Collection",
-]
+export let customCategories: string[] = []
 
 export function addCustomCategory(category: string) {
   if (!customCategories.includes(category)) {
