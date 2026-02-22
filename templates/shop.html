@@ -3,30 +3,31 @@
 {% block title %}Shop - U.S ATELIER{% endblock %}
 
 {% block content %}
-    <div class="products-section">
-        <div class="products-header">
-            <h2>Shop</h2>
-            <p>Discover our complete collection</p>
-        </div>
-
-        <div style="margin-bottom: 2rem;">
-            <label style="margin-right: 1rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">
-                Filter by category:
-            </label>
-            <select id="category-filter" style="padding: 0.5rem; background-color: var(--hover-dark); color: var(--primary-light); border: 1px solid var(--border-color);">
-                <option value="">All Categories</option>
-                <option value="Knitwear">Knitwear</option>
-                <option value="Trousers">Trousers</option>
-                <option value="Shirts">Shirts</option>
-                <option value="Basics">Basics</option>
-                <option value="Accessories">Accessories</option>
-            </select>
-        </div>
-
-        <div class="products-grid" id="products-grid">
-            <!-- Products loaded by JavaScript -->
-        </div>
+<div class="products-section">
+    <div class="products-header">
+        <h2>Shop</h2>
+        <p>Discover our complete collection</p>
     </div>
+
+    <div style="margin-bottom: 2rem;">
+        <label style="margin-right: 1rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">
+            Filter by category:
+        </label>,
+        <select id="category-filter"
+            style="padding: 0.5rem; background-color: var(--hover-dark); color: var(--primary-light); border: 1px solid var(--border-color);">
+            <option value="">All Categories</option>
+            <option value="Knitwear">Knitwear</option>
+            <option value="Trousers">Trousers</option>
+            <option value="Shirts">Shirts</option>
+            <option value="Basics">Basics</option>
+            <option value="Accessories">Accessories</option>
+        </select>
+    </div>
+
+    <div class="products-grid" id="products-grid">
+        <!-- Products loaded by JavaScript -->
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}

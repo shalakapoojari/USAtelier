@@ -4,14 +4,14 @@ import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import gsap from "gsap"
-import { Heart, ShoppingBag, User, LogOut, Package, ChevronDown } from "lucide-react"
+import { Heart, ShoppingBag, User, LogOut, Package, ChevronDown, LayoutDashboard } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useCart } from "@/lib/cart-context"
 import { useWishlist } from "@/lib/wishlist-context"
 
 export function SiteHeader() {
   const navRef = useRef<HTMLDivElement | null>(null)
-  const { user, logout } = useAuth()
+  const { user, logout, isAdmin } = useAuth()
   // Read unseen counts directly from contexts — they live in providers
   // (mounted at layout level) so they never reset on navigation
   const { unseenCount: cartUnseen, clearUnseen: clearCartUnseen } = useCart()
@@ -144,6 +144,16 @@ export function SiteHeader() {
                   </p>
                 </div>
                 <div className="py-1">
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-amber-400 hover:text-amber-300 hover:bg-amber-400/5 transition-colors border-b border-white/5"
+                    >
+                      <LayoutDashboard size={13} />
+                      Admin Panel
+                    </Link>
+                  )}
                   <Link
                     href="/account"
                     onClick={() => setProfileOpen(false)}

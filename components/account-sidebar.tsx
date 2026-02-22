@@ -3,7 +3,7 @@
 import type React from "react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
-import { User, Package, Heart, Settings, LogOut, ChevronRight } from "lucide-react"
+import { User, Package, Heart, Settings, LogOut, ChevronRight, LayoutDashboard } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
 type SidebarProps = {
@@ -18,7 +18,7 @@ const navItems = [
 ]
 
 export function AccountSidebar({ children }: SidebarProps) {
-    const { user, logout } = useAuth()
+    const { user, logout, isAdmin } = useAuth()
     const router = useRouter()
     const pathname = usePathname()
 
@@ -46,6 +46,17 @@ export function AccountSidebar({ children }: SidebarProps) {
 
                 {/* Nav links */}
                 <nav className="flex-1 py-4">
+                    {/* Admin Panel shortcut — only for admins */}
+                    {isAdmin && (
+                        <Link
+                            href="/admin"
+                            className="flex items-center gap-3 px-6 py-3.5 text-xs uppercase tracking-widest text-amber-400 hover:text-amber-300 hover:bg-amber-400/5 transition-all border-b border-white/5 mb-1"
+                        >
+                            <LayoutDashboard size={14} strokeWidth={1.5} />
+                            <span>Admin Panel</span>
+                            <ChevronRight size={12} className="ml-auto opacity-50" />
+                        </Link>
+                    )}
                     {navItems.map((item) => {
                         const active = isActive(item.href, item.exact)
                         return (

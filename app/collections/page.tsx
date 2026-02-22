@@ -13,11 +13,7 @@ export default function CollectionsPage() {
       <SiteHeader />
 
       {/* ================= INTRO ================= */}
-      <section className="pt-48 pb-24 px-6 text-center">
-        <p className="uppercase tracking-[0.5em] text-xs text-gray-400 mb-6">
-          Maison U.S ATELIER
-        </p>
-
+      <section className="pt-24 pb-16 px-6 text-center">
         <h1 className="font-serif text-6xl md:text-7xl font-light mb-6">
           Collections
         </h1>
