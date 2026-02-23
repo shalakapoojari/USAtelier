@@ -257,7 +257,7 @@ export function SiteHeader() {
             href="/shop"
             className="text-white hover:text-gray-400 transition-colors"
           >
-            Shop All
+            View All
           </Link>
 
           <div className="h-4 w-px bg-white/10 hidden md:block" />

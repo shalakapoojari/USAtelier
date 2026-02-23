@@ -153,7 +153,7 @@ export default function ShopPage() {
         </div>
       </div>
 
-      {/* Category - Only show on Shop All (no specific category in URL) */}
+      {/* Category - Only show on View All (no specific category in URL) */}
       {!urlCategory && (
         <div>
           <h3 className="text-white mb-6">Category</h3>
@@ -263,7 +263,7 @@ export default function ShopPage() {
       {!loading && filteredProducts.length > 0 && (
         <section className="pt-32 pb-16 text-center px-6">
           <h1 className="text-5xl md:text-6xl font-serif font-light mb-2 capitalize leading-none">
-            {urlSearch || urlCategory || "Shop All"}
+            {urlSearch || urlCategory || "View All"}
           </h1>
           {urlCategory && (
             <p className="text-gray-500 text-[10px] tracking-[0.3em] uppercase">
@@ -327,7 +327,7 @@ export default function ShopPage() {
                 </div>
 
                 {/* Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-10">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10">
                   {filteredProducts.map((product) => (
                     <ProductCard key={product.id} product={product} />
                   ))}
