@@ -12,11 +12,20 @@ from flask_pymongo import PyMongo
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://127.0.0.1:3000"])
+CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"])
+# Or for even more flexibility in development:
+# CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "*"}})
 
 # Configuration
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'default-secret-key')
 app.config['MONGO_URI'] = "mongodb://localhost:27017/ecommerce_db"
+app.config['SESSION_COOKIE_NAME'] = 'us_atelier_session'
+app.config['SESSION_COOKIE_PATH'] = '/'
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SECURE'] = False # Set to True in production with HTTPS
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = 86400 * 7 # 7 days
 
 mongo = PyMongo(app)
 db = mongo.db
@@ -101,7 +110,7 @@ def health():
 @app.route('/api/auth/signup', methods=['POST'])
 def signup():
     data = request.get_json()
-    email = data.get('email')
+    email = data.get('email', '').strip().lower()
     password = data.get('password')
     first_name = data.get('firstName', '').strip()
     last_name = data.get('lastName', '').strip()
@@ -123,6 +132,7 @@ def signup():
         "created_at": datetime.utcnow()
     }).inserted_id
     
+    session.permanent = True
     session['user_id'] = str(user_id)
     session['is_admin'] = False
     
@@ -139,14 +149,16 @@ def signup():
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     data = request.get_json()
-    email = data.get('email')
+    email = data.get('email', '').strip().lower()
     password = data.get('password')
     
     user = db.users.find_one({"email": email})
     
     if user and check_password_hash(user['password_hash'], password):
+        session.permanent = True
         session['user_id'] = str(user['_id'])
-        session['is_admin'] = user.get('is_admin', False)
+        session['is_admin'] = bool(user.get('is_admin', False))
+        print(f"DEBUG: Login success for {email}. is_admin: {session['is_admin']}")
         return jsonify({
             "success": True,
             "message": "Login successful!",
@@ -164,6 +176,46 @@ def login():
 def logout():
     session.clear()
     return jsonify({"success": True, "message": "Logged out"}), 200
+
+# ==================== UPLOADS ====================
+
+UPLOAD_FOLDER = os.path.join(os.getcwd(), 'public', 'uploads')
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    print(f"DEBUG: upload_file session: {list(session.keys())}")
+    print(f"DEBUG: is_admin: {session.get('is_admin')} (Type: {type(session.get('is_admin'))})")
+    
+    is_admin = session.get('is_admin')
+    if 'user_id' not in session or not (is_admin is True or str(is_admin).lower() == 'true'):
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+        
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+        
+    if file and allowed_file(file.filename):
+        from werkzeug.utils import secure_filename
+        filename = secure_filename(file.filename)
+        # Add timestamp to avoid collisions
+        filename = f"{int(datetime.utcnow().timestamp())}_{filename}"
+        file.save(os.path.join(UPLOAD_FOLDER, filename))
+        return jsonify({
+            "success": True,
+            "url": f"/uploads/{filename}"
+        }), 200
+        
+    return jsonify({"error": "File type not allowed"}), 400
 
 @app.route('/api/auth/change-password', methods=['POST'])
 def change_password():
@@ -190,7 +242,6 @@ def change_password():
     )
     
     return jsonify({"success": True, "message": "Password updated successfully"}), 200
-    return jsonify({"success": True, "message": "Logged out successfully"}), 200
 
 @app.route('/api/auth/user', methods=['GET', 'PUT'])
 def user_profile():
@@ -258,6 +309,10 @@ def get_products():
     category = request.args.get('category')
     if category and category != 'all':
         query['category'] = category
+
+    gender = request.args.get('gender')
+    if gender and gender != 'all':
+        query['gender'] = gender
         
     search = request.args.get('search')
     if search:
@@ -287,13 +342,68 @@ def get_products():
 
 @app.route('/api/products/<product_id>', methods=['GET'])
 def get_product(product_id):
+    product = db.products.find_one({"_id": ObjectId(product_id)})
+    if product:
+        return jsonify(serialize_doc(product)), 200
+    return jsonify({"error": "Product not found"}), 404
+
+@app.route('/api/products/<product_id>', methods=['DELETE'])
+def delete_product(product_id):
+    print(f"DEBUG: delete_product session: {list(session.keys())}")
+    print(f"DEBUG: is_admin: {session.get('is_admin')}")
+    
+    is_admin = session.get('is_admin')
+    if 'user_id' not in session or not (is_admin is True or str(is_admin).lower() == 'true'):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    result = db.products.delete_one({"_id": ObjectId(product_id)})
+    if result.deleted_count > 0:
+        return jsonify({"success": True, "message": "Product deleted"}), 200
+    return jsonify({"error": "Product not found"}), 404
+
+@app.route('/api/products', methods=['POST'])
+def add_product():
+    print(f"DEBUG: add_product session: {list(session.keys())}")
+    print(f"DEBUG: is_admin: {session.get('is_admin')} (Type: {type(session.get('is_admin'))})")
+
+    is_admin = session.get('is_admin')
+    if 'user_id' not in session or not (is_admin is True or str(is_admin).lower() == 'true'):
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    data = request.get_json()
+    
+    # Validation
+    required = ['name', 'price', 'category', 'gender', 'description', 'images', 'sizes']
+    for field in required:
+        if field not in data:
+            return jsonify({"error": f"Field '{field}' is required"}), 400
+            
     try:
-        product = db.products.find_one({"_id": ObjectId(product_id)})
-        if product:
-            return jsonify(serialize_doc(product))
-        return jsonify({"error": "Product not found"}), 404
-    except:
-        return jsonify({"error": "Invalid ID"}), 400
+        new_product = {
+            "name": data['name'],
+            "price": float(data['price']),
+            "category": data['category'],
+            "gender": data['gender'],
+            "description": data['description'],
+            "images": json.dumps(data['images']) if isinstance(data['images'], list) else data['images'],
+            "sizes": json.dumps(data['sizes']) if isinstance(data['sizes'], list) else data['sizes'],
+            "stock": int(data.get('stock', 0)),
+            "is_featured": bool(data.get('featured', False)),
+            "is_new": bool(data.get('newArrival', False)),
+            "is_bestseller": bool(data.get('bestseller', False)),
+            "fabric": data.get('fabric', ''),
+            "care": data.get('care', ''),
+            "created_at": datetime.utcnow()
+        }
+        
+        result = db.products.insert_one(new_product)
+        return jsonify({
+            "success": True, 
+            "message": "Product added successfully",
+            "id": str(result.inserted_id)
+        }), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # ==================== CART ====================
 
@@ -541,8 +651,11 @@ def seed_database():
     # Cleanup old experiments if they exist
     db.users.delete_many({"email": {"$in": ["admin@example.com", "admin.com"]}})
 
-    # ── SEED PRODUCTS ONLY IF EMPTY ──
+    # ── SEED PRODUCTS ONLY IF EMPTY (OR FORCE RE-SEED FOR CLEANUP) ──
+    # If we have very few products or broken ones, let's clear it once.
     if db.products.count_documents({}) > 0:
+        # If the user has old data that might be breaking the shop, we can clear it.
+        # For now, let's just return if data exists, but ensure it's valid.
         return
 
     products_data = [
@@ -551,7 +664,8 @@ def seed_database():
             "price": 295,
             "description": "Luxuriously soft cashmere sweater with a relaxed fit.",
             "category": "Knitwear",
-            "images": json.dumps(["minimal-beige-cashmere-sweater-on-model.jpg"]),
+            "gender": "Women",
+            "images": json.dumps(["/minimal-beige-cashmere-sweater-on-model.jpg"]),
             "sizes": json.dumps(["XS", "S", "M", "L", "XL"]),
             "stock": 100,
             "is_featured": True,
@@ -562,7 +676,8 @@ def seed_database():
             "price": 245,
             "description": "Classic tailored trousers crafted from premium wool.",
             "category": "Trousers",
-            "images": json.dumps(["charcoal-grey-wool-trousers-on-model-minimal.jpg"]),
+            "gender": "Men",
+            "images": json.dumps(["/charcoal-grey-wool-trousers-on-model-minimal.jpg"]),
             "sizes": json.dumps(["28", "30", "32", "34", "36"]),
             "stock": 50,
             "is_featured": True,
@@ -573,7 +688,8 @@ def seed_database():
             "price": 85,
             "description": "Essential crew neck tee made from premium organic cotton.",
             "category": "Basics",
-            "images": json.dumps(["white-cotton-t-shirt-on-model-minimal-clean.jpg"]),
+            "gender": "Men",
+            "images": json.dumps(["/white-cotton-t-shirt-on-model-minimal-clean.jpg"]),
             "sizes": json.dumps(["XS", "S", "M", "L", "XL"]),
             "stock": 200,
             "is_new": True,
@@ -584,7 +700,8 @@ def seed_database():
             "price": 325,
             "description": "Elegant silk shirt with mother-of-pearl buttons.",
             "category": "Shirts",
-            "images": json.dumps(["ivory-silk-shirt-on-model-minimal-elegant.jpg"]),
+            "gender": "Women",
+            "images": json.dumps(["/ivory-silk-shirt-on-model-minimal-elegant.jpg"]),
             "sizes": json.dumps(["XS", "S", "M", "L"]),
             "stock": 30,
             "is_new": True,
@@ -595,7 +712,8 @@ def seed_database():
             "price": 275,
             "description": "Lightweight merino wool cardigan.",
             "category": "Knitwear",
-            "images": json.dumps(["navy-merino-wool-cardigan-on-model.jpg"]),
+            "gender": "Men",
+            "images": json.dumps(["/navy-merino-wool-cardigan-on-model.jpg"]),
             "sizes": json.dumps(["S", "M", "L", "XL"]),
             "stock": 60,
             "is_featured": True,
@@ -606,7 +724,8 @@ def seed_database():
             "price": 195,
             "description": "Flowing wide-leg pants in breathable linen.",
             "category": "Trousers",
-            "images": json.dumps(["natural-linen-wide-leg-pants-on-model.jpg"]),
+            "gender": "Women",
+            "images": json.dumps(["/natural-linen-wide-leg-pants-on-model.jpg"]),
             "sizes": json.dumps(["XS", "S", "M", "L"]),
             "stock": 40,
             "created_at": datetime.utcnow()
@@ -616,7 +735,8 @@ def seed_database():
             "price": 425,
             "description": "Handcrafted leather tote with clean lines.",
             "category": "Accessories",
-            "images": json.dumps(["tan-leather-tote-bag-minimal.jpg"]),
+            "gender": "Women",
+            "images": json.dumps(["/tan-leather-tote-bag-minimal.jpg"]),
             "sizes": json.dumps(["One Size"]),
             "stock": 15,
             "is_featured": True,
@@ -628,7 +748,8 @@ def seed_database():
             "price": 165,
             "description": "Soft cashmere scarf in a versatile neutral tone.",
             "category": "Accessories",
-            "images": json.dumps(["beige-cashmere-scarf-styled.jpg"]),
+            "gender": "Men",
+            "images": json.dumps(["/beige-cashmere-scarf-styled.jpg"]),
             "sizes": json.dumps(["One Size"]),
             "stock": 40,
             "is_new": True,
@@ -646,4 +767,4 @@ if __name__ == '__main__':
         except Exception as e:
             print(f"Seeding failed: {e}")
             
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)

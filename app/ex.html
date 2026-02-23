@@ -1,18 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>U.S ATELIER | The New Era</title>
-    
+
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
-    
+
     <script src="https://cdn.jsdelivr.net/gh/studio-freight/lenis@1.0.29/bundled/lenis.min.js"></script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500&family=Cinzel:wght@400;600;800&family=Inter:wght@300;400&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500&family=Cinzel:wght@400;600;800&family=Inter:wght@300;400&display=swap"
+        rel="stylesheet">
 
     <style>
         :root {
@@ -31,8 +34,13 @@
         }
 
         /* Typography Override */
-        .serif { font-family: 'Cinzel', serif; }
-        .sans { font-family: 'Space Grotesk', sans-serif; }
+        .serif {
+            font-family: 'Cinzel', serif;
+        }
+
+        .sans {
+            font-family: 'Space Grotesk', sans-serif;
+        }
 
         /* Film Grain Overlay */
         .grain-overlay {
@@ -67,19 +75,25 @@
             display: inline-block;
             position: relative;
         }
+
         .magnetic-area {
             position: absolute;
-            top: -20px; left: -20px; right: -20px; bottom: -20px;
+            top: -20px;
+            left: -20px;
+            right: -20px;
+            bottom: -20px;
             z-index: 10;
         }
 
         /* Horizontal Scroll Section */
         .horizontal-section {
-            width: 400%; /* 4 panels */
+            width: 400%;
+            /* 4 panels */
             height: 100vh;
             display: flex;
             flex-wrap: nowrap;
         }
+
         .panel {
             width: 100vw;
             height: 100%;
@@ -87,13 +101,14 @@
             justify-content: center;
             align-items: center;
             position: relative;
-            border-right: 1px solid rgba(255,255,255,0.1);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         /* Text Reveal Masks */
         .line-mask {
             overflow: hidden;
         }
+
         .line-mask span {
             display: block;
             transform: translateY(100%);
@@ -104,11 +119,13 @@
             opacity: 0.2;
             transition: opacity 0.3s;
         }
+
         .highlight-text span.active {
             opacity: 1;
         }
     </style>
 </head>
+
 <body class="antialiased">
 
     <div class="grain-overlay"></div>
@@ -127,17 +144,21 @@
         <div class="magnetic-wrap">
             <a href="#" class="text-2xl serif font-bold tracking-widest magnetic-target">U.S ATELIER.</a>
         </div>
-        
+
         <div class="hidden md:flex gap-12 text-xs uppercase tracking-[0.25em] font-medium sans">
-            <div class="magnetic-wrap"><a href="#" class="block magnetic-target hover:text-gray-400 transition-colors">Collections</a></div>
-            <div class="magnetic-wrap"><a href="#" class="block magnetic-target hover:text-gray-400 transition-colors">Campaign</a></div>
-            <div class="magnetic-wrap"><a href="#" class="block magnetic-target hover:text-gray-400 transition-colors">Maison</a></div>
+            <div class="magnetic-wrap"><a href="#"
+                    class="block magnetic-target hover:text-gray-400 transition-colors">Collections</a></div>
+            <div class="magnetic-wrap"><a href="#"
+                    class="block magnetic-target hover:text-gray-400 transition-colors">Campaign</a></div>
+            <div class="magnetic-wrap"><a href="#"
+                    class="block magnetic-target hover:text-gray-400 transition-colors">Maison</a></div>
         </div>
 
         <div class="flex items-center gap-6">
             <span class="text-xs sans tracking-widest uppercase hidden md:block">Cart (0)</span>
             <div class="magnetic-wrap">
-                <button class="w-10 h-10 border border-white/30 rounded-full flex flex-col justify-center items-center gap-1 magnetic-target group">
+                <button
+                    class="w-10 h-10 border border-white/30 rounded-full flex flex-col justify-center items-center gap-1 magnetic-target group">
                     <span class="w-4 h-[1px] bg-white group-hover:w-6 transition-all"></span>
                     <span class="w-4 h-[1px] bg-white group-hover:w-6 transition-all"></span>
                 </button>
@@ -147,10 +168,10 @@
 
     <header class="relative w-full h-screen overflow-hidden flex items-center justify-center">
         <div class="absolute inset-0 z-0">
-            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=2564&auto=format&fit=crop" 
-                 class="w-full h-full object-cover opacity-60 scale-110 hero-bg" alt="Hero">
+            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=2564&auto=format&fit=crop"
+                class="w-full h-full object-cover opacity-60 scale-110 hero-bg" alt="Hero">
         </div>
-        
+
         <div class="z-10 text-center relative mix-blend-difference">
             <div class="line-mask mb-2">
                 <h2 class="text-sm sans uppercase tracking-[0.5em] text-gray-300">Fall Winter 2025</h2>
@@ -161,10 +182,11 @@
             <div class="line-mask">
                 <h1 class="text-[14vw] leading-[0.8] serif italic text-gray-400 hero-main-text">SHADOWS</h1>
             </div>
-            
+
             <div class="mt-12 opacity-0 hero-cta">
                 <div class="magnetic-wrap">
-                    <button class="px-8 py-4 border border-white/50 rounded-full text-xs uppercase tracking-widest hover:bg-white hover:text-black transition-all duration-500 magnetic-target">
+                    <button
+                        class="px-8 py-4 border border-white/50 rounded-full text-xs uppercase tracking-widest hover:bg-white hover:text-black transition-all duration-500 magnetic-target">
                         View The Lookbook
                     </button>
                 </div>
@@ -172,23 +194,25 @@
         </div>
 
         <div class="absolute bottom-10 left-10 hidden md:block">
-             <p class="text-[10px] uppercase tracking-widest w-32 leading-relaxed opacity-60">
+            <p class="text-[10px] uppercase tracking-widest w-32 leading-relaxed opacity-60">
                 Designed in Paris.<br>Crafted in Milan.<br>Worn in Darkness.
-             </p>
+            </p>
         </div>
     </header>
 
     <section class="min-h-screen flex items-center justify-center px-6 md:px-32 py-24 bg-[#030303]">
         <div class="max-w-4xl text-center">
             <p class="highlight-text text-3xl md:text-5xl serif leading-relaxed text-gray-300">
-                We believe in the quiet power of silence. In a world of noise, U.S ATELIER is the absence of it. We strip away the unnecessary to reveal the essential structure of the human form. This is not just clothing; this is architecture for the soul.
+                We believe in the quiet power of silence. In a world of noise, U.S ATELIER is the absence of it. We
+                strip away the unnecessary to reveal the essential structure of the human form. This is not just
+                clothing; this is architecture for the soul.
             </p>
         </div>
     </section>
 
     <div class="overflow-hidden bg-[#0a0a0a]" id="scroll-container">
         <div class="horizontal-section" id="runway">
-            
+
             <div class="panel bg-[#0a0a0a]">
                 <div class="flex flex-col items-start px-24">
                     <span class="text-9xl serif opacity-10 absolute top-10 left-10">01</span>
@@ -199,13 +223,15 @@
                     <span class="text-xs text-white border-b border-white pb-1">Scroll to Explore →</span>
                 </div>
                 <div class="absolute right-0 top-0 h-full w-1/2 overflow-hidden">
-                    <img src="https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=2576&auto=format&fit=crop" class="w-full h-full object-cover opacity-50 grayscale hover:grayscale-0 transition-all duration-700">
+                    <img src="https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=2576&auto=format&fit=crop"
+                        class="w-full h-full object-cover opacity-50 grayscale hover:grayscale-0 transition-all duration-700">
                 </div>
             </div>
 
             <div class="panel bg-[#050505]">
                 <div class="relative w-[400px] h-[600px] overflow-hidden group">
-                    <img src="https://images.unsplash.com/photo-1485230405346-71acb9518d9c?q=80&w=2694&auto=format&fit=crop" class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110">
+                    <img src="https://images.unsplash.com/photo-1485230405346-71acb9518d9c?q=80&w=2694&auto=format&fit=crop"
+                        class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110">
                     <div class="absolute bottom-6 left-6">
                         <h3 class="text-3xl serif italic">Vantablack Coat</h3>
                         <p class="text-xs uppercase mt-2">$2,400</p>
@@ -215,7 +241,8 @@
 
             <div class="panel bg-[#080808]">
                 <div class="relative w-[400px] h-[600px] overflow-hidden group">
-                    <img src="https://images.unsplash.com/photo-1529139574466-a302c2d56aee?q=80&w=2576&auto=format&fit=crop" class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110">
+                    <img src="https://images.unsplash.com/photo-1529139574466-a302c2d56aee?q=80&w=2576&auto=format&fit=crop"
+                        class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110">
                     <div class="absolute bottom-6 left-6">
                         <h3 class="text-3xl serif italic">Marble Silk</h3>
                         <p class="text-xs uppercase mt-2">$1,850</p>
@@ -227,7 +254,8 @@
                 <div class="text-center">
                     <h2 class="text-8xl serif mb-6">FIN</h2>
                     <div class="magnetic-wrap">
-                        <a href="#" class="inline-block px-12 py-5 border border-white/20 rounded-full uppercase text-sm tracking-widest hover:bg-white hover:text-black transition-all magnetic-target">
+                        <a href="#"
+                            class="inline-block px-12 py-5 border border-white/20 rounded-full uppercase text-sm tracking-widest hover:bg-white hover:text-black transition-all magnetic-target">
                             Shop The Collection
                         </a>
                     </div>
@@ -242,12 +270,15 @@
             <div class="w-full md:w-1/3 pt-12">
                 <div class="sticky top-32">
                     <span class="text-gold text-xs uppercase tracking-widest mb-4 block">The Details</span>
-                    <h3 class="text-4xl serif mb-6">Obsession with <br> <span class="italic text-gray-500">Imperfection</span>.</h3>
+                    <h3 class="text-4xl serif mb-6">Obsession with <br> <span
+                            class="italic text-gray-500">Imperfection</span>.</h3>
                     <p class="text-sm text-gray-400 leading-7 mb-8">
-                        Every stitch is calculated. Every tear is intentional. We source our wool from the highlands of Peru and our silk from the forgotten mills of Lyon.
+                        Every stitch is calculated. Every tear is intentional. We source our wool from the highlands of
+                        Peru and our silk from the forgotten mills of Lyon.
                     </p>
                     <ul class="space-y-4 text-xs uppercase tracking-widest text-gray-500 border-t border-white/10 pt-8">
-                        <li class="flex justify-between text-white"><span>Material</span> <span>100% Cashmere</span></li>
+                        <li class="flex justify-between text-white"><span>Material</span> <span>100% Cashmere</span>
+                        </li>
                         <li class="flex justify-between"><span>Origin</span> <span>Italy</span></li>
                         <li class="flex justify-between"><span>Year</span> <span>2025</span></li>
                     </ul>
@@ -256,25 +287,32 @@
 
             <div class="w-full md:w-2/3 grid grid-cols-2 gap-4">
                 <div class="space-y-4 mt-12">
-                    <img src="https://images.unsplash.com/photo-1445205170230-053b83016050?q=80&w=2671&auto=format&fit=crop" class="w-full aspect-[3/4] object-cover parallax-img-slow">
-                    <img src="https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=2670&auto=format&fit=crop" class="w-full aspect-[3/4] object-cover parallax-img-slow">
+                    <img src="https://images.unsplash.com/photo-1445205170230-053b83016050?q=80&w=2671&auto=format&fit=crop"
+                        class="w-full aspect-[3/4] object-cover parallax-img-slow">
+                    <img src="https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=2670&auto=format&fit=crop"
+                        class="w-full aspect-[3/4] object-cover parallax-img-slow">
                 </div>
                 <div class="space-y-4">
-                    <img src="https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=2670&auto=format&fit=crop" class="w-full aspect-[3/4] object-cover parallax-img-fast">
-                    <img src="https://images.unsplash.com/photo-1500917293891-ef795e70e1f6?q=80&w=2670&auto=format&fit=crop" class="w-full aspect-[3/4] object-cover parallax-img-fast">
+                    <img src="https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=2670&auto=format&fit=crop"
+                        class="w-full aspect-[3/4] object-cover parallax-img-fast">
+                    <img src="https://images.unsplash.com/photo-1500917293891-ef795e70e1f6?q=80&w=2670&auto=format&fit=crop"
+                        class="w-full aspect-[3/4] object-cover parallax-img-fast">
                 </div>
             </div>
         </div>
     </section>
 
     <footer class="bg-[#050505] pt-32 pb-12 px-6 md:px-12 border-t border-white/5 relative overflow-hidden">
-        <h1 class="text-[20vw] font-bold text-[#0a0a0a] absolute bottom-0 left-1/2 transform -translate-x-1/2 pointer-events-none serif leading-none">U.S ATELIER</h1>
+        <h1
+            class="text-[20vw] font-bold text-[#0a0a0a] absolute bottom-0 left-1/2 transform -translate-x-1/2 pointer-events-none serif leading-none">
+            U.S ATELIER</h1>
 
         <div class="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-12 mb-24">
             <div>
-                <h4 class="text-3xl serif mb-8">Join the Cult.</h4>
+                <h4 class="text-3xl serif mb-8">Stay Updated</h4>
                 <div class="flex border-b border-white/20 pb-4 max-w-md">
-                    <input type="email" placeholder="ENTER EMAIL" class="bg-transparent w-full outline-none text-white placeholder-gray-600 uppercase tracking-widest text-sm">
+                    <input type="email" placeholder="ENTER EMAIL"
+                        class="bg-transparent w-full outline-none text-white placeholder-gray-600 uppercase tracking-widest text-sm">
                     <button class="text-xs uppercase hover:text-gray-400">Submit</button>
                 </div>
             </div>
@@ -298,7 +336,7 @@
                 </ul>
             </div>
         </div>
-        
+
         <div class="relative z-10 flex justify-between text-[10px] uppercase tracking-widest text-gray-700">
             <span>&copy; 2025 U.S ATELIER Maison</span>
             <span>Privacy & Cookies</span>
@@ -330,7 +368,7 @@
         // Preloader Logic
         const loadTL = gsap.timeline();
         let progress = { val: 0 };
-        
+
         loadTL.to(progress, {
             val: 100,
             duration: 2,
@@ -339,25 +377,25 @@
                 document.querySelector('.loading-bar').style.width = progress.val + "%";
             }
         })
-        .to('.preloader', {
-            yPercent: -100,
-            duration: 1.2,
-            ease: "power3.inOut"
-        })
-        .from('.hero-main-text', {
-            y: 150,
-            duration: 1.5,
-            stagger: 0.2,
-            ease: "power4.out"
-        }, "-=0.8")
-        .to('.hero-cta', {
-            opacity: 1,
-            duration: 1
-        }, "-=1");
+            .to('.preloader', {
+                yPercent: -100,
+                duration: 1.2,
+                ease: "power3.inOut"
+            })
+            .from('.hero-main-text', {
+                y: 150,
+                duration: 1.5,
+                stagger: 0.2,
+                ease: "power4.out"
+            }, "-=0.8")
+            .to('.hero-cta', {
+                opacity: 1,
+                duration: 1
+            }, "-=1");
 
         // 3. HORIZONTAL SCROLL
         let sections = gsap.utils.toArray(".panel");
-        
+
         gsap.to(sections, {
             xPercent: -100 * (sections.length - 1),
             ease: "none",
@@ -374,7 +412,7 @@
         const highlightText = document.querySelector('.highlight-text');
         const textContent = highlightText.innerText;
         highlightText.innerHTML = '';
-        
+
         textContent.split(' ').forEach(word => {
             const span = document.createElement('span');
             span.innerText = word + ' ';
@@ -415,15 +453,15 @@
 
         // 6. MAGNETIC BUTTONS
         const magneticWraps = document.querySelectorAll('.magnetic-wrap');
-        
+
         magneticWraps.forEach(wrap => {
             const target = wrap.querySelector('.magnetic-target');
-            
+
             wrap.addEventListener('mousemove', (e) => {
                 const rect = wrap.getBoundingClientRect();
                 const x = e.clientX - rect.left - rect.width / 2;
                 const y = e.clientY - rect.top - rect.height / 2;
-                
+
                 gsap.to(target, {
                     x: x * 0.3,
                     y: y * 0.3,
@@ -456,4 +494,5 @@
 
     </script>
 </body>
+
 </html>

@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { ProductCard } from "@/components/product-card"
-import { products } from "@/lib/data"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -14,27 +14,77 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { Checkbox } from "@/components/ui/checkbox"
-import { SlidersHorizontal } from "lucide-react"
+import { SlidersHorizontal, Loader2 } from "lucide-react"
+
+const API_BASE = "http://127.0.0.1:5000"
 
 export default function ShopPage() {
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [selectedSizes, setSelectedSizes] = useState<string[]>([])
 
-  const categories = useMemo(() => Array.from(new Set(products.map((p) => p.category))), [])
-  const allSizes = useMemo(() => Array.from(new Set(products.flatMap((p) => p.sizes))), [])
+  const searchParams = useSearchParams()
+  const urlCategory = searchParams.get("category")
+
+  // Sync with URL category
+  useEffect(() => {
+    if (urlCategory) {
+      setSelectedCategories([urlCategory])
+    } else {
+      setSelectedCategories([])
+    }
+  }, [urlCategory])
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/products`, {
+          credentials: "include",
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setProducts(data)
+        }
+      } catch (err) {
+        console.error("Failed to fetch products:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchProducts()
+  }, [])
+
+  const categories = useMemo(() => Array.from(new Set(products.map((p) => p.category))), [products])
+  const allSizes = useMemo(() => {
+    return Array.from(new Set(products.flatMap((p) => {
+      if (Array.isArray(p.sizes)) return p.sizes
+      try {
+        const parsed = JSON.parse(p.sizes)
+        return Array.isArray(parsed) ? parsed : []
+      } catch {
+        return []
+      }
+    })))
+  }, [products])
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
       const categoryMatch =
         selectedCategories.length === 0 ||
         selectedCategories.includes(product.category)
+
+      const productSizes = Array.isArray(product.sizes) ? product.sizes : (() => {
+        try { return JSON.parse(product.sizes) } catch { return [] }
+      })()
+
       const sizeMatch =
         selectedSizes.length === 0 ||
-        product.sizes.some((size) => selectedSizes.includes(size))
+        productSizes.some((size: string) => selectedSizes.includes(size))
 
       return categoryMatch && sizeMatch
     })
-  }, [selectedCategories, selectedSizes])
+  }, [products, selectedCategories, selectedSizes])
 
   /* ================= FILTER UI ================= */
   const FilterContent = () => (
@@ -101,10 +151,12 @@ export default function ShopPage() {
 
   return (
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen">
-      <SiteHeader />
+      <Suspense fallback={<div>Loading...</div>}>
+        <SiteHeader />
+      </Suspense>
 
       {/* ================= PAGE HEADER ================= */}
-      <section className="pt-24 pb-16 text-center px-6">
+      <section className="pt-40 pb-16 text-center px-6">
         <p className="uppercase tracking-[0.5em] text-xs text-gray-400 mb-6">
           The Collection
         </p>
@@ -157,7 +209,12 @@ export default function ShopPage() {
             </div>
 
             {/* Grid */}
-            {filteredProducts.length > 0 ? (
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-32 gap-4">
+                <Loader2 className="animate-spin text-gray-400" />
+                <p className="text-xs uppercase tracking-[0.3em] text-gray-500">Discovering pieces...</p>
+              </div>
+            ) : filteredProducts.length > 0 ? (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-10">
                 {filteredProducts.map((product) => (
                   <ProductCard key={product.id} product={product} />

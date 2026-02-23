@@ -2,6 +2,8 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect, useRef } from "react"
+import { useAuth } from "@/lib/auth-context"
+import { useRouter } from "next/navigation"
 
 type WishlistItem = {
     id: string
@@ -29,6 +31,8 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     const [items, setItems] = useState<WishlistItem[]>([])
     const [isHydrated, setIsHydrated] = useState(false)
     const [unseenCount, setUnseenCount] = useState(0)
+    const { isAuthenticated } = useAuth()
+    const router = useRouter()
 
     // Keep a ref to the latest items so toggleItem can check synchronously
     // without needing to call setState inside another setState updater
@@ -53,6 +57,10 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     }, [items, isHydrated])
 
     const addItem = (item: WishlistItem) => {
+        if (!isAuthenticated) {
+            router.push("/signup")
+            return
+        }
         setItems((prev) => {
             if (prev.find((i) => i.id === item.id)) return prev
             return [...prev, item]
@@ -64,6 +72,10 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     }
 
     const toggleItem = (item: WishlistItem) => {
+        if (!isAuthenticated) {
+            router.push("/signup")
+            return
+        }
         // Check BEFORE the state update using the ref (always current)
         const alreadySaved = latestItems.current.some((i) => i.id === item.id)
         if (!alreadySaved) {

@@ -3,45 +3,66 @@
 {% block title %}Admin - U.S ATELIER{% endblock %}
 
 {% block content %}
-    <div class="cart-container" style="max-width: 1200px;">
-        <h1 style="font-size: 2rem; margin-bottom: 2rem; font-weight: 400;">Admin Dashboard</h1>
+<div class="cart-container" style="max-width: 1200px;">
+    <h1 style="font-size: 2rem; margin-bottom: 2rem; font-weight: 400;">Admin Dashboard</h1>
 
-        <div id="admin-access-denied" style="text-align: center; padding: 2rem; display: none;">
-            <p>You don't have permission to access the admin panel</p>
-            <a href="/" class="btn">Go Home</a>
+    <div id="admin-access-denied" style="text-align: center; padding: 2rem; display: none;">
+        <p>You don't have permission to access the admin panel</p>
+        <a href="/" class="btn">Go Home</a>
+    </div>
+
+    <div id="admin-content" style="display: none;">
+        <div id="admin-message" style="display: none; margin-bottom: 1.5rem;"></div>
+
+        <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+            <button onclick="showTab('orders')" class="btn" id="orders-tab">Orders</button>
+            <button onclick="showTab('products')" class="btn" id="products-tab">Products</button>
         </div>
 
-        <div id="admin-content" style="display: none;">
-            <div id="admin-message" style="display: none; margin-bottom: 1.5rem;"></div>
-            
-            <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
-                <button onclick="showTab('orders')" class="btn" id="orders-tab">Orders</button>
-                <button onclick="showTab('products')" class="btn" id="products-tab">Products</button>
+        <div id="orders-section" class="admin-section">
+            <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Orders</h2>
+            <div id="orders-table">
+                <!-- Orders loaded by JavaScript -->
             </div>
+        </div>
 
-            <div id="orders-section" class="admin-section">
-                <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Orders</h2>
-                <div id="orders-table">
-                    <!-- Orders loaded by JavaScript -->
-                </div>
-            </div>
+        <div id="products-section" class="admin-section" style="display: none;">
+            <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Products</h2>
+            <button onclick="toggleProductForm()" class="btn" style="margin-bottom: 1rem;">Add New Product</button>
 
-            <div id="products-section" class="admin-section" style="display: none;">
-                <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Products</h2>
-                <button onclick="toggleProductForm()" class="btn" style="margin-bottom: 1rem;">Add New Product</button>
+            <div id="product-form"
+                style="display: none; border: 1px solid var(--border-color); padding: 1.5rem; margin-bottom: 2rem; background: var(--background-secondary);">
+                <h3 style="margin-bottom: 1.5rem;">Add/Edit Product</h3>
+                <form id="product-form-element" onsubmit="handleProductSubmit(event)">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label for="product-name">Product Name</label>
+                            <input type="text" id="product-name" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="product-gender">Gender</label>
+                            <select id="product-gender" name="gender" required
+                                style="width: 100%; padding: 0.75rem; background: var(--hover-dark); color: var(--primary-light); border: 1px solid var(--border-color);">
+                                <option value="Men">Men</option>
+                                <option value="Women">Women</option>
+                                <option value="Unisex">Unisex</option>
+                            </select>
+                        </div>
+                    </div>
 
-                <div id="product-form" style="display: none; border: 1px solid var(--border-color); padding: 1.5rem; margin-bottom: 2rem; background: var(--background-secondary);">
-                    <h3 style="margin-bottom: 1.5rem;">Add/Edit Product</h3>
-                    <form id="product-form-element" onsubmit="handleProductSubmit(event)">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                            <div class="form-group">
-                                <label for="product-name">Product Name</label>
-                                <input type="text" id="product-name" name="name" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="product-category">Category</label>
-                                <input type="text" id="product-category" name="category" required>
-                            </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label for="product-category">Category</label>
+                            <select id="product-category" name="category" required
+                                style="width: 100%; padding: 0.75rem; background: var(--hover-dark); color: var(--primary-light); border: 1px solid var(--border-color);">
+                                <option value="T-shirt">T-shirt</option>
+                                <option value="Trouser">Trouser</option>
+                                <option value="Jeans">Jeans</option>
+                                <option value="Shirt">Shirt</option>
+                                <option value="Knitwear">Knitwear</option>
+                                <option value="Basics">Basics</option>
+                                <option value="Accessories">Accessories</option>
+                            </select>
                         </div>
 
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
@@ -65,7 +86,8 @@
                             <input type="text" id="product-images" name="images" placeholder="image1.jpg, image2.jpg">
                         </div>
 
-                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                        <div
+                            style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
                             <label style="display: flex; align-items: center; cursor: pointer;">
                                 <input type="checkbox" id="product-inStock" name="inStock" checked>
                                 <span style="margin-left: 0.5rem;">In Stock</span>
@@ -88,17 +110,18 @@
 
                         <div style="display: flex; gap: 1rem;">
                             <button type="submit" class="btn">Save Product</button>
-                            <button type="button" class="btn" style="background: var(--accent-gray);" onclick="resetProductForm()">Cancel</button>
+                            <button type="button" class="btn" style="background: var(--accent-gray);"
+                                onclick="resetProductForm()">Cancel</button>
                         </div>
-                    </form>
-                </div>
+                </form>
+            </div>
 
-                <div id="products-list">
-                    <!-- Products loaded by JavaScript -->
-                </div>
+            <div id="products-list">
+                <!-- Products loaded by JavaScript -->
             </div>
         </div>
     </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -163,6 +186,7 @@
             list.innerHTML = '<table style="width: 100%; border-collapse: collapse;">' +
                 '<thead><tr style="border-bottom: 2px solid var(--border-color);">' +
                 '<th style="text-align: left; padding: 0.75rem;">Product</th>' +
+                '<th style="text-align: left; padding: 0.75rem;">Gender</th>' +
                 '<th style="text-align: left; padding: 0.75rem;">Category</th>' +
                 '<th style="text-align: left; padding: 0.75rem;">Price</th>' +
                 '<th style="text-align: left; padding: 0.75rem;">Stock</th>' +
@@ -173,6 +197,7 @@
                 products.map(product => `
                     <tr style="border-bottom: 1px solid var(--border-color);">
                         <td style="padding: 0.75rem;">${product.name}</td>
+                        <td style="padding: 0.75rem;">${product.gender || 'N/A'}</td>
                         <td style="padding: 0.75rem;">${product.category}</td>
                         <td style="padding: 0.75rem;">$${product.price}</td>
                         <td style="padding: 0.75rem;">${product.inStock ? '✓ In Stock' : '✗ Out'}</td>
@@ -220,9 +245,10 @@
         try {
             const res = await fetch(`/api/admin/products/${productId}`);
             const product = await res.json();
-            
+
             document.getElementById('product-id').value = product.id;
             document.getElementById('product-name').value = product.name;
+            document.getElementById('product-gender').value = product.gender || 'Men';
             document.getElementById('product-category').value = product.category;
             document.getElementById('product-price').value = product.price;
             document.getElementById('product-description').value = product.description;
@@ -232,7 +258,7 @@
             document.getElementById('product-featured').checked = product.featured;
             document.getElementById('product-bestseller').checked = product.bestseller;
             document.getElementById('product-newArrival').checked = product.newArrival;
-            
+
             document.getElementById('product-form').style.display = 'block';
         } catch (error) {
             console.log("[v0] Error loading product:", error);
@@ -250,7 +276,7 @@
         messageDiv.className = `alert alert-${type}`;
         messageDiv.textContent = message;
         messageDiv.style.display = 'block';
-        
+
         if (type === 'success') {
             setTimeout(() => {
                 messageDiv.style.display = 'none';
@@ -263,13 +289,14 @@
 
         const productId = document.getElementById('product-id').value;
         const formData = new FormData(document.getElementById('product-form-element'));
-        
+
         const name = formData.get('name').trim();
         const price = parseFloat(formData.get('price'));
-        const category = formData.get('category').trim();
+        const gender = formData.get('gender');
+        const category = formData.get('category');
         const description = formData.get('description').trim();
 
-        if (!name || !category || !description || !price || isNaN(price)) {
+        if (!name || !gender || !category || !description || !price || isNaN(price)) {
             showAdminMessage('Please fill in all required fields correctly', 'error');
             return;
         }
@@ -281,6 +308,7 @@
 
         const product = {
             name: name,
+            gender: gender,
             category: category,
             price: price,
             description: description,

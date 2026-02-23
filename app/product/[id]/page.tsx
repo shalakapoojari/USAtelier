@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { use } from "react"
 import Image from "next/image"
 import Link from "next/link"
@@ -8,12 +8,13 @@ import { notFound, useRouter } from "next/navigation"
 
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
-import { products } from "@/lib/data"
 import { useCart } from "@/lib/cart-context"
 import { useWishlist } from "@/lib/wishlist-context"
 import { useToast } from "@/lib/toast-context"
 
-import { ChevronDown, ChevronUp, ShoppingBag, Heart, Star, Check, Sparkles, Award, ArrowLeft } from "lucide-react"
+import { ChevronDown, ChevronUp, ShoppingBag, Heart, Star, Check, Sparkles, Award, ArrowLeft, Loader2 } from "lucide-react"
+
+const API_BASE = "http://127.0.0.1:5000"
 
 export default function ProductPage({
   params,
@@ -21,7 +22,9 @@ export default function ProductPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = use(params)
-  const product = products.find((p) => p.id === id)
+  const [product, setProduct] = useState<any>(null)
+  const [allProducts, setAllProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const router = useRouter()
   const { addItem } = useCart()
   const { toggleItem, isWishlisted } = useWishlist()
@@ -34,9 +37,65 @@ export default function ProductPage({
   const [showShipping, setShowShipping] = useState(false)
   const [addedToCart, setAddedToCart] = useState(false)
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [productRes, allProductsRes] = await Promise.all([
+          fetch(`${API_BASE}/api/products/${id}`, { credentials: "include" }),
+          fetch(`${API_BASE}/api/products`, { credentials: "include" }),
+        ])
+
+        if (productRes.ok) {
+          const data = await productRes.json()
+          setProduct(data)
+        } else {
+          notFound()
+        }
+
+        if (allProductsRes.ok) {
+          const allData = await allProductsRes.json()
+          setAllProducts(allData)
+        }
+      } catch (err) {
+        console.error("Fetch error:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [id])
+
+  if (loading) {
+    return (
+      <div className="bg-[#030303] text-[#e8e8e3] min-h-screen flex items-center justify-center">
+        <Loader2 className="animate-spin text-gray-500" />
+      </div>
+    )
+  }
+
   if (!product) notFound()
 
-  const relatedProducts = products
+  // Helper to parse images
+  const images = (() => {
+    if (Array.isArray(product.images)) return product.images
+    try {
+      const parsed = JSON.parse(product.images)
+      return Array.isArray(parsed) ? parsed : [product.images]
+    } catch {
+      return [product.images]
+    }
+  })()
+
+  const isInStock = product.stock !== undefined ? product.stock > 0 : product.inStock
+
+  const formatImageUrl = (url: string) => {
+    if (!url) return "/placeholder.jpg"
+    if (url.startsWith("http") || url.startsWith("data:")) return url
+    if (!url.startsWith("/")) return `/${url}`
+    return url
+  }
+
+  const relatedProducts = allProducts
     .filter((p) => p.category === product.category && p.id !== product.id)
     .slice(0, 4)
 
@@ -53,7 +112,7 @@ export default function ProductPage({
       name: product.name,
       price: product.price,
       size: selectedSize,
-      image: product.images[0],
+      image: formatImageUrl(images[0]),
     })
 
     setAddedToCart(true)
@@ -67,7 +126,7 @@ export default function ProductPage({
       id: product.id,
       name: product.name,
       price: product.price,
-      image: product.images[0],
+      image: formatImageUrl(images[0]),
       category: product.category,
     })
     if (wasWishlisted) {
@@ -82,7 +141,7 @@ export default function ProductPage({
       <SiteHeader />
 
       {/* ── BACK LINK ── */}
-      <div className="pt-28 px-6 md:px-12 max-w-[1400px] mx-auto">
+      <div className="pt-44 px-6 md:px-12 max-w-[1400px] mx-auto">
         <button
           onClick={() => router.back()}
           className="flex items-center gap-2 text-xs uppercase tracking-widest text-gray-500 hover:text-white transition-colors"
@@ -101,7 +160,7 @@ export default function ProductPage({
             {/* Main image */}
             <div className="relative aspect-[3/4] overflow-hidden bg-[#111]">
               <Image
-                src={product.images[selectedImage]}
+                src={formatImageUrl(images[selectedImage])}
                 alt={product.name}
                 fill
                 priority
@@ -111,19 +170,19 @@ export default function ProductPage({
 
               {/* Badges top-left */}
               <div className="absolute top-4 left-4 flex flex-col gap-2">
-                {product.newArrival && (
+                {(product.newArrival || product.is_new) && (
                   <span className="bg-white text-black text-[10px] uppercase tracking-widest px-3 py-1 font-medium flex items-center gap-1">
                     <Sparkles size={10} />
                     New
                   </span>
                 )}
-                {product.bestseller && (
+                {(product.bestseller || product.is_bestseller) && (
                   <span className="bg-amber-500 text-black text-[10px] uppercase tracking-widest px-3 py-1 font-medium flex items-center gap-1">
                     <Award size={10} />
                     Bestseller
                   </span>
                 )}
-                {!product.inStock && (
+                {!isInStock && (
                   <span className="bg-red-600 text-white text-[10px] uppercase tracking-widest px-3 py-1 font-medium">
                     Out of Stock
                   </span>
@@ -132,9 +191,9 @@ export default function ProductPage({
             </div>
 
             {/* Thumbnails */}
-            {product.images.length > 1 && (
+            {images.length > 1 && (
               <div className="grid grid-cols-4 gap-3">
-                {product.images.map((image, index) => (
+                {images.map((image: string, index: number) => (
                   <button
                     key={index}
                     onClick={() => setSelectedImage(index)}
@@ -144,7 +203,7 @@ export default function ProductPage({
                       }`}
                   >
                     <Image
-                      src={image}
+                      src={formatImageUrl(image)}
                       alt={`${product.name} view ${index + 1}`}
                       fill
                       className="object-cover"
@@ -199,8 +258,8 @@ export default function ProductPage({
               </div>
               <div className="bg-white/5 rounded px-4 py-3">
                 <p className="text-gray-500 uppercase tracking-widest mb-1">Availability</p>
-                <p className={product.inStock ? "text-green-400" : "text-red-400"}>
-                  {product.inStock ? "In Stock" : "Out of Stock"}
+                <p className={isInStock ? "text-green-400" : "text-red-400"}>
+                  {isInStock ? "In Stock" : "Out of Stock"}
                 </p>
               </div>
               {product.fabric && (
@@ -223,17 +282,17 @@ export default function ProductPage({
                 <span className="uppercase tracking-widest text-xs text-gray-400">
                   Select Size
                 </span>
-                {!selectedSize && product.inStock && (
+                {!selectedSize && isInStock && (
                   <span className="text-[10px] text-gray-500 animate-pulse">
                     ↑ choose a size to add to cart
                   </span>
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                {product.sizes.map((size) => (
+                {product.sizes && (Array.isArray(product.sizes) ? product.sizes : (() => { try { return JSON.parse(product.sizes) } catch { return [] } })()).map((size: string) => (
                   <button
                     key={size}
-                    disabled={!product.inStock}
+                    disabled={!isInStock}
                     onClick={() => setSelectedSize(size)}
                     className={`px-4 py-2 text-xs tracking-widest border transition-all duration-200 ${selectedSize === size
                       ? "border-white bg-white text-black"
@@ -250,7 +309,7 @@ export default function ProductPage({
             <div className="flex gap-3 mb-10">
               <button
                 onClick={handleAddToCart}
-                disabled={!product.inStock}
+                disabled={!isInStock}
                 className={`flex-1 py-4 flex items-center justify-center gap-2 uppercase tracking-widest text-xs font-medium transition-all duration-500 ${addedToCart
                   ? "bg-green-500 text-white border border-green-500"
                   : "border border-white/40 hover:bg-white hover:text-black"
@@ -261,7 +320,7 @@ export default function ProductPage({
                     <Check size={14} />
                     Added to Cart
                   </>
-                ) : product.inStock ? (
+                ) : isInStock ? (
                   <>
                     <ShoppingBag size={14} />
                     Add to Cart
@@ -361,27 +420,30 @@ export default function ProductPage({
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-              {relatedProducts.map((p) => (
-                <Link key={p.id} href={`/product/${p.id}`} className="group block">
-                  <div className="relative aspect-[3/4] overflow-hidden mb-4 bg-[#111]">
-                    <Image
-                      src={p.images[0]}
-                      alt={p.name}
-                      fill
-                      className="object-cover transition-transform duration-700 group-hover:scale-105"
-                    />
-                    {p.newArrival && (
-                      <span className="absolute top-3 left-3 bg-white text-black text-[9px] uppercase tracking-widest px-2 py-0.5">
-                        New
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm uppercase tracking-widest group-hover:text-gray-400 transition-colors">
-                    {p.name}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">₹{p.price.toLocaleString('en-IN')}</p>
-                </Link>
-              ))}
+              {relatedProducts.map((p: any) => {
+                const pImages = Array.isArray(p.images) ? p.images : (() => { try { return JSON.parse(p.images) } catch { return [p.images] } })()
+                return (
+                  <Link key={p.id} href={`/product/${p.id}`} className="group block">
+                    <div className="relative aspect-[3/4] overflow-hidden mb-4 bg-[#111]">
+                      <Image
+                        src={formatImageUrl(pImages[0])}
+                        alt={p.name}
+                        fill
+                        className="object-cover transition-transform duration-700 group-hover:scale-105"
+                      />
+                      {(p.newArrival || p.is_new) && (
+                        <span className="absolute top-3 left-3 bg-white text-black text-[9px] uppercase tracking-widest px-2 py-0.5">
+                          New
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm uppercase tracking-widest group-hover:text-gray-400 transition-colors">
+                      {p.name}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">₹{p.price.toLocaleString('en-IN')}</p>
+                  </Link>
+                )
+              })}
             </div>
           </section>
         )}

@@ -57,129 +57,154 @@ export function SiteHeader() {
     router.push("/")
   }
 
+  const categories = ["Knitwear", "Trousers", "Basics", "Shirts", "Accessories"]
+
   return (
-    <nav
-      ref={navRef}
-      className="fixed top-0 left-0 w-full px-8 py-5 flex justify-between items-center z-50 bg-[#030303] border-b border-white/5"
-    >
-      {/* ── BRAND ── */}
-      <Link href="/" className="text-2xl font-serif tracking-widest font-bold shrink-0">
-        U.S ATELIER.
-      </Link>
+    <header className="fixed top-0 left-0 w-full z-50">
+      <nav
+        ref={navRef}
+        className="w-full px-8 py-5 flex justify-between items-center bg-[#030303] border-b border-white/5"
+      >
+        {/* ── BRAND ── */}
+        <Link href="/" className="text-2xl font-serif tracking-widest font-bold shrink-0">
+          U.S ATELIER.
+        </Link>
 
-      {/* ── CENTER NAV ── */}
-      <div className="hidden md:flex gap-12 text-xs uppercase tracking-[0.25em] font-medium">
-        <Link href="/collections" className="hover:text-gray-400 transition-colors">Collections</Link>
-        <Link href="/campaign" className="hover:text-gray-400 transition-colors">Campaign</Link>
-        <Link href="/maison" className="hover:text-gray-400 transition-colors">Maison</Link>
-        <Link href="/shop" className="hover:text-gray-400 transition-colors">Shop</Link>
-      </div>
+        {/* ── CENTER NAV ── */}
+        <div className="hidden md:flex gap-12 text-xs uppercase tracking-[0.25em] font-medium">
+          <Link href="/collections" className="hover:text-gray-400 transition-colors">Collections</Link>
+          <Link href="/campaign" className="hover:text-gray-400 transition-colors">Campaign</Link>
+          <Link href="/maison" className="hover:text-gray-400 transition-colors">Maison</Link>
+          <Link href="/shop" className="hover:text-gray-400 transition-colors">Shop</Link>
+        </div>
 
-      {/* ── RIGHT ICONS ── */}
-      <div className="flex items-center gap-5">
+        {/* ── RIGHT ICONS ── */}
+        <div className="flex items-center gap-5">
 
-        {/* Favourites icon */}
-        <button
-          onClick={handleFavouritesClick}
-          className="relative flex items-center justify-center w-9 h-9 text-gray-400 hover:text-white transition-colors"
-          title="Favourites"
-        >
-          <Heart
-            size={18}
-            strokeWidth={1.5}
-            className={wishlistUnseen > 0 ? "fill-red-400 text-red-400" : ""}
-          />
-          {wishlistUnseen > 0 && (
-            <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border border-black animate-pulse" />
-          )}
-        </button>
-
-        {/* Cart icon */}
-        <button
-          onClick={handleCartClick}
-          className="relative flex items-center justify-center w-9 h-9 text-gray-400 hover:text-white transition-colors"
-          title="Cart"
-        >
-          <ShoppingBag size={18} strokeWidth={1.5} />
-          {cartUnseen > 0 && (
-            <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-white rounded-full border border-black animate-pulse" />
-          )}
-        </button>
-
-        {/* Profile / Login */}
-        {!user ? (
-          <Link
-            href="/login"
-            className="text-[10px] uppercase tracking-[0.2em] text-gray-400 hover:text-white transition-colors ml-2"
+          {/* Favourites icon */}
+          <button
+            onClick={handleFavouritesClick}
+            className="relative flex items-center justify-center w-9 h-9 text-gray-400 hover:text-white transition-colors"
+            title="Favourites"
           >
-            Login
-          </Link>
-        ) : (
-          <div className="relative" ref={profileRef}>
-            <button
-              onClick={() => setProfileOpen((o) => !o)}
-              className="flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors"
-              title="Account"
-            >
-              <div className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center bg-white/5 hover:border-white/50 transition-colors">
-                <User size={14} strokeWidth={1.5} />
-              </div>
-              <ChevronDown
-                size={12}
-                className={`transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`}
-              />
-            </button>
-
-            {/* Dropdown */}
-            {profileOpen && (
-              <div className="absolute right-0 top-full mt-3 w-52 bg-[#0e0e0e] border border-white/10 shadow-2xl z-50">
-                <div className="px-4 py-3 border-b border-white/10">
-                  <p className="text-xs uppercase tracking-widest text-gray-400 truncate">
-                    {user.email}
-                  </p>
-                </div>
-                <div className="py-1">
-                  {isAdmin && (
-                    <Link
-                      href="/admin"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-amber-400 hover:text-amber-300 hover:bg-amber-400/5 transition-colors border-b border-white/5"
-                    >
-                      <LayoutDashboard size={13} />
-                      Admin Panel
-                    </Link>
-                  )}
-                  <Link
-                    href="/account"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
-                  >
-                    <User size={13} />
-                    My Account
-                  </Link>
-                  <Link
-                    href="/account/orders"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
-                  >
-                    <Package size={13} />
-                    Orders
-                  </Link>
-                </div>
-                <div className="border-t border-white/10 py-1">
-                  <button
-                    onClick={handleLogout}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
-                  >
-                    <LogOut size={13} />
-                    Sign Out
-                  </button>
-                </div>
-              </div>
+            <Heart
+              size={18}
+              strokeWidth={1.5}
+              className={wishlistUnseen > 0 ? "fill-red-400 text-red-400" : ""}
+            />
+            {wishlistUnseen > 0 && (
+              <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border border-black animate-pulse" />
             )}
-          </div>
-        )}
+          </button>
+
+          {/* Cart icon */}
+          <button
+            onClick={handleCartClick}
+            className="relative flex items-center justify-center w-9 h-9 text-gray-400 hover:text-white transition-colors"
+            title="Cart"
+          >
+            <ShoppingBag size={18} strokeWidth={1.5} />
+            {cartUnseen > 0 && (
+              <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-white rounded-full border border-black animate-pulse" />
+            )}
+          </button>
+
+          {/* Profile / Login */}
+          {!user ? (
+            <Link
+              href="/login"
+              className="text-[10px] uppercase tracking-[0.2em] text-gray-400 hover:text-white transition-colors ml-2"
+            >
+              Login
+            </Link>
+          ) : (
+            <div className="relative" ref={profileRef}>
+              <button
+                onClick={() => setProfileOpen((o) => !o)}
+                className="flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors"
+                title="Account"
+              >
+                <div className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center bg-white/5 hover:border-white/50 transition-colors">
+                  <User size={14} strokeWidth={1.5} />
+                </div>
+                <ChevronDown
+                  size={12}
+                  className={`transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {/* Dropdown */}
+              {profileOpen && (
+                <div className="absolute right-0 top-full mt-3 w-52 bg-[#0e0e0e] border border-white/10 shadow-2xl z-50">
+                  <div className="px-4 py-3 border-b border-white/10">
+                    <p className="text-xs uppercase tracking-widest text-gray-400 truncate">
+                      {user.email}
+                    </p>
+                  </div>
+                  <div className="py-1">
+                    {isAdmin && (
+                      <Link
+                        href="/admin"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-amber-400 hover:text-amber-300 hover:bg-amber-400/5 transition-colors border-b border-white/5"
+                      >
+                        <LayoutDashboard size={13} />
+                        Admin Panel
+                      </Link>
+                    )}
+                    <Link
+                      href="/account"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      <User size={13} />
+                      My Account
+                    </Link>
+                    <Link
+                      href="/account/orders"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      <Package size={13} />
+                      Orders
+                    </Link>
+                  </div>
+                  <div className="border-t border-white/10 py-1">
+                    <button
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      <LogOut size={13} />
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </nav>
+
+      {/* ── CATEGORY SUB-NAV ── */}
+      <div className="w-full bg-[#030303]/80 backdrop-blur-md border-b border-white/5 py-3 px-8 overflow-x-auto no-scrollbar">
+        <div className="max-w-[1400px] mx-auto flex items-center justify-center gap-8 md:gap-12 whitespace-nowrap">
+          <Link
+            href="/shop"
+            className="text-[10px] uppercase tracking-[0.3em] text-gray-400 hover:text-white transition-colors"
+          >
+            View All
+          </Link>
+          {categories.map((cat) => (
+            <Link
+              key={cat}
+              href={`/shop?category=${cat}`}
+              className="text-[10px] uppercase tracking-[0.3em] text-gray-400 hover:text-white transition-colors"
+            >
+              {cat}
+            </Link>
+          ))}
+        </div>
       </div>
-    </nav>
+    </header>
   )
 }

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 
-const API_BASE = "http://localhost:5000"
+const API_BASE = "http://127.0.0.1:5000"
 
 type User = {
   id: string
@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       })
 
       const data = await res.json()
@@ -108,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, password, firstName, lastName, phone }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password, firstName, lastName, phone }),
       })
 
       const data = await res.json()

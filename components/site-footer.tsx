@@ -27,9 +27,9 @@ export function SiteFooter() {
 
           {/* Newsletter — takes 2 cols */}
           <div className="lg:col-span-2">
-            <h4 className="font-serif text-3xl font-light mb-3">Join the Cult.</h4>
+            <h4 className="font-serif text-3xl font-light mb-3">Stay Updated</h4>
             <p className="text-xs text-gray-500 tracking-widest mb-8 max-w-xs leading-relaxed">
-              Early access to new collections, private sales, and editorial drops.
+              Early access to new collections and exclusive editorial drops.
             </p>
             {submitted ? (
               <p className="text-sm uppercase tracking-widest text-gray-400">Thank you for joining.</p>

@@ -9,19 +9,32 @@
         <p>Discover our complete collection</p>
     </div>
 
-    <div style="margin-bottom: 2rem;">
-        <label style="margin-right: 1rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">
-            Filter by category:
-        </label>,
-        <select id="category-filter"
-            style="padding: 0.5rem; background-color: var(--hover-dark); color: var(--primary-light); border: 1px solid var(--border-color);">
-            <option value="">All Categories</option>
-            <option value="Knitwear">Knitwear</option>
-            <option value="Trousers">Trousers</option>
-            <option value="Shirts">Shirts</option>
-            <option value="Basics">Basics</option>
-            <option value="Accessories">Accessories</option>
-        </select>
+    <div style="margin-bottom: 2rem; display: flex; flex-direction: column; gap: 1rem;">
+        <div style="display: flex; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+            <button onclick="setGender('all')" class="filter-tab active" id="gender-all"
+                style="background: none; border: none; color: inherit; cursor: pointer; padding: 0.5rem 1rem; font-size: 0.9rem; text-transform: uppercase;">All</button>
+            <button onclick="setGender('Men')" class="filter-tab" id="gender-Men"
+                style="background: none; border: none; color: inherit; cursor: pointer; padding: 0.5rem 1rem; font-size: 0.9rem; text-transform: uppercase;">Men</button>
+            <button onclick="setGender('Women')" class="filter-tab" id="gender-Women"
+                style="background: none; border: none; color: inherit; cursor: pointer; padding: 0.5rem 1rem; font-size: 0.9rem; text-transform: uppercase;">Women</button>
+        </div>
+
+        <div style="display: flex; align-items: center;">
+            <label style="margin-right: 1rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">
+                Filter by category:
+            </label>
+            <select id="category-filter"
+                style="padding: 0.5rem; background-color: var(--hover-dark); color: var(--primary-light); border: 1px solid var(--border-color);">
+                <option value="">All Categories</option>
+                <option value="T-shirt">T-shirt</option>
+                <option value="Trouser">Trouser</option>
+                <option value="Jeans">Jeans</option>
+                <option value="Shirt">Shirt</option>
+                <option value="Knitwear">Knitwear</option>
+                <option value="Basics">Basics</option>
+                <option value="Accessories">Accessories</option>
+            </select>
+        </div>
     </div>
 
     <div class="products-grid" id="products-grid">
@@ -31,21 +44,75 @@
 {% endblock %}
 
 {% block extra_js %}
+<style>
+    .filter-tab.active {
+        color: var(--primary-light) !important;
+        border-bottom: 2px solid var(--primary-light) !important;
+    }
+
+    .filter-tab {
+        opacity: 0.6;
+        transition: opacity 0.2s, color 0.2s;
+    }
+
+    .filter-tab:hover {
+        opacity: 1;
+    }
+</style>
 <script>
     let allProducts = [];
+    let currentGender = 'all';
+    let currentCategory = '';
 
     async function loadProducts() {
         try {
             const res = await fetch('/api/products');
             allProducts = await res.json();
-            displayProducts(allProducts);
+
+            // Check for gender in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const genderParam = urlParams.get('gender');
+            if (genderParam) {
+                setGender(genderParam);
+            } else {
+                applyFilters();
+            }
         } catch (error) {
             console.log("[v0] Error loading products:", error);
         }
     }
 
+    function setGender(gender) {
+        currentGender = gender;
+
+        // Update UI
+        document.querySelectorAll('.filter-tab').forEach(tab => tab.classList.remove('active'));
+        document.getElementById(`gender-${gender}`).classList.add('active');
+
+        applyFilters();
+    }
+
+    function applyFilters() {
+        let filtered = allProducts;
+
+        if (currentGender !== 'all') {
+            filtered = filtered.filter(p => p.gender === currentGender);
+        }
+
+        if (currentCategory) {
+            filtered = filtered.filter(p => p.category === currentCategory);
+        }
+
+        displayProducts(filtered);
+    }
+
     function displayProducts(products) {
         const grid = document.getElementById('products-grid');
+        if (products.length === 0) {
+            grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 4rem; opacity: 0.5;">No products found in this category.</p>';
+            return;
+        }
+
         grid.innerHTML = products.map(product => `
             <div class="product-card" onclick="window.location.href='/product/${product.id}'">
                 <div class="product-image">
@@ -58,7 +125,7 @@
                     <div class="product-price">$${product.price}</div>
                     ${product.bestseller ? '<span class="product-badge">Bestseller</span>' : ''}
                     ${product.newArrival ? '<span class="product-badge">New</span>' : ''}
-                    <div class="product-category">${product.category}</div>
+                    <div class="product-category">${product.gender || ''} ${product.category}</div>
                 </div>
             </div>
         `).join('');
@@ -69,9 +136,8 @@
 
         const categoryFilter = document.getElementById('category-filter');
         categoryFilter.addEventListener('change', (e) => {
-            const category = e.target.value;
-            const filtered = category ? allProducts.filter(p => p.category === category) : allProducts;
-            displayProducts(filtered);
+            currentCategory = e.target.value;
+            applyFilters();
         });
     });
 </script>

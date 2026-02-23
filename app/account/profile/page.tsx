@@ -9,9 +9,12 @@ import { SiteFooter } from "@/components/site-footer"
 import { AccountSidebar } from "@/components/account-sidebar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Eye, EyeOff } from "lucide-react"
 import { useToast } from "@/lib/toast-context"
 
 import { useAuth } from "@/lib/auth-context"
+
+const API_BASE = "http://127.0.0.1:5000"
 
 export default function ProfilePage() {
   const { user, updateProfile } = useAuth()
@@ -41,6 +44,10 @@ export default function ProfilePage() {
     newPassword: "",
     confirmPassword: "",
   })
+
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
 
@@ -85,7 +92,7 @@ export default function ProfilePage() {
 
     setIsUpdatingPassword(true)
     try {
-      const response = await fetch("http://localhost:5000/api/auth/change-password", {
+      const response = await fetch(`${API_BASE}/api/auth/change-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -113,7 +120,7 @@ export default function ProfilePage() {
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen">
       <SiteHeader />
 
-      <div className="pt-[72px]">
+      <div className="pt-40">
         <AccountSidebar>
           <div className="p-10 max-w-xl">
             {/* Header */}
@@ -200,37 +207,64 @@ export default function ProfilePage() {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">Current Password</label>
-                      <Input
-                        name="currentPassword"
-                        type="password"
-                        value={passwordData.currentPassword}
-                        onChange={handlePasswordInputChange}
-                        required
-                        className="bg-transparent border-white/20 text-white focus:border-white/50"
-                      />
+                      <div className="relative">
+                        <Input
+                          name="currentPassword"
+                          type={showCurrentPassword ? "text" : "password"}
+                          value={passwordData.currentPassword}
+                          onChange={handlePasswordInputChange}
+                          required
+                          className="bg-transparent border-white/20 text-white focus:border-white/50 pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                        >
+                          {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">New Password</label>
-                        <Input
-                          name="newPassword"
-                          type="password"
-                          value={passwordData.newPassword}
-                          onChange={handlePasswordInputChange}
-                          required
-                          className="bg-transparent border-white/20 text-white focus:border-white/50"
-                        />
+                        <div className="relative">
+                          <Input
+                            name="newPassword"
+                            type={showNewPassword ? "text" : "password"}
+                            value={passwordData.newPassword}
+                            onChange={handlePasswordInputChange}
+                            required
+                            className="bg-transparent border-white/20 text-white focus:border-white/50 pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                          >
+                            {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
                       </div>
                       <div>
                         <label className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">Confirm New Password</label>
-                        <Input
-                          name="confirmPassword"
-                          type="password"
-                          value={passwordData.confirmPassword}
-                          onChange={handlePasswordInputChange}
-                          required
-                          className="bg-transparent border-white/20 text-white focus:border-white/50"
-                        />
+                        <div className="relative">
+                          <Input
+                            name="confirmPassword"
+                            type={showConfirmPassword ? "text" : "password"}
+                            value={passwordData.confirmPassword}
+                            onChange={handlePasswordInputChange}
+                            required
+                            className="bg-transparent border-white/20 text-white focus:border-white/50 pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                          >
+                            {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

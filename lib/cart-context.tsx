@@ -2,6 +2,8 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
+import { useAuth } from "@/lib/auth-context"
+import { useRouter } from "next/navigation"
 
 export type CartItem = {
   id: string
@@ -30,6 +32,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
   const [isHydrated, setIsHydrated] = useState(false)
   const [unseenCount, setUnseenCount] = useState(0)
+  const { isAuthenticated } = useAuth()
+  const router = useRouter()
 
   // Load from localStorage once after mount
   useEffect(() => {
@@ -49,6 +53,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [items, isHydrated])
 
   const addItem = (newItem: Omit<CartItem, "quantity">) => {
+    if (!isAuthenticated) {
+      router.push("/signup")
+      return
+    }
     // Every addItem call is an addition — increment badge
     setUnseenCount((c) => c + 1)
     setItems((prev) => {
