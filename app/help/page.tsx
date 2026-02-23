@@ -69,7 +69,7 @@ export default function HelpPage() {
         <div className="bg-[#030303] text-[#e8e8e3] min-h-screen">
             <SiteHeader />
 
-            <main className="pt-52 pb-32 px-6 md:px-12">
+            <main className="pt-40 pb-32 px-6 md:px-12">
                 <div className="max-w-4xl mx-auto">
                     {/* Header */}
                     <section className="text-center mb-20">

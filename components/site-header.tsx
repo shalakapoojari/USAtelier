@@ -22,6 +22,44 @@ export function SiteHeader() {
   const profileRef = useRef<HTMLDivElement>(null)
 
   const [searchQuery, setSearchQuery] = useState("")
+  const [placeholder, setPlaceholder] = useState("")
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [loopNum, setLoopNum] = useState(0)
+  const [typingSpeed, setTypingSpeed] = useState(150)
+
+  const phrases = [
+    "Search for pieces...",
+    "Search for Trousers...",
+    "Search for Knitwear...",
+    "Search for Basics...",
+    "Search for Shirts...",
+    "Search for Accessories..."
+  ]
+
+  useEffect(() => {
+    const handleTyping = () => {
+      const i = loopNum % phrases.length
+      const fullText = phrases[i]
+
+      setPlaceholder(
+        isDeleting
+          ? fullText.substring(0, placeholder.length - 1)
+          : fullText.substring(0, placeholder.length + 1)
+      )
+
+      setTypingSpeed(isDeleting ? 50 : 150)
+
+      if (!isDeleting && placeholder === fullText) {
+        setTimeout(() => setIsDeleting(true), 2000)
+      } else if (isDeleting && placeholder === "") {
+        setIsDeleting(false)
+        setLoopNum(loopNum + 1)
+      }
+    }
+
+    const timer = setTimeout(handleTyping, typingSpeed)
+    return () => clearTimeout(timer)
+  }, [placeholder, isDeleting, loopNum, typingSpeed, phrases])
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,11 +89,19 @@ export function SiteHeader() {
   }, [])
 
   const handleCartClick = () => {
+    if (!user) {
+      router.push("/login")
+      return
+    }
     clearCartUnseen()
     router.push("/cart")
   }
 
   const handleFavouritesClick = () => {
+    if (!user) {
+      router.push("/login")
+      return
+    }
     clearWishlistUnseen()
     router.push("/favourites")
   }
@@ -77,19 +123,27 @@ export function SiteHeader() {
         </Link>
 
         {/* Search Box - Growing to fill center */}
-        <form onSubmit={handleSearchSubmit} className="flex-1 max-w-2xl relative group items-center hidden md:flex">
+        <form onSubmit={handleSearchSubmit} className="flex-1 max-w-4xl relative group items-center hidden md:flex mx-4">
           <input
             type="text"
-            placeholder="Search for pieces, collections..."
+            placeholder={placeholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 px-10 py-2.5 text-xs tracking-widest uppercase rounded-sm focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all placeholder:text-gray-600"
+            className="w-full bg-white/5 border border-white/10 px-10 py-2.5 text-[10px] tracking-widest uppercase rounded-sm focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all placeholder:text-gray-600 h-10"
           />
           <Search size={14} className="absolute left-3 text-gray-500 group-focus-within:text-white transition-colors" />
           <button type="submit" className="hidden">Search</button>
         </form>
 
-        <div className="flex items-center gap-5 ml-auto">
+        <div className="flex items-center gap-3 ml-auto">
+          {/* Help Link Moved Here */}
+          <Link
+            href="/help"
+            className="text-[10px] uppercase tracking-[0.2em] text-gray-400 hover:text-white transition-colors mr-2 hidden lg:block"
+          >
+            Help
+          </Link>
+
           {/* Favourites icon */}
           <button
             onClick={handleFavouritesClick}
@@ -196,31 +250,23 @@ export function SiteHeader() {
         </div>
       </div>
 
-      {/* ── ROW 2: PRIMARY NAV ── */}
-      <div className="w-full flex justify-center py-4 border-b border-white/5">
-        <div className="flex gap-12 text-[10px] uppercase tracking-[0.25em] font-medium">
-          <Link href="/collections" className="hover:text-gray-400 transition-colors">Collections</Link>
-          <Link href="/campaign" className="hover:text-gray-400 transition-colors">Campaign</Link>
-          <Link href="/maison" className="hover:text-gray-400 transition-colors">Maison</Link>
-          <Link href="/shop" className="hover:text-gray-400 transition-colors">Shop</Link>
-          <Link href="/help" className="hover:text-gray-400 transition-colors">Help</Link>
-        </div>
-      </div>
-
-      {/* ── ROW 3: CATEGORY NAV ── */}
-      <div className="w-full bg-[#030303]/80 backdrop-blur-md border-b border-white/5 py-3 px-8 overflow-x-auto no-scrollbar">
-        <div className="max-w-[1400px] mx-auto flex items-center justify-center gap-8 md:gap-12 whitespace-nowrap">
+      {/* ── ROW 2: COMBINED NAV & CATEGORIES ── */}
+      <div className="w-full bg-[#030303]/80 backdrop-blur-md border-b border-white/5 py-4 px-8 overflow-x-auto no-scrollbar">
+        <div className="max-w-[1400px] mx-auto flex items-center justify-center gap-8 md:gap-12 whitespace-nowrap text-[10px] uppercase tracking-[0.25em] font-medium font-sans">
           <Link
             href="/shop"
-            className="text-[10px] uppercase tracking-[0.3em] text-gray-400 hover:text-white transition-colors"
+            className="text-white hover:text-gray-400 transition-colors"
           >
-            View All
+            Shop All
           </Link>
+
+          <div className="h-4 w-px bg-white/10 hidden md:block" />
+
           {categories.map((cat) => (
             <Link
               key={cat}
               href={`/shop?category=${cat}`}
-              className="text-[10px] uppercase tracking-[0.3em] text-gray-400 hover:text-white transition-colors"
+              className="text-gray-400 hover:text-white transition-colors"
             >
               {cat}
             </Link>

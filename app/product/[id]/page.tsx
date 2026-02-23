@@ -11,6 +11,7 @@ import { SiteFooter } from "@/components/site-footer"
 import { useCart } from "@/lib/cart-context"
 import { useWishlist } from "@/lib/wishlist-context"
 import { useToast } from "@/lib/toast-context"
+import { useAuth } from "@/lib/auth-context"
 
 import { ChevronDown, ChevronUp, ShoppingBag, Heart, Star, Check, Sparkles, Award, ArrowLeft, Loader2 } from "lucide-react"
 
@@ -29,6 +30,7 @@ export default function ProductPage({
   const { addItem } = useCart()
   const { toggleItem, isWishlisted } = useWishlist()
   const { showToast } = useToast()
+  const { isAuthenticated } = useAuth()
 
   const [selectedSize, setSelectedSize] = useState("")
   const [selectedImage, setSelectedImage] = useState(0)
@@ -100,6 +102,11 @@ export default function ProductPage({
     .slice(0, 4)
 
   const handleAddToCart = () => {
+    if (!isAuthenticated) {
+      router.push("/login")
+      return
+    }
+
     if (!selectedSize) {
       const sizeSection = document.getElementById("size-section")
       sizeSection?.scrollIntoView({ behavior: "smooth" })
@@ -121,6 +128,11 @@ export default function ProductPage({
   }
 
   const handleWishlistToggle = () => {
+    if (!isAuthenticated) {
+      router.push("/login")
+      return
+    }
+
     const wasWishlisted = isWishlisted(product.id)
     toggleItem({
       id: product.id,
@@ -141,7 +153,7 @@ export default function ProductPage({
       <SiteHeader />
 
       {/* ── BACK LINK ── */}
-      <div className="pt-60 px-6 md:px-12 max-w-[1400px] mx-auto">
+      <div className="pt-44 px-6 md:px-12 max-w-[1400px] mx-auto">
         <button
           onClick={() => router.back()}
           className="flex items-center gap-2 text-xs uppercase tracking-widest text-gray-500 hover:text-white transition-colors"

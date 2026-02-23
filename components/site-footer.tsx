@@ -23,44 +23,7 @@ export function SiteFooter() {
 
       <div className="relative z-10 max-w-[1400px] mx-auto">
         {/* Top grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-16 mb-20 pb-20 border-b border-white/5">
-
-          {/* Newsletter — takes 2 cols */}
-          <div className="lg:col-span-2">
-            <h4 className="font-serif text-3xl font-light mb-3">Stay Updated</h4>
-            <p className="text-xs text-gray-500 tracking-widest mb-8 max-w-xs leading-relaxed">
-              Early access to new collections and exclusive editorial drops.
-            </p>
-            {submitted ? (
-              <p className="text-sm uppercase tracking-widest text-gray-400">Thank you for joining.</p>
-            ) : (
-              <form onSubmit={handleSubmit} className="flex border-b border-white/20 pb-4 max-w-sm">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="YOUR EMAIL"
-                  className="bg-transparent w-full outline-none text-white placeholder-gray-600 uppercase tracking-widest text-xs"
-                />
-                <button
-                  type="submit"
-                  className="text-xs uppercase tracking-widest text-gray-400 hover:text-white transition-colors shrink-0 ml-4"
-                >
-                  Join
-                </button>
-              </form>
-            )}
-
-            {/* Socials */}
-            <div className="flex gap-6 mt-10">
-              {["Instagram", "Pinterest", "TikTok"].map((s) => (
-                <a key={s} href="#" className="text-[10px] uppercase tracking-widest text-gray-600 hover:text-white transition-colors">
-                  {s}
-                </a>
-              ))}
-            </div>
-          </div>
-
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16 mb-20 pb-20 border-b border-white/5 pb-20 border-b border-white/5">
           {/* Shop */}
           <div>
             <p className="text-[10px] uppercase tracking-[0.4em] text-white mb-6">Shop</p>

@@ -23,6 +23,7 @@ export default function ShopPage() {
   const [loading, setLoading] = useState(true)
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [selectedSizes, setSelectedSizes] = useState<string[]>([])
+  const [priceLimit, setPriceLimit] = useState<number>(100000)
 
   const searchParams = useSearchParams()
   const urlCategory = searchParams.get("category")
@@ -58,16 +59,35 @@ export default function ShopPage() {
 
   const categories = useMemo(() => Array.from(new Set(products.map((p) => p.category))), [products])
   const allSizes = useMemo(() => {
-    return Array.from(new Set(products.flatMap((p) => {
-      if (Array.isArray(p.sizes)) return p.sizes
+    const sizes = new Set<string>()
+    products.forEach((p) => {
       try {
         const parsed = JSON.parse(p.sizes)
-        return Array.isArray(parsed) ? parsed : []
+        if (Array.isArray(parsed)) parsed.forEach(s => sizes.add(s))
       } catch {
-        return []
+        // If not JSON, skip or handle as single string
       }
-    })))
+    })
+    return Array.from(sizes).sort()
   }, [products])
+
+  const absoluteMaxPrice = useMemo(() => {
+    if (products.length === 0) return 0
+    return Math.max(...products.map(p => p.price))
+  }, [products])
+
+  const categoryMaxPrice = useMemo(() => {
+    const categoryProducts = urlCategory
+      ? products.filter(p => p.category.toLowerCase() === urlCategory.toLowerCase())
+      : products
+    if (categoryProducts.length === 0) return absoluteMaxPrice
+    return Math.max(...categoryProducts.map(p => p.price))
+  }, [products, urlCategory, absoluteMaxPrice])
+
+  // Reset price limit when category changes
+  useEffect(() => {
+    setPriceLimit(categoryMaxPrice)
+  }, [categoryMaxPrice])
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
@@ -83,14 +103,17 @@ export default function ShopPage() {
         selectedSizes.length === 0 ||
         productSizes.some((size: string) => selectedSizes.includes(size))
 
+      const priceMatch = product.price <= priceLimit
+
+      const normalize = (str: string) => str.toLowerCase().replace(/[\s-]/g, "")
       const searchMatch =
         !urlSearch ||
-        product.name.toLowerCase().includes(urlSearch.toLowerCase()) ||
-        product.description.toLowerCase().includes(urlSearch.toLowerCase())
+        normalize(product.name).includes(normalize(urlSearch)) ||
+        normalize(product.description).includes(normalize(urlSearch))
 
-      return categoryMatch && sizeMatch && searchMatch
+      return categoryMatch && sizeMatch && priceMatch && searchMatch
     })
-  }, [products, selectedCategories, selectedSizes, urlSearch])
+  }, [products, selectedCategories, selectedSizes, priceLimit, urlSearch])
 
   /* ================= FILTER UI ================= */
   const FilterContent = () => (
@@ -152,6 +175,43 @@ export default function ShopPage() {
           ))}
         </div>
       </div>
+
+      {/* Price Range */}
+      <div className="pt-10 border-t border-white/5">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-[10px] uppercase tracking-[0.4em] font-medium">Price Range</h3>
+          <span className="text-[10px] text-gray-500 font-mono tracking-widest">
+            ₹0 — ₹{priceLimit.toLocaleString('en-IN')}
+          </span>
+        </div>
+        <div className="px-2 relative pt-6">
+          {/* Floating Tooltip */}
+          <div
+            className="absolute -top-2 px-2 py-1 bg-white text-black text-[9px] font-bold rounded-sm whitespace-nowrap transition-all duration-75 pointer-events-none shadow-lg -translate-x-1/2"
+            style={{
+              left: `${(priceLimit / categoryMaxPrice) * 100}%`,
+            }}
+          >
+            ₹{priceLimit.toLocaleString('en-IN')}
+            {/* Tooltip arrow */}
+            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] border-t-white"></div>
+          </div>
+
+          <input
+            type="range"
+            min="0"
+            max={categoryMaxPrice}
+            step="100"
+            value={priceLimit > categoryMaxPrice ? categoryMaxPrice : priceLimit}
+            onChange={(e) => setPriceLimit(parseInt(e.target.value))}
+            className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white hover:accent-gray-300 transition-all"
+          />
+          <div className="flex justify-between mt-4 text-[9px] text-gray-600 tracking-widest font-mono">
+            <span>₹0</span>
+            <span>₹{categoryMaxPrice.toLocaleString('en-IN')}</span>
+          </div>
+        </div>
+      </div>
     </div>
   )
 
@@ -162,24 +222,31 @@ export default function ShopPage() {
       </Suspense>
 
       {/* ================= PAGE HEADER ================= */}
-      <section className="pt-52 pb-16 text-center px-6">
-        <p className="uppercase tracking-[0.5em] text-xs text-gray-400 mb-6">
-          The Collection
-        </p>
-        <h1 className="text-6xl md:text-7xl font-serif font-light mb-4">
-          Shop All
+      <section className="pt-28 pb-0 text-center px-6">
+        {!urlCategory && !urlSearch && (
+          <p className="uppercase tracking-[0.5em] text-xs text-gray-400 mb-4">
+            The Collection
+          </p>
+        )}
+        {urlSearch && (
+          <p className="uppercase tracking-[0.5em] text-xs text-gray-400 mb-4">
+            Search Results
+          </p>
+        )}
+        <h1 className="text-5xl md:text-6xl font-serif font-light mb-2 capitalize leading-none">
+          {urlSearch ? `"${urlSearch}"` : (urlCategory || "Shop All")}
         </h1>
-        <p className="text-gray-500 text-sm tracking-widest">
+        <p className="text-gray-500 text-[10px] tracking-[0.3em] uppercase">
           {filteredProducts.length} pieces available
         </p>
       </section>
 
       {/* ================= CONTENT ================= */}
-      <main className="px-6 md:px-12 pb-32">
+      <main className="px-6 md:px-12 pb-32 -mt-4">
         <div className="flex gap-16">
           {/* Desktop Filters */}
           <aside className="hidden lg:block w-72 shrink-0">
-            <div className="sticky top-32">
+            <div className="sticky top-6">
               <FilterContent />
             </div>
           </aside>

@@ -159,7 +159,7 @@ export default function HomePage() {
             className="hero-bg object-cover opacity-60 scale-110"
           />
 
-          <div className="relative z-10 text-center mix-blend-difference pt-40">
+          <div className="relative z-10 text-center mix-blend-difference pt-32">
             {/* Subtitle */}
             <div className="overflow-hidden mb-4">
               <p className="uppercase tracking-[0.5em] text-xs text-gray-300 translate-y-full hero-line">
