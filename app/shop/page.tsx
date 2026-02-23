@@ -23,6 +23,7 @@ export default function ShopPage() {
   const [loading, setLoading] = useState(true)
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [selectedSizes, setSelectedSizes] = useState<string[]>([])
+  const [selectedGenders, setSelectedGenders] = useState<string[]>([])
   const [priceLimit, setPriceLimit] = useState<number>(100000)
 
   const searchParams = useSearchParams()
@@ -105,50 +106,87 @@ export default function ShopPage() {
 
       const priceMatch = product.price <= priceLimit
 
-      const normalize = (str: string) => str.toLowerCase().replace(/[\s-]/g, "")
-      const searchMatch =
-        !urlSearch ||
-        normalize(product.name).includes(normalize(urlSearch)) ||
-        normalize(product.description).includes(normalize(urlSearch))
+      const genderMatch =
+        selectedGenders.length === 0 ||
+        selectedGenders.includes(product.gender)
 
-      return categoryMatch && sizeMatch && priceMatch && searchMatch
+      const normalize = (str: string) => str.toLowerCase().trim()
+
+      const searchMatch = !urlSearch || (() => {
+        const queryWords = normalize(urlSearch).split(/\s+/).filter(Boolean)
+        const searchableText = normalize(`${product.name} ${product.description} ${product.category}`)
+        return queryWords.every(word => searchableText.includes(word))
+      })()
+
+      return categoryMatch && sizeMatch && priceMatch && genderMatch && searchMatch
     })
-  }, [products, selectedCategories, selectedSizes, priceLimit, urlSearch])
+  }, [products, selectedCategories, selectedSizes, priceLimit, selectedGenders, urlSearch])
 
   /* ================= FILTER UI ================= */
   const FilterContent = () => (
     <div className="space-y-12 text-sm uppercase tracking-widest text-gray-400">
-      {/* Category */}
+      {/* Gender */}
       <div>
-        <h3 className="text-white mb-6">Category</h3>
+        <h3 className="text-white mb-6">Gender</h3>
         <div className="space-y-4">
-          {categories.map((category) => (
+          {["Men", "Women"].map((gender) => (
             <label
-              key={category}
+              key={gender}
               className="flex items-center gap-3 cursor-pointer"
             >
               <Checkbox
-                checked={selectedCategories.includes(category)}
+                checked={selectedGenders.includes(gender)}
                 onCheckedChange={(checked) => {
                   if (checked) {
-                    setSelectedCategories([
-                      ...selectedCategories,
-                      category,
-                    ])
+                    setSelectedGenders([...selectedGenders, gender])
                   } else {
-                    setSelectedCategories(
-                      selectedCategories.filter((c) => c !== category)
-                    )
+                    setSelectedGenders(selectedGenders.filter((g) => g !== gender))
                   }
                 }}
+                className="border-white/20 data-[state=checked]:bg-white data-[state=checked]:text-black"
               />
-              <span className="hover:text-white transition-colors">
-                {category}
+              <span className={selectedGenders.includes(gender) ? "text-white transition-colors" : "transition-colors"}>
+                {gender}
               </span>
             </label>
           ))}
         </div>
       </div>
+
+      {/* Category - Only show on Shop All (no specific category in URL) */}
+      {!urlCategory && (
+        <div>
+          <h3 className="text-white mb-6">Category</h3>
+          <div className="space-y-4">
+            {categories.map((category) => (
+              <label
+                key={category}
+                className="flex items-center gap-3 cursor-pointer"
+              >
+                <Checkbox
+                  checked={selectedCategories.includes(category)}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelectedCategories([
+                        ...selectedCategories,
+                        category,
+                      ])
+                    } else {
+                      setSelectedCategories(
+                        selectedCategories.filter((c) => c !== category)
+                      )
+                    }
+                  }}
+                  className="border-white/20 data-[state=checked]:bg-white data-[state=checked]:text-black"
+                />
+                <span className={selectedCategories.includes(category) ? "text-white transition-colors" : "transition-colors"}>
+                  {category}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
 
 
       {/* Size */}
@@ -222,93 +260,79 @@ export default function ShopPage() {
       </Suspense>
 
       {/* ================= PAGE HEADER ================= */}
-      <section className="pt-28 pb-0 text-center px-6">
-        {!urlCategory && !urlSearch && (
-          <p className="uppercase tracking-[0.5em] text-xs text-gray-400 mb-4">
-            The Collection
-          </p>
-        )}
-        {urlSearch && (
-          <p className="uppercase tracking-[0.5em] text-xs text-gray-400 mb-4">
-            Search Results
-          </p>
-        )}
-        <h1 className="text-5xl md:text-6xl font-serif font-light mb-2 capitalize leading-none">
-          {urlSearch ? `"${urlSearch}"` : (urlCategory || "Shop All")}
-        </h1>
-        <p className="text-gray-500 text-[10px] tracking-[0.3em] uppercase">
-          {filteredProducts.length} pieces available
-        </p>
-      </section>
+      {!loading && filteredProducts.length > 0 && (
+        <section className="pt-32 pb-16 text-center px-6">
+          <h1 className="text-5xl md:text-6xl font-serif font-light mb-2 capitalize leading-none">
+            {urlSearch || urlCategory || "Shop All"}
+          </h1>
+          {urlCategory && (
+            <p className="text-gray-500 text-[10px] tracking-[0.3em] uppercase">
+              {filteredProducts.length} pieces available
+            </p>
+          )}
+        </section>
+      )}
 
       {/* ================= CONTENT ================= */}
-      <main className="px-6 md:px-12 pb-32 -mt-4">
-        <div className="flex gap-16">
-          {/* Desktop Filters */}
-          <aside className="hidden lg:block w-72 shrink-0">
-            <div className="sticky top-6">
-              <FilterContent />
-            </div>
-          </aside>
+      <main className={`px-6 md:px-12 pb-32 ${filteredProducts.length === 0 && !loading ? 'flex justify-center' : ''}`}>
+        <div className={`flex gap-16 ${filteredProducts.length === 0 && !loading ? 'w-full max-w-4xl justify-center' : 'w-full'}`}>
+          {/* Desktop Filters - Only shown if products exist */}
+          {!loading && filteredProducts.length > 0 && (
+            <aside className="hidden lg:block w-72 shrink-0 -mt-32">
+              <div className="sticky top-28">
+                <FilterContent />
+              </div>
+            </aside>
+          )}
 
-          {/* Products */}
-          <div className="flex-1">
-            {/* Mobile Filter */}
-            <div className="flex justify-end mb-10 lg:hidden">
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="border-white/20 text-white"
-                  >
-                    <SlidersHorizontal className="w-4 h-4 mr-2" />
-                    Filters
-                  </Button>
-                </SheetTrigger>
-                <SheetContent
-                  side="left"
-                  className="bg-[#030303] border-white/10"
-                >
-                  <SheetHeader>
-                    <SheetTitle className="text-white tracking-widest uppercase">
-                      Filters
-                    </SheetTitle>
-                  </SheetHeader>
-                  <div className="mt-12">
-                    <FilterContent />
-                  </div>
-                </SheetContent>
-              </Sheet>
-            </div>
-
-            {/* Grid */}
+          {/* Products area */}
+          <div className={filteredProducts.length > 0 ? "flex-1" : "w-full"}>
             {loading ? (
               <div className="flex flex-col items-center justify-center py-32 gap-4">
                 <Loader2 className="animate-spin text-gray-400" />
                 <p className="text-xs uppercase tracking-[0.3em] text-gray-500">Discovering pieces...</p>
               </div>
-            ) : filteredProducts.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-10">
-                {filteredProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
+            ) : filteredProducts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center animate-in fade-in duration-700">
+                <h2 className="text-3xl font-serif text-gray-400">Product Not Found</h2>
               </div>
             ) : (
-              <div className="text-center py-32">
-                <p className="uppercase tracking-widest text-gray-500 mb-6">
-                  No matching pieces found
-                </p>
-                <Button
-                  variant="outline"
-                  className="border-white/20 text-white"
-                  onClick={() => {
-                    setSelectedCategories([])
-                    setSelectedSizes([])
-                  }}
-                >
-                  Reset Filters
-                </Button>
-              </div>
+              <>
+                {/* Mobile Filter */}
+                <div className="flex justify-end mb-10 lg:hidden">
+                  <Sheet>
+                    <SheetTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="border-white/20 text-white"
+                      >
+                        <SlidersHorizontal className="w-4 h-4 mr-2" />
+                        Filters
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent
+                      side="left"
+                      className="bg-[#030303] border-white/10"
+                    >
+                      <SheetHeader>
+                        <SheetTitle className="text-white tracking-widest uppercase">
+                          Filters
+                        </SheetTitle>
+                      </SheetHeader>
+                      <div className="mt-12">
+                        <FilterContent />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                </div>
+
+                {/* Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-10">
+                  {filteredProducts.map((product) => (
+                    <ProductCard key={product.id} product={product} />
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </div>
