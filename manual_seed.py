@@ -7,7 +7,7 @@ default_categories = [
     {"name": "Basics", "subcategories": ["Tees"]},
     {"name": "Shirts", "subcategories": ["Formal"]},
     {"name": "Accessories", "subcategories": ["Bags", "Scarf"]},
-    {"name": "Hardware", "subcategories": ["Router", "Adapter"]},
+
 ]
 if db.categories.count_documents({}) == 0:
     db.categories.insert_many(default_categories)

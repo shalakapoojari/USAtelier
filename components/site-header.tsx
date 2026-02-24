@@ -299,7 +299,7 @@ export function SiteHeader() {
                       {cat.subcategories.map((sub: string) => (
                         <Link
                           key={sub}
-                          href={`/shop?category=${cat.name}&subcategory=${sub}`}
+                          href={`/shop?category=${cat.name}&jumpTo=${sub}`}
                           className="text-gray-500 hover:text-white transition-all text-[9px] tracking-[0.22em] hover:translate-x-1 duration-200"
                         >
                           {sub}

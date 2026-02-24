@@ -681,7 +681,7 @@ def get_categories():
             {"name": "Basics", "subcategories": ["Tees"]},
             {"name": "Shirts", "subcategories": ["Formal"]},
             {"name": "Accessories", "subcategories": ["Bags", "Scarf"]},
-            {"name": "Hardware", "subcategories": ["Router", "Adapter"]},
+
         ]
         db.categories.insert_many(default_categories)
         print("Emergeny Categories Seeded!")

@@ -32,6 +32,7 @@ export default function ShopPage() {
   const urlCategory = searchParams.get("category")
   const urlSubcategory = searchParams.get("subcategory")
   const urlSearch = searchParams.get("search")
+  const jumpTo = searchParams.get("jumpTo")
 
   // Sync with URL category and subcategory
   useEffect(() => {
@@ -72,6 +73,27 @@ export default function ShopPage() {
     }
     fetchData()
   }, [])
+
+  // Scroll to section if jumpTo is present
+  useEffect(() => {
+    if (jumpTo && !loading && products.length > 0) {
+      // Small delay to ensure the DOM has rendered the grouped sections
+      const timer = setTimeout(() => {
+        const element = document.getElementById(`section-${jumpTo.toLowerCase()}`);
+        if (element) {
+          const headerOffset = 220; // Further increased to ensure title is fully cleared from navbar
+          const elementPosition = element.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: "smooth"
+          });
+        }
+      }, 700); // Slightly more delay to ensure all products are rendered
+      return () => clearTimeout(timer);
+    }
+  }, [jumpTo, loading, products])
 
   const allSizes = useMemo(() => {
     const sizes = new Set<string>()
@@ -179,7 +201,7 @@ export default function ShopPage() {
                 }}
                 className="border-white/20 data-[state=checked]:bg-white data-[state=checked]:text-black"
               />
-              <span className={selectedGenders.includes(gender) ? "text-white transition-colors" : "transition-colors"}>
+              <span className={`text-[11px] ${selectedGenders.includes(gender) ? "text-white font-medium" : "text-gray-400"} transition-colors uppercase tracking-widest`}>
                 {gender}
               </span>
             </label>
@@ -213,7 +235,7 @@ export default function ShopPage() {
                   }}
                   className="border-white/20 data-[state=checked]:bg-white data-[state=checked]:text-black"
                 />
-                <span className={selectedCategories.includes(cat.name) ? "text-white transition-colors" : "transition-colors"}>
+                <span className={`text-[11px] ${selectedCategories.includes(cat.name) ? "text-white font-medium" : "text-gray-400"} transition-colors uppercase tracking-widest`}>
                   {cat.name}
                 </span>
               </label>
@@ -222,35 +244,7 @@ export default function ShopPage() {
         </div>
       )}
 
-      {/* Subcategory - Show when category is selected */}
-      {selectedCategories.length === 1 && (
-        <div>
-          <h3 className="text-white mb-6">Subcategory</h3>
-          <div className="space-y-4">
-            {categories.find(c => c.name === selectedCategories[0])?.subcategories?.map((sub: string) => (
-              <label
-                key={sub}
-                className="flex items-center gap-3 cursor-pointer"
-              >
-                <Checkbox
-                  checked={selectedSubcategories.includes(sub)}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setSelectedSubcategories([...selectedSubcategories, sub])
-                    } else {
-                      setSelectedSubcategories(selectedSubcategories.filter((s) => s !== sub))
-                    }
-                  }}
-                  className="border-white/20 data-[state=checked]:bg-white data-[state=checked]:text-black"
-                />
-                <span className={selectedSubcategories.includes(sub) ? "text-white transition-colors" : "transition-colors"}>
-                  {sub}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
+
 
 
       {/* Size */}
@@ -325,7 +319,7 @@ export default function ShopPage() {
 
       {/* ================= PAGE HEADER ================= */}
       {!loading && filteredProducts.length > 0 && (
-        <section className="pt-32 pb-16 text-center px-6">
+        <section className="pt-52 pb-16 text-center px-6">
           {urlCategory && (
             <h1 className="text-4xl md:text-6xl font-serif font-light mb-4 uppercase tracking-[0.2em]">
               {urlCategory.toString().toUpperCase()}
@@ -344,8 +338,8 @@ export default function ShopPage() {
         <div className={`flex gap-16 ${filteredProducts.length === 0 && !loading ? 'w-full max-w-4xl justify-center' : 'w-full'}`}>
           {/* Desktop Filters - Only shown if products exist */}
           {!loading && filteredProducts.length > 0 && (
-            <aside className="hidden lg:block w-72 shrink-0 -mt-32">
-              <div className="sticky top-28">
+            <aside className="hidden lg:block w-70 shrink-0">
+              <div className="sticky top-44 h-[calc(100vh-220px)] overflow-y-auto pr-6 custom-scrollbar scroll-smooth">
                 <FilterContent />
               </div>
             </aside>
@@ -484,7 +478,7 @@ export default function ShopPage() {
                         if (sectionProducts.length === 0) return null;
 
                         return (
-                          <div key={subName} className="w-full">
+                          <div key={subName} className="w-full pt-16 scroll-mt-64" id={`section-${subName.toLowerCase()}`}>
                             <div className="mb-12">
                               <h2 className="text-3xl font-serif font-light mb-6 uppercase tracking-[0.5em] text-white">
                                 {subName}
