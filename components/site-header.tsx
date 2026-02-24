@@ -112,7 +112,22 @@ export function SiteHeader() {
     router.push("/")
   }
 
-  const categories = ["Knitwear", "Trousers", "Basics", "Shirts", "Accessories"]
+  const [dynamicCategories, setDynamicCategories] = useState<any[]>([])
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/categories")
+        if (res.ok) {
+          const data = await res.json()
+          setDynamicCategories(data)
+        }
+      } catch (err) {
+        console.error("Failed to fetch categories:", err)
+      }
+    }
+    fetchCategories()
+  }, [])
 
   return (
     <header className="fixed top-0 left-0 w-full z-50 bg-[#030303]">
@@ -262,14 +277,37 @@ export function SiteHeader() {
 
           <div className="h-4 w-px bg-white/10 hidden md:block" />
 
-          {categories.map((cat) => (
-            <Link
-              key={cat}
-              href={`/shop?category=${cat}`}
-              className="text-gray-400 hover:text-white transition-colors"
-            >
-              {cat}
-            </Link>
+          {dynamicCategories.map((cat) => (
+            <div key={cat.id || cat.name} className="relative group/cat">
+              <Link
+                href={`/shop?category=${cat.name}`}
+                className="text-gray-400 hover:text-white transition-colors flex items-center gap-1 py-1"
+              >
+                {cat.name}
+                {cat.subcategories && cat.subcategories.length > 0 && (
+                  <ChevronDown size={10} className="group-hover/cat:rotate-180 transition-transform duration-200" />
+                )}
+              </Link>
+
+              {/* Subcategories Dropdown */}
+              {cat.subcategories && cat.subcategories.length > 0 && (
+                <div className="absolute left-1/2 -translate-x-1/2 top-full pt-4 opacity-0 invisible group-hover/cat:opacity-100 group-hover/cat:visible transition-all duration-200 z-50">
+                  <div className="bg-[#0e0e0e] border border-white/10 p-4 shadow-2xl min-w-[200px]">
+                    <div className="flex flex-col gap-3">
+                      {cat.subcategories.map((sub: string) => (
+                        <Link
+                          key={sub}
+                          href={`/shop?category=${cat.name}&subcategory=${sub}`}
+                          className="text-gray-500 hover:text-white transition-colors text-[9px] tracking-[0.2em]"
+                        >
+                          {sub}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       </div>

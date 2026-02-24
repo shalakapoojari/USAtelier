@@ -48,14 +48,12 @@ export function ProductCard({ product }: ProductCardProps) {
     if (!imgRef.current) return
     gsap.to(imgRef.current, { scale: 1.04, duration: 0.5, ease: "power2.out" })
     gsap.to(rootRef.current, { boxShadow: "0 10px 30px rgba(0,0,0,0.15)", duration: 0.35 })
-    if (images.length > 1) setCurrentImage(1)
   }
 
   const handleLeave = () => {
     if (!imgRef.current) return
     gsap.to(imgRef.current, { scale: 1, duration: 0.35, ease: "power2.out" })
     gsap.to(rootRef.current, { boxShadow: "0 0px 0px rgba(0,0,0,0)", duration: 0.35 })
-    setCurrentImage(0)
   }
 
   return (

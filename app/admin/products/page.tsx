@@ -42,6 +42,7 @@ export default function ProductsPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [isAdding, setIsAdding] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<any>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const { showToast } = useToast()
 
@@ -59,6 +60,7 @@ export default function ProductsPage() {
     bestseller: false,
     fabric: "",
     care: "",
+    gender: "Unisex",
   })
 
   useEffect(() => {
@@ -133,7 +135,6 @@ export default function ProductsPage() {
       showToast("Upload error", "info")
     }
   }
-
   const handleDeleteProduct = async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return
 
@@ -155,6 +156,53 @@ export default function ProductsPage() {
     }
   }
 
+  const handleEditProduct = (product: any) => {
+    // Robustly handle images which might be JSON strings or arrays
+    const images = (() => {
+      if (Array.isArray(product.images)) return product.images
+      try {
+        const parsed = JSON.parse(product.images)
+        return Array.isArray(parsed) ? (parsed.length > 0 ? parsed : ["", "", ""]) : [product.images]
+      } catch {
+        return [product.images]
+      }
+    })()
+
+    // Pad images to at least 3
+    const paddedImages = [...images]
+    while (paddedImages.length < 3) paddedImages.push("")
+
+    // Handle sizes
+    const sizes = (() => {
+      if (Array.isArray(product.sizes)) return product.sizes
+      try {
+        const parsed = JSON.parse(product.sizes)
+        return Array.isArray(parsed) ? parsed : []
+      } catch {
+        return []
+      }
+    })()
+
+    setFormData({
+      name: product.name || "",
+      price: product.price?.toString() || "",
+      category: product.category || "",
+      subcategory: product.subcategory || "",
+      description: product.description || "",
+      images: paddedImages,
+      sizes: sizes,
+      stock: product.stock?.toString() || "0",
+      featured: product.is_featured || false,
+      newArrival: product.is_new || false,
+      bestseller: product.is_bestseller || false,
+      fabric: product.fabric || "",
+      care: product.care || "",
+      gender: product.gender || "Unisex",
+    })
+    setEditingProduct(product)
+    setDialogOpen(true)
+  }
+
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsAdding(true)
@@ -167,8 +215,13 @@ export default function ProductsPage() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/products`, {
-        method: "POST",
+      const url = editingProduct
+        ? `${API_BASE}/api/products/${editingProduct.id}`
+        : `${API_BASE}/api/products`
+      const method = editingProduct ? "PUT" : "POST"
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
@@ -178,8 +231,9 @@ export default function ProductsPage() {
       })
 
       if (res.ok) {
-        showToast("Product added successfully", "info")
+        showToast(editingProduct ? "Product updated successfully" : "Product added successfully", "info")
         setDialogOpen(false)
+        setEditingProduct(null)
         fetchProducts()
         setFormData({
           name: "",
@@ -195,10 +249,11 @@ export default function ProductsPage() {
           bestseller: false,
           fabric: "",
           care: "",
+          gender: "Unisex",
         })
       } else {
         const data = await res.json()
-        showToast(data.error || "Failed to add product", "info")
+        showToast(data.error || "Failed to save product", "info")
       }
     } catch (err) {
       showToast("Network error", "info")
@@ -238,7 +293,28 @@ export default function ProductsPage() {
           </p>
         </div>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          setDialogOpen(open)
+          if (!open) {
+            setEditingProduct(null)
+            setFormData({
+              name: "",
+              price: "",
+              category: "",
+              subcategory: "",
+              description: "",
+              images: ["", "", ""],
+              sizes: [],
+              stock: "100",
+              featured: false,
+              newArrival: false,
+              bestseller: false,
+              fabric: "",
+              care: "",
+              gender: "Unisex",
+            })
+          }
+        }}>
           <DialogTrigger asChild>
             <Button className="border border-white/40 bg-transparent px-8 py-6 uppercase tracking-widest text-xs hover:bg-white hover:text-black transition-all rounded-none">
               Add Product
@@ -246,7 +322,9 @@ export default function ProductsPage() {
           </DialogTrigger>
           <DialogContent className="bg-[#0a0a0a] border-white/10 text-white max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="font-serif text-3xl font-light tracking-widest uppercase">Add New Product</DialogTitle>
+              <DialogTitle className="font-serif text-3xl font-light tracking-widest uppercase">
+                {editingProduct ? "Edit Product" : "Add New Product"}
+              </DialogTitle>
             </DialogHeader>
 
             <form onSubmit={handleAddProduct} className="space-y-12 py-8">
@@ -285,8 +363,25 @@ export default function ProductsPage() {
                             type="number"
                             value={formData.stock}
                             onChange={handleInputChange}
+                            required
                             className="bg-transparent border-white/10 focus:border-white/30 rounded-none h-12"
                           />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-[10px] uppercase tracking-widest text-gray-400">Gender</Label>
+                          <Select
+                            value={formData.gender}
+                            onValueChange={(v) => setFormData(p => ({ ...p, gender: v }))}
+                          >
+                            <SelectTrigger className="bg-transparent border-white/10 focus:border-white/30 rounded-none h-12">
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-[#0a0a0a] border-white/10 text-white">
+                              <SelectItem value="Men">Men</SelectItem>
+                              <SelectItem value="Women">Women</SelectItem>
+                              <SelectItem value="Unisex">Unisex</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
                     </div>
@@ -438,8 +533,8 @@ export default function ProductsPage() {
                           type="button"
                           onClick={() => toggleSize(size)}
                           className={`px-3 py-2 text-[10px] uppercase tracking-widest border transition-all ${formData.sizes.includes(size)
-                              ? "bg-white text-black border-white"
-                              : "border-white/10 text-gray-500 hover:text-white hover:border-white/30"
+                            ? "bg-white text-black border-white"
+                            : "border-white/10 text-gray-500 hover:text-white hover:border-white/30"
                             }`}
                         >
                           {size}
@@ -456,7 +551,7 @@ export default function ProductsPage() {
                   disabled={isAdding}
                   className="w-full bg-white text-black hover:bg-gray-200 uppercase tracking-widest text-xs py-8 rounded-none transition-all"
                 >
-                  {isAdding ? <Loader2 className="animate-spin" /> : "Publish to Catalog"}
+                  {isAdding ? <Loader2 className="animate-spin" /> : editingProduct ? "Update Catalog Item" : "Publish to Catalog"}
                 </Button>
               </DialogFooter>
             </form>
@@ -506,6 +601,9 @@ export default function ProductsPage() {
                   {p.stock > 0 ? <span className="text-white">In Stock ({p.stock})</span> : <span className="text-red-500/60">Sold Out</span>}
                 </td>
                 <td className="px-8 py-6 text-right space-x-4">
+                  <button onClick={() => handleEditProduct(p)} className="uppercase tracking-widest text-[10px] text-gray-400 hover:text-white transition-colors">
+                    Edit
+                  </button>
                   <button onClick={() => handleDeleteProduct(p.id)} className="uppercase tracking-widest text-[10px] text-red-400/40 hover:text-red-400 transition-colors">
                     Delete
                   </button>

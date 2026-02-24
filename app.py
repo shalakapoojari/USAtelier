@@ -373,7 +373,7 @@ def add_product():
     data = request.get_json()
     
     # Validation
-    required = ['name', 'price', 'category', 'gender', 'description', 'images', 'sizes']
+    required = ['name', 'price', 'category', 'description', 'images', 'sizes']
     for field in required:
         if field not in data:
             return jsonify({"error": f"Field '{field}' is required"}), 400
@@ -383,7 +383,8 @@ def add_product():
             "name": data['name'],
             "price": float(data['price']),
             "category": data['category'],
-            "gender": data['gender'],
+            "subcategory": data.get('subcategory', ''),
+            "gender": data.get('gender', 'Unisex'),
             "description": data['description'],
             "images": json.dumps(data['images']) if isinstance(data['images'], list) else data['images'],
             "sizes": json.dumps(data['sizes']) if isinstance(data['sizes'], list) else data['sizes'],
@@ -402,6 +403,54 @@ def add_product():
             "message": "Product added successfully",
             "id": str(result.inserted_id)
         }), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/products/<product_id>', methods=['PUT'])
+def update_product(product_id):
+    is_admin = session.get('is_admin')
+    if 'user_id' not in session or not (is_admin is True or str(is_admin).lower() == 'true'):
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    data = request.get_json()
+    
+    # Validation
+    required = ['name', 'price', 'category', 'description', 'images', 'sizes']
+    for field in required:
+        if field not in data:
+            return jsonify({"error": f"Field '{field}' is required"}), 400
+            
+    try:
+        updated_product = {
+            "name": data['name'],
+            "price": float(data['price']),
+            "category": data['category'],
+            "subcategory": data.get('subcategory', ''),
+            "gender": data.get('gender', 'Unisex'),
+            "description": data['description'],
+            "images": json.dumps(data['images']) if isinstance(data['images'], list) else data['images'],
+            "sizes": json.dumps(data['sizes']) if isinstance(data['sizes'], list) else data['sizes'],
+            "stock": int(data.get('stock', 0)),
+            "is_featured": bool(data.get('featured', False)),
+            "is_new": bool(data.get('newArrival', False)),
+            "is_bestseller": bool(data.get('bestseller', False)),
+            "fabric": data.get('fabric', ''),
+            "care": data.get('care', ''),
+            "updated_at": datetime.utcnow()
+        }
+        
+        result = db.products.update_one(
+            {"_id": ObjectId(product_id)},
+            {"$set": updated_product}
+        )
+        
+        if result.matched_count > 0:
+            return jsonify({
+                "success": True, 
+                "message": "Product updated successfully"
+            }), 200
+        else:
+            return jsonify({"error": "Product not found"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -625,6 +674,18 @@ def get_orders():
 
 @app.route('/api/categories', methods=['GET'])
 def get_categories():
+    if db.categories.count_documents({}) == 0:
+        default_categories = [
+            {"name": "Knitwear", "subcategories": ["Sweaters", "Cardigans"]},
+            {"name": "Trousers", "subcategories": ["Tailored", "Casual"]},
+            {"name": "Basics", "subcategories": ["Tees"]},
+            {"name": "Shirts", "subcategories": ["Formal"]},
+            {"name": "Accessories", "subcategories": ["Bags", "Scarf"]},
+            {"name": "Hardware", "subcategories": ["Router", "Adapter"]},
+        ]
+        db.categories.insert_many(default_categories)
+        print("Emergeny Categories Seeded!")
+
     categories = list(db.categories.find())
     return jsonify([serialize_doc(c) for c in categories])
 
