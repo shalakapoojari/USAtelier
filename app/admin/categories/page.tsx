@@ -1,170 +1,206 @@
 "use client"
 
-import { useState } from "react"
-import {
-  customCategories,
-  addCustomCategory,
-  deleteCustomCategory,
-  products,
-  updateProduct,
-} from "@/lib/data"
-
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Trash2 } from "lucide-react"
-import Link from "next/link"
+import { Plus, Trash2, Loader2, FolderPlus } from "lucide-react"
+import { useToast } from "@/lib/toast-context"
+
+const API_BASE = "http://localhost:5000"
+
+type Category = {
+  id: string
+  name: string
+  subcategories: string[]
+}
 
 export default function CategoriesPage() {
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(true)
   const [newCategoryName, setNewCategoryName] = useState("")
+  const [newSubcategoryName, setNewSubcategoryName] = useState<{ [key: string]: string }>({})
+  const { showToast } = useToast()
 
-  const handleAddCategory = () => {
-    if (!newCategoryName.trim()) return
-    addCustomCategory(newCategoryName.trim())
-    setNewCategoryName("")
-  }
+  useEffect(() => {
+    fetchCategories()
+  }, [])
 
-  const handleDeleteCategory = (category: string) => {
-    if (!confirm(`Delete category "${category}"? This cannot be undone.`))
-      return
-
-    deleteCustomCategory(category)
-
-    products.forEach((product) => {
-      if (product.customCategories?.includes(category)) {
-        updateProduct(product.id, {
-          customCategories: product.customCategories.filter(
-            (c) => c !== category
-          ),
-        })
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/categories`)
+      if (res.ok) {
+        const data = await res.json()
+        setCategories(data)
       }
-    })
+    } catch (err) {
+      console.error("Failed to fetch categories:", err)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const getCategoryProductCount = (category: string) =>
-    products.filter((p) =>
-      p.customCategories?.includes(category)
-    ).length
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) return
+    try {
+      const res = await fetch(`${API_BASE}/api/categories`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: newCategoryName.trim() }),
+      })
+      if (res.ok) {
+        showToast("Category added", "info")
+        setNewCategoryName("")
+        fetchCategories()
+      } else {
+        const data = await res.json()
+        showToast(data.error || "Failed to add", "info")
+      }
+    } catch {
+      showToast("Network error", "info")
+    }
+  }
+
+  const handleSubcategorySubmit = async (catName: string) => {
+    const subName = newSubcategoryName[catName]
+    if (!subName || !subName.trim()) return
+
+    try {
+      const res = await fetch(`${API_BASE}/api/categories`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: catName, subcategory: subName.trim() }),
+      })
+      if (res.ok) {
+        showToast("Subcategory added", "info")
+        setNewSubcategoryName(prev => ({ ...prev, [catName]: "" }))
+        fetchCategories()
+      } else {
+        const data = await res.json()
+        showToast(data.error || "Failed to add", "info")
+      }
+    } catch {
+      showToast("Network error", "info")
+    }
+  }
+
+  const handleDeleteCategory = async (id: string, name: string) => {
+    if (!confirm(`Delete category "${name}"? This cannot be undone.`)) return
+
+    try {
+      const res = await fetch(`${API_BASE}/api/categories/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      if (res.ok) {
+        showToast("Category deleted", "info")
+        fetchCategories()
+      } else {
+        showToast("Failed to delete", "info")
+      }
+    } catch {
+      showToast("Network error", "info")
+    }
+  }
 
   return (
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen px-8 py-16">
-      {/* ================= HEADER ================= */}
       <div className="max-w-[1400px] mx-auto mb-20">
-        <p className="uppercase tracking-[0.5em] text-xs text-gray-500 mb-4">
-          Admin
-        </p>
-        <h1 className="font-serif text-5xl font-light">
-          Categories
-        </h1>
+        <p className="uppercase tracking-[0.5em] text-xs text-gray-500 mb-4">Admin</p>
+        <h1 className="font-serif text-5xl font-light">Categories</h1>
         <p className="mt-4 text-sm tracking-widest text-gray-500 max-w-xl">
-          Create, organize, and maintain custom product groupings.
+          Manage product categories and their subcategories.
         </p>
       </div>
 
-      <div className="max-w-[1400px] mx-auto space-y-24">
-        {/* ================= ADD CATEGORY ================= */}
-        <section className="border border-white/10 p-10">
-          <h2 className="uppercase tracking-widest text-xs text-gray-400 mb-8">
-            Create New Category
-          </h2>
-
-          <div className="flex gap-6 max-w-xl">
-            <Input
-              value={newCategoryName}
-              onChange={(e) =>
-                setNewCategoryName(e.target.value)
-              }
-              placeholder="Category name"
-              className="bg-transparent border-white/20 text-white placeholder:text-gray-600"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAddCategory()
-              }}
-            />
-
-            <Button
-              onClick={handleAddCategory}
-              className="border border-white/40 bg-transparent uppercase tracking-widest text-xs hover:bg-white hover:text-black transition-all"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add
-            </Button>
-          </div>
-        </section>
-
-        {/* ================= CATEGORY LIST ================= */}
-        <section>
-          <h2 className="uppercase tracking-widest text-xs text-gray-400 mb-12">
-            Existing Categories ({customCategories.length})
-          </h2>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {customCategories.map((category) => (
-              <div
-                key={category}
-                className="border border-white/10 p-8 flex flex-col justify-between"
-              >
-                <div>
-                  <h3 className="font-serif text-2xl font-light mb-2">
-                    {category}
-                  </h3>
-                  <p className="text-xs tracking-widest text-gray-500">
-                    {getCategoryProductCount(category)} PRODUCTS
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-6 mt-8">
-                  <Link
-                    href={`/collections/${category
-                      .toLowerCase()
-                      .replace(/\s+/g, "-")}`}
-                    className="uppercase tracking-widest text-xs text-gray-400 hover:text-white transition-colors"
-                  >
-                    View
-                  </Link>
-
-                  <button
-                    onClick={() =>
-                      handleDeleteCategory(category)
-                    }
-                    className="uppercase tracking-widest text-xs text-red-500 hover:text-red-400 transition-colors ml-auto"
-                  >
-                    Delete
-                  </button>
-                </div>
+      <div className="max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-3 gap-12">
+        {/* ADD CATEGORY */}
+        <div className="lg:col-span-1">
+          <section className="border border-white/10 p-10 sticky top-10 bg-white/[0.02]">
+            <h2 className="uppercase tracking-widest text-[10px] text-gray-400 mb-8 border-b border-white/5 pb-4">
+              Create New Category
+            </h2>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest text-gray-500">Name</label>
+                <Input
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="e.g. Outerwear"
+                  className="bg-transparent border-white/20 text-white rounded-none h-12"
+                />
               </div>
-            ))}
-          </div>
-        </section>
+              <Button
+                onClick={handleAddCategory}
+                className="w-full bg-white text-black hover:bg-gray-200 uppercase tracking-widest text-xs h-12 rounded-none"
+              >
+                <Plus className="h-4 w-4 mr-2" /> Add Category
+              </Button>
+            </div>
+          </section>
+        </div>
 
-        {/* ================= TAG INFO ================= */}
-        <section className="border border-white/10 p-10 max-w-3xl">
-          <h2 className="uppercase tracking-widest text-xs text-gray-400 mb-6">
-            Product Tags
-          </h2>
+        {/* CATEGORY LIST */}
+        <div className="lg:col-span-2">
+          {loading ? (
+            <div className="flex flex-col items-center py-20 gap-4">
+              <Loader2 className="animate-spin text-gray-500" />
+              <p className="text-xs uppercase tracking-[0.3em] text-gray-500">Loading catalog structure...</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-8">
+              {categories.map((cat) => (
+                <div key={cat.id} className="border border-white/10 p-8 hover:bg-white/[0.01] transition-all group">
+                  <div className="flex justify-between items-start mb-8">
+                    <div>
+                      <h3 className="font-serif text-3xl font-light">{cat.name}</h3>
+                      <p className="text-[10px] uppercase tracking-[0.3em] text-gray-500 mt-2">
+                        {cat.subcategories.length} Subcategories
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                      className="text-red-500/40 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                  </div>
 
-          <p className="text-sm tracking-widest text-gray-500 mb-8">
-            These system tags can be applied directly to products.
-          </p>
+                  {/* Subcategories */}
+                  <div className="space-y-6">
+                    <div className="flex flex-wrap gap-2">
+                      {cat.subcategories.map(sub => (
+                        <Badge key={sub} variant="outline" className="border-white/10 text-gray-400 py-1 px-3 rounded-none uppercase text-[10px] tracking-widest">
+                          {sub}
+                        </Badge>
+                      ))}
+                    </div>
 
-          <div className="flex gap-3 mb-8">
-            <Badge className="bg-white text-black">
-              Featured
-            </Badge>
-            <Badge className="bg-white text-black">
-              New Arrival
-            </Badge>
-            <Badge className="bg-white text-black">
-              Bestseller
-            </Badge>
-          </div>
-
-          <Link
-            href="/admin/products"
-            className="inline-block border border-white/30 px-8 py-4 uppercase tracking-widest text-xs hover:bg-white hover:text-black transition-all"
-          >
-            Go to Products
-          </Link>
-        </section>
+                    <div className="flex gap-4 pt-4 border-t border-white/5">
+                      <Input
+                        value={newSubcategoryName[cat.name] || ""}
+                        onChange={(e) => setNewSubcategoryName(prev => ({ ...prev, [cat.name]: e.target.value }))}
+                        placeholder="Add subcategory..."
+                        className="bg-transparent border-white/10 focus:border-white/30 text-xs rounded-none h-10"
+                        onKeyDown={(e) => e.key === "Enter" && handleSubcategorySubmit(cat.name)}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleSubcategorySubmit(cat.name)}
+                        className="border-white/20 hover:bg-white hover:text-black rounded-none h-10 px-6 uppercase text-[10px] tracking-widest"
+                      >
+                        <FolderPlus className="h-3 w-3 mr-2" /> Add
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

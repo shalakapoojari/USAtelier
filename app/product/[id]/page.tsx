@@ -15,7 +15,7 @@ import { useAuth } from "@/lib/auth-context"
 
 import { ChevronDown, ChevronUp, ShoppingBag, Heart, Star, Check, Sparkles, Award, ArrowLeft, Loader2 } from "lucide-react"
 
-const API_BASE = "http://127.0.0.1:5000"
+const API_BASE = "http://localhost:5000"
 
 export default function ProductPage({
   params,

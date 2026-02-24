@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 
-const API_BASE = "http://127.0.0.1:5000"
+const API_BASE = "http://localhost:5000"
 
 type User = {
   id: string

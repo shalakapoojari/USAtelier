@@ -14,7 +14,7 @@ import { useToast } from "@/lib/toast-context"
 
 import { useAuth } from "@/lib/auth-context"
 
-const API_BASE = "http://127.0.0.1:5000"
+const API_BASE = "http://localhost:5000"
 
 export default function ProfilePage() {
   const { user, updateProfile } = useAuth()

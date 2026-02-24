@@ -13,6 +13,7 @@ export type Product = {
   fabric?: string
   care?: string
   customCategories?: string[]
+  subcategory?: string
 }
 
 export type Collection = {
@@ -59,6 +60,7 @@ export const products: Product[] = [
     price: 24485,
     description: "Luxuriously soft cashmere sweater with a relaxed fit. Perfect for layering or wearing alone.",
     category: "Knitwear",
+    subcategory: "Sweaters",
     images: ["/minimal-beige-cashmere-sweater-on-model.jpg", "/beige-cashmere-sweater-detail-texture-close-up.jpg"],
     sizes: ["XS", "S", "M", "L", "XL"],
     inStock: true,
@@ -73,6 +75,7 @@ export const products: Product[] = [
     price: 20335,
     description: "Classic tailored trousers crafted from premium wool. Timeless silhouette with a modern fit.",
     category: "Trousers",
+    subcategory: "Tailored",
     images: ["/charcoal-grey-wool-trousers-on-model-minimal.jpg", "/grey-tailored-trousers-detail-close-up.jpg"],
     sizes: ["28", "30", "32", "34", "36"],
     inStock: true,
@@ -87,6 +90,7 @@ export const products: Product[] = [
     price: 7055,
     description: "Essential crew neck tee made from premium organic cotton. Soft, breathable, and perfectly fitted.",
     category: "Basics",
+    subcategory: "Tees",
     images: ["/white-cotton-t-shirt-on-model-minimal-clean.jpg", "/white-tee-shirt-folded-detail.jpg"],
     sizes: ["XS", "S", "M", "L", "XL"],
     inStock: true,
@@ -100,6 +104,7 @@ export const products: Product[] = [
     price: 26975,
     description: "Elegant silk shirt with mother-of-pearl buttons. Effortlessly sophisticated.",
     category: "Shirts",
+    subcategory: "Formal",
     images: ["/ivory-silk-shirt-on-model-minimal-elegant.jpg", "/silk-shirt-detail-buttons-close-up.jpg"],
     sizes: ["XS", "S", "M", "L"],
     inStock: true,
@@ -113,6 +118,7 @@ export const products: Product[] = [
     price: 22825,
     description: "Lightweight merino wool cardigan. Versatile layering piece for any season.",
     category: "Knitwear",
+    subcategory: "Cardigans",
     images: ["/navy-merino-wool-cardigan-on-model.jpg", "/navy-cardigan-detail-texture.jpg"],
     sizes: ["S", "M", "L", "XL"],
     inStock: true,
@@ -126,6 +132,7 @@ export const products: Product[] = [
     price: 16185,
     description: "Flowing wide-leg pants in breathable linen. Relaxed yet refined.",
     category: "Trousers",
+    subcategory: "Casual",
     images: ["/natural-linen-wide-leg-pants-on-model.jpg", "/linen-pants-texture-detail.jpg"],
     sizes: ["XS", "S", "M", "L"],
     inStock: false,
@@ -138,6 +145,7 @@ export const products: Product[] = [
     price: 35275,
     description: "Handcrafted leather tote with clean lines. Spacious interior with magnetic closure.",
     category: "Accessories",
+    subcategory: "Bags",
     images: ["/tan-leather-tote-bag-minimal.jpg", "/leather-bag-detail-stitching.jpg"],
     sizes: ["One Size"],
     inStock: true,
@@ -152,6 +160,7 @@ export const products: Product[] = [
     price: 13695,
     description: "Soft cashmere scarf in a versatile neutral tone. Essential cold-weather accessory.",
     category: "Accessories",
+    subcategory: "Scarf",
     images: ["/beige-cashmere-scarf-styled.jpg", "/beige-cashmere-sweater-detail-texture-close-up.jpg"],
     sizes: ["One Size"],
     inStock: true,

@@ -621,6 +621,53 @@ def get_orders():
     orders = list(db.orders.find({"user_id": session['user_id']}).sort("created_at", -1))
     return jsonify([serialize_doc(o) for o in orders])
 
+# ==================== CATEGORIES ====================
+
+@app.route('/api/categories', methods=['GET'])
+def get_categories():
+    categories = list(db.categories.find())
+    return jsonify([serialize_doc(c) for c in categories])
+
+@app.route('/api/categories', methods=['POST'])
+def add_category():
+    is_admin = session.get('is_admin')
+    if 'user_id' not in session or not (is_admin is True or str(is_admin).lower() == 'true'):
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    data = request.get_json()
+    name = data.get('name', '').strip()
+    subcategory = data.get('subcategory', '').strip()
+    
+    if not name:
+        return jsonify({"error": "Category name required"}), 400
+        
+    existing = db.categories.find_one({"name": name})
+    if existing:
+        if subcategory and subcategory not in existing.get('subcategories', []):
+            db.categories.update_one(
+                {"_id": existing['_id']},
+                {"$push": {"subcategories": subcategory}}
+            )
+            return jsonify({"success": True, "message": "Subcategory added"}), 201
+        return jsonify({"error": "Category already exists"}), 400
+        
+    new_cat = {
+        "name": name,
+        "subcategories": [subcategory] if subcategory else [],
+        "created_at": datetime.utcnow()
+    }
+    db.categories.insert_one(new_cat)
+    return jsonify({"success": True, "message": "Category created"}), 201
+
+@app.route('/api/categories/<cat_id>', methods=['DELETE'])
+def delete_category(cat_id):
+    is_admin = session.get('is_admin')
+    if 'user_id' not in session or not (is_admin is True or str(is_admin).lower() == 'true'):
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    db.categories.delete_one({"_id": ObjectId(cat_id)})
+    return jsonify({"success": True, "message": "Category deleted"}), 200
+
 # ==================== SEEDING ====================
 
 def seed_database():
@@ -651,6 +698,19 @@ def seed_database():
     # Cleanup old experiments if they exist
     db.users.delete_many({"email": {"$in": ["admin@example.com", "admin.com"]}})
 
+    # ── SEED CATEGORIES ──
+    default_categories = [
+        {"name": "Knitwear", "subcategories": ["Sweaters", "Cardigans"]},
+        {"name": "Trousers", "subcategories": ["Tailored", "Casual"]},
+        {"name": "Basics", "subcategories": ["Tees"]},
+        {"name": "Shirts", "subcategories": ["Formal"]},
+        {"name": "Accessories", "subcategories": ["Bags", "Scarf"]},
+    ]
+    
+    if db.categories.count_documents({}) == 0:
+        db.categories.insert_many(default_categories)
+        print("Categories Seeded!")
+
     # ── SEED PRODUCTS ONLY IF EMPTY (OR FORCE RE-SEED FOR CLEANUP) ──
     # If we have very few products or broken ones, let's clear it once.
     if db.products.count_documents({}) > 0:
@@ -664,6 +724,7 @@ def seed_database():
             "price": 295,
             "description": "Luxuriously soft cashmere sweater with a relaxed fit.",
             "category": "Knitwear",
+            "subcategory": "Sweaters",
             "gender": "Women",
             "images": json.dumps(["/minimal-beige-cashmere-sweater-on-model.jpg"]),
             "sizes": json.dumps(["XS", "S", "M", "L", "XL"]),
@@ -676,6 +737,7 @@ def seed_database():
             "price": 245,
             "description": "Classic tailored trousers crafted from premium wool.",
             "category": "Trousers",
+            "subcategory": "Tailored",
             "gender": "Men",
             "images": json.dumps(["/charcoal-grey-wool-trousers-on-model-minimal.jpg"]),
             "sizes": json.dumps(["28", "30", "32", "34", "36"]),
@@ -688,6 +750,7 @@ def seed_database():
             "price": 85,
             "description": "Essential crew neck tee made from premium organic cotton.",
             "category": "Basics",
+            "subcategory": "Tees",
             "gender": "Men",
             "images": json.dumps(["/white-cotton-t-shirt-on-model-minimal-clean.jpg"]),
             "sizes": json.dumps(["XS", "S", "M", "L", "XL"]),
@@ -700,6 +763,7 @@ def seed_database():
             "price": 325,
             "description": "Elegant silk shirt with mother-of-pearl buttons.",
             "category": "Shirts",
+            "subcategory": "Formal",
             "gender": "Women",
             "images": json.dumps(["/ivory-silk-shirt-on-model-minimal-elegant.jpg"]),
             "sizes": json.dumps(["XS", "S", "M", "L"]),
@@ -712,6 +776,7 @@ def seed_database():
             "price": 275,
             "description": "Lightweight merino wool cardigan.",
             "category": "Knitwear",
+            "subcategory": "Cardigans",
             "gender": "Men",
             "images": json.dumps(["/navy-merino-wool-cardigan-on-model.jpg"]),
             "sizes": json.dumps(["S", "M", "L", "XL"]),
@@ -724,6 +789,7 @@ def seed_database():
             "price": 195,
             "description": "Flowing wide-leg pants in breathable linen.",
             "category": "Trousers",
+            "subcategory": "Casual",
             "gender": "Women",
             "images": json.dumps(["/natural-linen-wide-leg-pants-on-model.jpg"]),
             "sizes": json.dumps(["XS", "S", "M", "L"]),
@@ -735,6 +801,7 @@ def seed_database():
             "price": 425,
             "description": "Handcrafted leather tote with clean lines.",
             "category": "Accessories",
+            "subcategory": "Bags",
             "gender": "Women",
             "images": json.dumps(["/tan-leather-tote-bag-minimal.jpg"]),
             "sizes": json.dumps(["One Size"]),
@@ -748,6 +815,7 @@ def seed_database():
             "price": 165,
             "description": "Soft cashmere scarf in a versatile neutral tone.",
             "category": "Accessories",
+            "subcategory": "Scarf",
             "gender": "Men",
             "images": json.dumps(["/beige-cashmere-scarf-styled.jpg"]),
             "sizes": json.dumps(["One Size"]),

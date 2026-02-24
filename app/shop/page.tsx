@@ -16,10 +16,11 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { SlidersHorizontal, Loader2 } from "lucide-react"
 
-const API_BASE = "http://127.0.0.1:5000"
+const API_BASE = "http://localhost:5000"
 
 export default function ShopPage() {
   const [products, setProducts] = useState<any[]>([])
+  const [categories, setCategories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [selectedSizes, setSelectedSizes] = useState<string[]>([])
@@ -40,37 +41,47 @@ export default function ShopPage() {
   }, [urlCategory])
 
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchData = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/products`, {
-          credentials: "include",
-        })
-        if (res.ok) {
-          const data = await res.json()
+        const [prodRes, catRes] = await Promise.all([
+          fetch(`${API_BASE}/api/products`, { credentials: "include" }),
+          fetch(`${API_BASE}/api/categories`)
+        ])
+
+        if (prodRes.ok) {
+          const data = await prodRes.json()
           setProducts(data)
         }
+        if (catRes.ok) {
+          const data = await catRes.json()
+          setCategories(data)
+        }
       } catch (err) {
-        console.error("Failed to fetch products:", err)
+        console.error("Failed to fetch shop data:", err)
       } finally {
         setLoading(false)
       }
     }
-    fetchProducts()
+    fetchData()
   }, [])
 
-  const categories = useMemo(() => Array.from(new Set(products.map((p) => p.category))), [products])
   const allSizes = useMemo(() => {
     const sizes = new Set<string>()
-    products.forEach((p) => {
+    const relevantProducts = urlCategory
+      ? products.filter(p => (p.category || "").toLowerCase() === urlCategory.toLowerCase())
+      : products
+
+    relevantProducts.forEach((p) => {
+      if (!p.sizes) return
       try {
-        const parsed = JSON.parse(p.sizes)
+        const parsed = typeof p.sizes === 'string' ? JSON.parse(p.sizes) : p.sizes
         if (Array.isArray(parsed)) parsed.forEach(s => sizes.add(s))
       } catch {
-        // If not JSON, skip or handle as single string
+        // If not JSON, skip
       }
     })
     return Array.from(sizes).sort()
-  }, [products])
+  }, [products, urlCategory])
 
   const absoluteMaxPrice = useMemo(() => {
     if (products.length === 0) return 0
@@ -79,10 +90,10 @@ export default function ShopPage() {
 
   const categoryMaxPrice = useMemo(() => {
     const categoryProducts = urlCategory
-      ? products.filter(p => p.category.toLowerCase() === urlCategory.toLowerCase())
+      ? products.filter(p => (p.category || "").toLowerCase() === urlCategory.toLowerCase())
       : products
     if (categoryProducts.length === 0) return absoluteMaxPrice
-    return Math.max(...categoryProducts.map(p => p.price))
+    return Math.max(...categoryProducts.map(p => p.price || 0))
   }, [products, urlCategory, absoluteMaxPrice])
 
   // Reset price limit when category changes
@@ -158,29 +169,29 @@ export default function ShopPage() {
         <div>
           <h3 className="text-white mb-6">Category</h3>
           <div className="space-y-4">
-            {categories.map((category) => (
+            {categories.map((cat) => (
               <label
-                key={category}
+                key={cat.id || cat.name}
                 className="flex items-center gap-3 cursor-pointer"
               >
                 <Checkbox
-                  checked={selectedCategories.includes(category)}
+                  checked={selectedCategories.includes(cat.name)}
                   onCheckedChange={(checked) => {
                     if (checked) {
                       setSelectedCategories([
                         ...selectedCategories,
-                        category,
+                        cat.name,
                       ])
                     } else {
                       setSelectedCategories(
-                        selectedCategories.filter((c) => c !== category)
+                        selectedCategories.filter((c) => c !== cat.name)
                       )
                     }
                   }}
                   className="border-white/20 data-[state=checked]:bg-white data-[state=checked]:text-black"
                 />
-                <span className={selectedCategories.includes(category) ? "text-white transition-colors" : "transition-colors"}>
-                  {category}
+                <span className={selectedCategories.includes(cat.name) ? "text-white transition-colors" : "transition-colors"}>
+                  {cat.name}
                 </span>
               </label>
             ))}
@@ -254,7 +265,7 @@ export default function ShopPage() {
   )
 
   return (
-    <div className="bg-[#030303] text-[#e8e8e3] min-h-screen">
+    <div className="bg-[#030303] text-[#e8e8e3] min-h-screen overflow-x-hidden">
       <Suspense fallback={<div>Loading...</div>}>
         <SiteHeader />
       </Suspense>
@@ -262,9 +273,11 @@ export default function ShopPage() {
       {/* ================= PAGE HEADER ================= */}
       {!loading && filteredProducts.length > 0 && (
         <section className="pt-32 pb-16 text-center px-6">
-          <h1 className="text-5xl md:text-6xl font-serif font-light mb-2 capitalize leading-none">
-            {urlSearch || urlCategory || "View All"}
-          </h1>
+          {urlCategory && (
+            <h1 className="text-4xl md:text-6xl font-serif font-light mb-4 uppercase tracking-[0.2em]">
+              {urlCategory.toString().toUpperCase()}
+            </h1>
+          )}
           {urlCategory && (
             <p className="text-gray-500 text-[10px] tracking-[0.3em] uppercase">
               {filteredProducts.length} pieces available
@@ -327,11 +340,152 @@ export default function ShopPage() {
                 </div>
 
                 {/* Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10">
-                  {filteredProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} />
-                  ))}
-                </div>
+                {(() => {
+                  if (!urlCategory || urlSearch) {
+                    return (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10">
+                        {filteredProducts.map((product) => (
+                          <ProductCard key={product.id || Math.random()} product={product} />
+                        ))}
+                      </div>
+                    );
+                  }
+
+                  // Grouping Logic for Category Views
+                  const subcategories = Array.from(
+                    new Set(
+                      filteredProducts.map(p => {
+                        if (p.subcategory) return p.subcategory;
+
+                        // Heuristics for products missing subcategory
+                        const name = (p.name || "").toLowerCase();
+                        const cat = (p.category || "").toLowerCase();
+
+                        if (cat === "knitwear") {
+                          if (name.includes("sweater") || name.includes("jumper")) return "Sweaters";
+                          if (name.includes("cardigan")) return "Cardigans";
+                        }
+                        if (cat === "trousers") {
+                          if (name.includes("tailored") || name.includes("wool")) return "Tailored";
+                          if (name.includes("chino") || name.includes("linen") || name.includes("pants")) return "Casual";
+                        }
+                        if (cat === "accessories") {
+                          if (name.includes("bag") || name.includes("tote")) return "Bags";
+                          if (name.includes("scarf") || name.includes("muffler")) return "Scarf";
+                        }
+                        if (cat === "basics") {
+                          if (name.includes("tee") || name.includes("t-shirt")) return "Tees";
+                        }
+                        if (cat === "shirts") {
+                          if (name.includes("shirt")) return "Formal";
+                        }
+
+                        return null;
+                      }).filter(Boolean)
+                    )
+                  ).sort((a: any, b: any) => {
+                    const priority: Record<string, number> = {
+                      "Bags": 1,
+                      "Scarf": 2,
+                      "Sweaters": 1,
+                      "Cardigans": 2,
+                      "Tailored": 1,
+                      "Casual": 2,
+                    };
+                    return (priority[a] || 99) - (priority[b] || 99);
+                  });
+
+                  if (subcategories.length === 0) {
+                    return (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10">
+                        {filteredProducts.map((product) => (
+                          <ProductCard key={product.id || Math.random()} product={product} />
+                        ))}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-20 w-full">
+                      {subcategories.map((subName: any) => {
+                        const sectionProducts = filteredProducts.filter(p => {
+                          if (p.subcategory === subName) return true;
+
+                          // Match heuristics if subcategory is missing
+                          const name = (p.name || "").toLowerCase();
+                          const cat = (p.category || "").toLowerCase();
+
+                          if (subName === "Sweaters") return cat === "knitwear" && (name.includes("sweater") || name.includes("jumper"));
+                          if (subName === "Cardigans") return cat === "knitwear" && name.includes("cardigan");
+                          if (subName === "Tailored") return cat === "trousers" && (name.includes("tailored") || name.includes("wool"));
+                          if (subName === "Casual") return cat === "trousers" && (name.includes("chino") || name.includes("linen") || name.includes("pants"));
+                          if (subName === "Bags") return cat === "accessories" && (name.includes("bag") || name.includes("tote"));
+                          if (subName === "Scarf") return cat === "accessories" && (name.includes("scarf") || name.includes("muffler"));
+                          if (subName === "Tees") return cat === "basics" && (name.includes("tee") || name.includes("t-shirt"));
+                          if (subName === "Formal") return cat === "shirts" && name.includes("shirt");
+
+                          return false;
+                        });
+
+                        if (sectionProducts.length === 0) return null;
+
+                        return (
+                          <div key={subName} className="w-full">
+                            <div className="mb-12">
+                              <h2 className="text-3xl font-serif font-light mb-6 uppercase tracking-[0.5em] text-white">
+                                {subName}
+                              </h2>
+                              <div className="h-px w-full bg-white/20" />
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10">
+                              {sectionProducts.map((product) => (
+                                <ProductCard key={product.id || Math.random()} product={product} />
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Fallback for products in category that didn't match any subcategory */}
+                      {(() => {
+                        const unmatched = filteredProducts.filter(p => {
+                          return !subcategories.some(subName => {
+                            if (p.subcategory === subName) return true;
+                            const name = (p.name || "").toLowerCase();
+                            const cat = (p.category || "").toLowerCase();
+                            if (subName === "Sweaters") return cat === "knitwear" && (name.includes("sweater") || name.includes("jumper"));
+                            if (subName === "Cardigans") return cat === "knitwear" && name.includes("cardigan");
+                            if (subName === "Tailored") return cat === "trousers" && (name.includes("tailored") || name.includes("wool"));
+                            if (subName === "Casual") return cat === "trousers" && (name.includes("chino") || name.includes("linen") || name.includes("pants"));
+                            if (subName === "Bags") return cat === "accessories" && (name.includes("bag") || name.includes("tote"));
+                            if (subName === "Scarf") return cat === "accessories" && (name.includes("scarf") || name.includes("muffler"));
+                            if (subName === "Tees") return cat === "basics" && (name.includes("tee") || name.includes("t-shirt"));
+                            if (subName === "Formal") return cat === "shirts" && name.includes("shirt");
+                            return false;
+                          });
+                        });
+
+                        if (unmatched.length === 0) return null;
+
+                        return (
+                          <div className="w-full">
+                            <div className="mb-12">
+                              <h2 className="text-3xl font-serif font-light mb-6 uppercase tracking-[0.5em] text-white/50">
+                                Other Pieces
+                              </h2>
+                              <div className="h-px w-full bg-white/10" />
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10">
+                              {unmatched.map((product) => (
+                                <ProductCard key={product.id || Math.random()} product={product} />
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  );
+                })()}
               </>
             )}
           </div>
