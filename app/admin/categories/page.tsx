@@ -4,10 +4,8 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Trash2, Loader2, FolderPlus } from "lucide-react"
+import { Plus, Trash2, Loader2, FolderPlus, X } from "lucide-react"
 import { useToast } from "@/lib/toast-context"
-
-const API_BASE = "http://localhost:5000"
 
 type Category = {
   id: string
@@ -16,6 +14,12 @@ type Category = {
 }
 
 export default function CategoriesPage() {
+  const [API_BASE, setApiBase] = useState("")
+
+  useEffect(() => {
+    setApiBase(`http://${window.location.hostname}:5000`)
+  }, [])
+
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [newCategoryName, setNewCategoryName] = useState("")
@@ -23,8 +27,8 @@ export default function CategoriesPage() {
   const { showToast } = useToast()
 
   useEffect(() => {
-    fetchCategories()
-  }, [])
+    if (API_BASE) fetchCategories()
+  }, [API_BASE])
 
   const fetchCategories = async () => {
     try {
@@ -105,6 +109,28 @@ export default function CategoriesPage() {
     }
   }
 
+  const handleDeleteSubcategory = async (catId: string, subName: string) => {
+    if (!confirm(`Delete subcategory "${subName}"?`)) return
+
+    try {
+      const res = await fetch(`${API_BASE}/api/categories/${catId}/subcategories`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ subcategory: subName }),
+      })
+      if (res.ok) {
+        showToast("Subcategory deleted", "info")
+        fetchCategories()
+      } else {
+        const data = await res.json()
+        showToast(data.error || "Failed to delete", "info")
+      }
+    } catch {
+      showToast("Network error", "info")
+    }
+  }
+
   return (
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen px-8 py-16">
       <div className="max-w-[1400px] mx-auto mb-20">
@@ -134,7 +160,7 @@ export default function CategoriesPage() {
               </div>
               <Button
                 onClick={handleAddCategory}
-                className="w-full bg-[#e8e8e3] text-black hover:bg-gray-200 uppercase tracking-widest text-xs h-12 rounded-none"
+                className="w-full bg-[#e8e8e3] text-black hover:bg-white uppercase tracking-widest text-xs h-12 rounded-none transition-all"
               >
                 <Plus className="h-4 w-4 mr-2" /> Add Category
               </Button>
@@ -172,8 +198,14 @@ export default function CategoriesPage() {
                   <div className="space-y-6">
                     <div className="flex flex-wrap gap-2">
                       {cat.subcategories.map(sub => (
-                        <Badge key={sub} variant="outline" className="border-white/10 text-gray-400 py-1 px-3 rounded-none uppercase text-[10px] tracking-widest">
+                        <Badge key={sub} variant="outline" className="border-white/10 text-gray-400 py-1 px-3 rounded-none uppercase text-[10px] tracking-widest flex items-center gap-2">
                           {sub}
+                          <button
+                            onClick={() => handleDeleteSubcategory(cat.id, sub)}
+                            className="hover:text-red-500 transition-colors"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
                         </Badge>
                       ))}
                     </div>

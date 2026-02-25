@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog"
@@ -27,8 +28,6 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/lib/toast-context"
 
-const API_BASE = "http://localhost:5000"
-
 const AVAILABLE_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "One Size"]
 
 type Category = {
@@ -38,6 +37,12 @@ type Category = {
 }
 
 export default function ProductsPage() {
+  const [API_BASE, setApiBase] = useState("")
+
+  useEffect(() => {
+    setApiBase(`http://${window.location.hostname}:5000`)
+  }, [])
+
   const [products, setProducts] = useState<any[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -67,9 +72,11 @@ export default function ProductsPage() {
   })
 
   useEffect(() => {
-    fetchProducts()
-    fetchCategories()
-  }, [])
+    if (API_BASE) {
+      fetchProducts()
+      fetchCategories()
+    }
+  }, [API_BASE])
 
   const fetchProducts = async () => {
     try {
@@ -302,7 +309,9 @@ export default function ProductsPage() {
       <div className="max-w-[1400px] mx-auto mb-20 flex justify-between items-end">
         <div>
           <p className="uppercase tracking-[0.5em] text-xs text-gray-500 mb-4">Admin</p>
-          <h1 className="font-serif text-5xl font-light">Products</h1>
+          <h1 className="font-serif text-5xl font-light">
+            Total Products: <span className="text-xl opacity-50" style={{ fontFamily: 'Times New Roman, serif' }}>({products.length})</span>
+          </h1>
           <p className="mt-4 text-sm tracking-widest text-gray-500">
             Editorial product catalog Management.
           </p>
@@ -331,7 +340,7 @@ export default function ProductsPage() {
           }
         }}>
           <DialogTrigger asChild>
-            <Button className="border border-white/40 bg-transparent px-8 py-6 uppercase tracking-widest text-xs hover:bg-[#e8e8e3] hover:text-black transition-all rounded-none">
+            <Button className="bg-[#e8e8e3] text-black px-8 py-6 uppercase tracking-widest text-xs hover:bg-white transition-all rounded-none">
               Add Product
             </Button>
           </DialogTrigger>
@@ -340,6 +349,9 @@ export default function ProductsPage() {
               <DialogTitle className="font-serif text-3xl font-light tracking-widest uppercase">
                 {editingProduct ? "Edit Product" : "Add New Product"}
               </DialogTitle>
+              <DialogDescription className="text-gray-500 text-xs tracking-widest uppercase">
+                Fill in the details below to {editingProduct ? "update" : "add"} a product in the catalog.
+              </DialogDescription>
             </DialogHeader>
 
             <form onSubmit={handleAddProduct} className="space-y-12 py-8">
@@ -528,11 +540,12 @@ export default function ProductsPage() {
                         { label: "New", key: "newArrival" },
                         { label: "Best", key: "bestseller" }
                       ].map(item => (
-                        <div key={item.key} className="flex flex-col items-center gap-3 p-3 border border-white/5">
+                        <div key={item.key} className="flex flex-col items-center gap-3 p-3 border border-white/10 bg-white/[0.02] hover:bg-white/[0.05] transition-all">
                           <Label className="text-[8px] uppercase tracking-widest text-gray-500">{item.label}</Label>
                           <Switch
                             checked={(formData as any)[item.key]}
                             onCheckedChange={(v) => setFormData(p => ({ ...p, [item.key]: v }))}
+                            className="data-[state=checked]:bg-[#e8e8e3]/80 border border-white/10"
                           />
                         </div>
                       ))}
@@ -549,7 +562,7 @@ export default function ProductsPage() {
                           onClick={() => toggleSize(size)}
                           className={`px-3 py-2 text-[10px] uppercase tracking-widest border transition-all ${formData.sizes.includes(size)
                             ? "bg-[#e8e8e3] text-black border-[#e8e8e3]"
-                            : "border-white/10 text-gray-500 hover:text-white hover:border-white/30"
+                            : "border-white/20 text-gray-500 hover:text-white hover:border-white/40"
                             }`}
                         >
                           {size}

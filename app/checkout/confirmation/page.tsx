@@ -218,7 +218,7 @@ export default function ConfirmationPage() {
             }`}
         >
           <Link
-            href="/shop"
+            href="/view-all"
             className="flex-1 flex items-center justify-center gap-2 py-5 border border-white/40 uppercase tracking-widest text-xs hover:bg-white hover:text-black transition-all"
           >
             Continue Shopping

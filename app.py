@@ -12,9 +12,30 @@ from flask_pymongo import PyMongo
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"])
-# Or for even more flexibility in development:
-# CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "*"}})
+# CORS must specify origins when supports_credentials=True
+# Wildcard "*" is NOT allowed with credentials.
+CORS(app, supports_credentials=True, origins=[
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+    "http://localhost:3002",
+    "http://127.0.0.1:3002",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+])
+
+# Upload Configuration
+UPLOAD_FOLDER = os.path.join(os.getcwd(), 'public', 'uploads')
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif', 'avif', 'bmp', 'tiff', 'jfif'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # Configuration
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'default-secret-key')
@@ -49,7 +70,7 @@ def serialize_doc(doc):
 def home():
     return render_template('index.html')
 
-@app.route('/shop')
+@app.route('/view-all')
 def shop():
     return render_template('shop.html')
 
@@ -178,15 +199,6 @@ def logout():
     return jsonify({"success": True, "message": "Logged out"}), 200
 
 # ==================== UPLOADS ====================
-
-UPLOAD_FOLDER = os.path.join(os.getcwd(), 'public', 'uploads')
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif', 'avif', 'bmp', 'tiff', 'jfif'}
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
@@ -674,18 +686,6 @@ def get_orders():
 
 @app.route('/api/categories', methods=['GET'])
 def get_categories():
-    if db.categories.count_documents({}) == 0:
-        default_categories = [
-            {"name": "Knitwear", "subcategories": ["Sweaters", "Cardigans"]},
-            {"name": "Trousers", "subcategories": ["Tailored", "Casual"]},
-            {"name": "Basics", "subcategories": ["Tees"]},
-            {"name": "Shirts", "subcategories": ["Formal"]},
-            {"name": "Accessories", "subcategories": ["Bags", "Scarf"]},
-
-        ]
-        db.categories.insert_many(default_categories)
-        print("Emergeny Categories Seeded!")
-
     categories = list(db.categories.find())
     return jsonify([serialize_doc(c) for c in categories])
 
@@ -725,9 +725,81 @@ def delete_category(cat_id):
     is_admin = session.get('is_admin')
     if 'user_id' not in session or not (is_admin is True or str(is_admin).lower() == 'true'):
         return jsonify({"error": "Unauthorized"}), 401
-        
+    
     db.categories.delete_one({"_id": ObjectId(cat_id)})
     return jsonify({"success": True, "message": "Category deleted"}), 200
+
+@app.route('/api/categories/<cat_id>/subcategories', methods=['DELETE'])
+def delete_subcategory(cat_id):
+    is_admin = session.get('is_admin')
+    if 'user_id' not in session or not (is_admin is True or str(is_admin).lower() == 'true'):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json()
+    subcategory = data.get('subcategory')
+    
+    if not subcategory:
+        return jsonify({"error": "Subcategory name required"}), 400
+        
+    db.categories.update_one(
+        {"_id": ObjectId(cat_id)},
+        {"$pull": {"subcategories": subcategory}}
+    )
+    return jsonify({"success": True, "message": "Subcategory deleted"}), 200
+
+# ==================== HOMEPAGE ====================
+
+@app.route('/api/homepage', methods=['GET'])
+def get_homepage_config():
+    print("DEBUG: Fetching homepage config")
+    config = db.homepage_config.find_one({"type": "main"})
+    if not config:
+        # Default starting config
+        print("DEBUG: No config found, using default")
+        config = {
+            "type": "main",
+            "hero_image": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=2564&auto=format&fit=crop",
+            "hero_subtitle": "Fall Winter 2025",
+            "hero_title_1": "ETHEREAL",
+            "hero_title_2": "SHADOWS",
+            "hero_cta_text": "View The Lookbook",
+            "hero_cta_link": "/shop",
+            "manifesto_text": "We believe in the quiet power of silence. In a world of noise, U.S ATELIER is the absence of it. We strip away the unnecessary to reveal the essential structure of the human form. This is not just clothing; this is architecture for the soul.",
+            "featured_product_ids": [] 
+        }
+    return jsonify(serialize_doc(config))
+
+@app.route('/api/homepage', methods=['POST'])
+def update_homepage_config():
+    is_admin = session.get('is_admin')
+    print(f"DEBUG: Updating homepage config. is_admin: {is_admin}")
+    
+    if 'user_id' not in session or not (is_admin is True or str(is_admin).lower() == 'true'):
+        print("DEBUG: Unauthorized update attempt")
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    data = request.get_json()
+    print(f"DEBUG: New homepage data: {data}")
+    
+    update_data = {
+        "hero_image": data.get('hero_image'),
+        "hero_subtitle": data.get('hero_subtitle'),
+        "hero_title_1": data.get('hero_title_1'),
+        "hero_title_2": data.get('hero_title_2'),
+        "hero_cta_text": data.get('hero_cta_text'),
+        "hero_cta_link": data.get('hero_cta_link'),
+        "manifesto_text": data.get('manifesto_text'),
+        "featured_product_ids": data.get('featured_product_ids', []),
+        "updated_at": datetime.utcnow()
+    }
+    
+    db.homepage_config.update_one(
+        {"type": "main"},
+        {"$set": update_data},
+        upsert=True
+    )
+    print("DEBUG: Homepage config updated successfully")
+    return jsonify({"success": True, "message": "Homepage updated successfully"}), 200
 
 # ==================== SEEDING ====================
 
@@ -889,6 +961,16 @@ def seed_database():
     db.products.insert_many(products_data)
     print("MongoDB Products Seeded!")
 
+@app.after_request
+def after_request(response):
+    origin = request.headers.get('Origin')
+    if origin:
+        response.headers.add('Access-Control-Allow-Origin', origin)
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
+
 if __name__ == '__main__':
     with app.app_context():
         try:
@@ -896,4 +978,4 @@ if __name__ == '__main__':
         except Exception as e:
             print(f"Seeding failed: {e}")
             
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=True)

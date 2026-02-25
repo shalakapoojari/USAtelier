@@ -231,7 +231,7 @@ export default function ProductPage({
 
             {/* Category breadcrumb */}
             <Link
-              href="/shop"
+              href="/view-all"
               className="uppercase tracking-[0.4em] text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
             >
               {product.category}

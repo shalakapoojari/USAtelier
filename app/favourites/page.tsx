@@ -54,7 +54,7 @@ export default function FavouritesPage() {
                             Save pieces you love while browsing the collection
                         </p>
                         <Link
-                            href="/shop"
+                            href="/view-all"
                             className="inline-block px-10 py-4 border border-white/30 uppercase tracking-widest text-xs hover:bg-white hover:text-black transition-all"
                         >
                             Explore the Collection

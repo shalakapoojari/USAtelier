@@ -13,6 +13,7 @@ import {
   CreditCard,
   Users,
   ArrowLeft,
+  Paintbrush,
 } from "lucide-react"
 
 const navItems = [
@@ -20,6 +21,7 @@ const navItems = [
   ["/admin/orders", "Orders", ShoppingCart],
   ["/admin/products", "Products", Package],
   ["/admin/categories", "Categories", FolderOpen],
+  ["/admin/homepage", "Homepage Design", Paintbrush],
   ["/admin/payments", "Payments", CreditCard],
   ["/admin/customers", "Customers", Users],
 ] as const

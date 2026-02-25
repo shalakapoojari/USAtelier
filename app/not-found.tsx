@@ -53,7 +53,7 @@ export default function NotFound() {
                             Return Home
                         </Link>
                         <Link
-                            href="/shop"
+                            href="/view-all"
                             className="px-12 py-5 border border-white/10 uppercase tracking-widest text-xs text-gray-400 hover:text-white hover:border-white/30 transition-all duration-300"
                         >
                             Shop the Collection

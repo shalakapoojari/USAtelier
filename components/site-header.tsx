@@ -66,7 +66,7 @@ export function SiteHeader() {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (searchQuery.trim()) {
-      router.push(`/shop?search=${encodeURIComponent(searchQuery.trim())}`)
+      router.push(`/view-all?search=${encodeURIComponent(searchQuery.trim())}`)
     }
   }
 
@@ -271,7 +271,7 @@ export function SiteHeader() {
       <div className="w-full bg-[#030303]/80 backdrop-blur-md border-b border-white/5 py-4 px-8 relative">
         <div className="max-w-[1400px] mx-auto flex items-center justify-center gap-8 md:gap-12 whitespace-nowrap text-[10px] uppercase tracking-[0.25em] font-medium font-sans">
           <Link
-            href="/shop"
+            href="/view-all"
             className="text-white hover:text-gray-400 transition-colors"
           >
             View All
@@ -282,7 +282,7 @@ export function SiteHeader() {
           {dynamicCategories.map((cat) => (
             <div key={cat.id || cat.name} className="relative group">
               <Link
-                href={`/shop?category=${cat.name}`}
+                href={`/view-all?category=${cat.name}`}
                 className="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5 py-4 px-1"
               >
                 {cat.name}
@@ -299,7 +299,7 @@ export function SiteHeader() {
                       {cat.subcategories.map((sub: string) => (
                         <Link
                           key={sub}
-                          href={`/shop?category=${cat.name}&jumpTo=${sub}`}
+                          href={`/view-all?category=${cat.name}&jumpTo=${sub}`}
                           className="text-gray-500 hover:text-white transition-all text-[11px] tracking-[0.25em] hover:translate-x-2 duration-300"
                         >
                           {sub}
