@@ -146,7 +146,7 @@ export function SiteHeader() {
             placeholder={placeholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 px-10 py-2.5 text-[10px] tracking-widest uppercase rounded-sm focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all placeholder:text-gray-600 h-10"
+            className="w-full bg-white/5 border border-white/10 px-10 py-2.5 text-[10px] tracking-widest rounded-sm focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all placeholder:text-gray-600 h-10"
           />
           <Search size={14} className="absolute left-3 text-gray-500 group-focus-within:text-white transition-colors" />
           <button type="submit" className="hidden">Search</button>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Save, Image as ImageIcon, Upload, Check, Filter } from "lucide-react"
+import { Loader2, Save, Image as ImageIcon, Upload, Check, Filter, GripVertical, ChevronUp, ChevronDown, Eye } from "lucide-react"
 import { useToast } from "@/lib/toast-context"
 import Image from "next/image"
 import {
@@ -41,19 +41,23 @@ type ConfigType = {
 function HeroSlideEditor({
     slide,
     index,
+    total,
     products,
     categories,
     onUpdate,
     onRemove,
-    onUpload
+    onUpload,
+    onMove
 }: {
     slide: HeroSlide,
     index: number,
+    total: number,
     products: any[],
     categories: any[],
     onUpdate: (index: number, data: Partial<HeroSlide>) => void,
     onRemove: (index: number) => void,
-    onUpload: (index: number, file: File) => void
+    onUpload: (index: number, file: File) => void,
+    onMove: (from: number, to: number) => void
 }) {
     const [categoryFilter, setCategoryFilter] = useState("all")
     const filteredProducts = categoryFilter === "all"
@@ -61,21 +65,49 @@ function HeroSlideEditor({
         : products.filter(p => p.category === categoryFilter)
 
     return (
-        <div className="bg-white/[0.02] p-8 border border-white/5 space-y-8 relative group/slide">
-            <div className="flex justify-between items-start">
-                <span className="text-[10px] uppercase tracking-[0.5em] text-gray-600 font-bold">Slide 0{index + 1}</span>
-                {index > 0 && (
-                    <Button
-                        variant="ghost"
-                        onClick={() => onRemove(index)}
-                        className="text-red-500/50 hover:text-red-500 hover:bg-red-500/10 text-[9px] uppercase tracking-widest h-8 px-3 rounded-none transition-all"
-                    >
-                        Remove Slide
-                    </Button>
-                )}
+        <div className="bg-white/[0.02] border border-white/5 space-y-8 relative group/slide overflow-hidden">
+            {/* Slide Header with Sorting & Actions */}
+            <div className="flex justify-between items-center bg-white/5 px-8 py-4 border-b border-white/5">
+                <div className="flex items-center gap-6">
+                    <span className="text-[10px] uppercase tracking-[0.5em] text-gray-400 font-bold">Slide 0{index + 1}</span>
+                    <div className="flex items-center gap-2 border-l border-white/10 pl-6 text-gray-600">
+                        <GripVertical size={14} />
+                    </div>
+                </div>
+                <div className="flex items-center gap-4">
+                    <div className="flex border border-white/10">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={index === 0}
+                            onClick={() => onMove(index, index - 1)}
+                            className="size-8 rounded-none border-r border-white/10 hover:bg-white/5 text-gray-500 hover:text-white transition-all disabled:opacity-20"
+                        >
+                            <ChevronUp size={14} />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={index === total - 1}
+                            onClick={() => onMove(index, index + 1)}
+                            className="size-8 rounded-none hover:bg-white/5 text-gray-500 hover:text-white transition-all disabled:opacity-20"
+                        >
+                            <ChevronDown size={14} />
+                        </Button>
+                    </div>
+                    {index > 0 && (
+                        <Button
+                            variant="ghost"
+                            onClick={() => onRemove(index)}
+                            className="text-red-500/50 hover:text-red-500 hover:bg-red-500/10 text-[9px] uppercase tracking-widest h-8 px-4 rounded-none transition-all"
+                        >
+                            Remove
+                        </Button>
+                    )}
+                </div>
             </div>
 
-            <div className="flex flex-col 2xl:flex-row gap-8">
+            <div className="px-8 pb-8 flex flex-col 2xl:flex-row gap-8">
                 <div className="relative w-full 2xl:w-48 aspect-[3/4] bg-white/5 border border-white/10 overflow-hidden group/image shadow-lg shrink-0">
                     {slide.image ? (
                         <Image src={slide.image} alt="Hero" fill className="object-cover" />
@@ -144,7 +176,7 @@ function HeroSlideEditor({
                                     </div>
 
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4">
-                                        {products.map(p => {
+                                        {filteredProducts.map(p => {
                                             const images = typeof p.images === 'string' ? JSON.parse(p.images) : p.images
                                             const imgUrl = images?.[0] || "/placeholder.jpg"
                                             return (
@@ -232,7 +264,6 @@ function ProductSelectionRow({
     return (
         <div className="space-y-4 pb-8 border-b border-white/5 last:border-0 pt-4">
             <div className="px-4">
-                {/* Section Title & Subtitle clearly at the top-left */}
                 <div className="flex justify-between items-start mb-6">
                     <div>
                         <h3 className="text-2xl md:text-4xl font-serif mb-2 uppercase tracking-[0.2em] text-[#e8e8e3]">{title}</h3>
@@ -248,7 +279,6 @@ function ProductSelectionRow({
                 </div>
 
                 <div className="flex flex-col md:flex-row md:items-center gap-6">
-                    {/* Category Filter below the heading */}
                     <div className="flex items-center gap-4 min-w-[280px]">
                         <Label className="text-[9px] uppercase tracking-[0.2em] text-gray-400 whitespace-nowrap flex items-center gap-2">
                             <Filter size={12} /> Filter Category
@@ -331,7 +361,6 @@ export default function HomepageDesignPage() {
     const [saving, setSaving] = useState(false)
     const { showToast } = useToast()
 
-    // Filters for each section
     const [filters, setFilters] = useState({
         bestseller: "all",
         featured: "all",
@@ -399,6 +428,16 @@ export default function HomepageDesignPage() {
             ...prev,
             hero_slides: prev.hero_slides.filter((_, i) => i !== index)
         }))
+    }
+
+    const handleSlideMove = (fromIndex: number, toIndex: number) => {
+        if (toIndex < 0 || toIndex >= config.hero_slides.length) return
+        setConfig(prev => {
+            const newSlides = [...prev.hero_slides]
+            const [movedSlide] = newSlides.splice(fromIndex, 1)
+            newSlides.splice(toIndex, 0, movedSlide)
+            return { ...prev, hero_slides: newSlides }
+        })
     }
 
     const handleFileUpload = async (index: number, file: File) => {
@@ -487,34 +526,46 @@ export default function HomepageDesignPage() {
                         </p>
                     </div>
 
-                    <Button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="bg-[#e8e8e3] text-black hover:bg-white px-10 py-7 md:py-8 uppercase tracking-widest text-xs rounded-none transition-all flex items-center gap-3 w-full md:w-auto shadow-2xl"
-                    >
-                        {saving ? <Loader2 className="animate-spin size-4" /> : <Save size={18} />}
-                        Save Work
-                    </Button>
+                    <div className="flex items-center gap-4 w-full md:w-auto">
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" className="bg-white/5 border-white/10 hover:bg-white/8 text-[#e8e8e3] px-8 py-7 md:py-8 uppercase tracking-widest text-xs rounded-none transition-all flex items-center gap-3">
+                                    <Eye size={18} /> Preview
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="bg-[#030303] border-white/10 text-white max-w-[95vw] w-full h-[90vh] p-0 overflow-hidden rounded-none shadow-2xl">
+                                <div className="p-6 border-b border-white/5 flex justify-between items-center">
+                                    <h2 className="font-serif text-xl uppercase tracking-widest">Live Preview (Unsaved)</h2>
+                                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-gray-500">
+                                        <div className="size-2 rounded-full bg-emerald-500 animate-pulse" /> Live Status
+                                    </div>
+                                </div>
+                                <div className="h-full bg-gray-900 flex items-center justify-center">
+                                    <p className="font-serif text-gray-500 italic">Preview window simulating storefront...</p>
+                                </div>
+                            </DialogContent>
+                        </Dialog>
+
+                        <Button
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="bg-[#e8e8e3] text-black hover:bg-white px-10 py-7 md:py-8 uppercase tracking-widest text-xs rounded-none transition-all flex items-center gap-3 w-full md:w-auto shadow-2xl"
+                        >
+                            {saving ? <Loader2 className="animate-spin size-4" /> : <Save size={18} />}
+                            Save Work
+                        </Button>
+                    </div>
                 </div>
             </div>
 
             <div className="max-w-[1100px] pl-10 md:pl-32 pr-8 md:pr-12 pb-24">
-
                 <div className="space-y-16">
                     {/* HERO CAROUSEL */}
                     <div className="w-full">
                         <section className="space-y-12">
-                            <div className="flex justify-between items-end">
-                                <div>
-                                    <h2 className="text-3xl font-serif mb-4 uppercase tracking-widest">Hero Carousel</h2>
-                                    <p className="text-[10px] text-gray-500 uppercase tracking-widest">Manage multiple high-impact editorial slides</p>
-                                </div>
-                                {/* <Button
-                                    onClick={handleAddSlide}
-                                    className="bg-transparent border border-white/20 hover:bg-white/5 text-[#e8e8e3] px-8 py-6 rounded-none uppercase text-[10px] tracking-widest transition-all"
-                                >
-                                    + Add New Slide
-                                </Button> */}
+                            <div>
+                                <h2 className="text-3xl font-serif mb-4 uppercase tracking-widest">Hero Carousel</h2>
+                                <p className="text-[10px] text-gray-500 uppercase tracking-widest">Manage multiple high-impact editorial slides</p>
                             </div>
 
                             <div className="grid grid-cols-1 gap-10">
@@ -522,31 +573,32 @@ export default function HomepageDesignPage() {
                                     <HeroSlideEditor
                                         key={idx}
                                         index={idx}
+                                        total={config.hero_slides.length}
                                         slide={slide}
                                         products={products}
                                         categories={categories}
                                         onUpdate={handleSlideUpdate}
                                         onRemove={handleRemoveSlide}
                                         onUpload={handleFileUpload}
+                                        onMove={handleSlideMove}
                                     />
                                 ))}
 
-                                {/* Add Slide Action Card */}
                                 <button
                                     onClick={handleAddSlide}
-                                    className="w-full flex flex-col items-center justify-center p-16 border border-dashed border-white/10 bg-white/1 hover:bg-white/3 hover:border-white/20 transition-all group/add-card"
+                                    className="w-full flex flex-col items-center justify-center p-8 border border-dashed border-white/10 bg-white/1 hover:bg-white/3 hover:border-white/20 transition-all group/add-card"
                                 >
-                                    <div className="size-16 rounded-full border border-white/10 flex items-center justify-center mb-6 group-hover/add-card:scale-110 transition-all">
-                                        <Plus className="text-gray-500 group-hover/add-card:text-[#e8e8e3]" size={32} strokeWidth={1} />
+                                    <div className="size-12 rounded-full border border-white/10 flex items-center justify-center mb-4 group-hover/add-card:scale-110 transition-all">
+                                        <Plus className="text-gray-500 group-hover/add-card:text-[#e8e8e3]" size={24} strokeWidth={1} />
                                     </div>
-                                    <h3 className="font-serif text-2xl uppercase tracking-widest text-gray-500 group-hover/add-card:text-[#e8e8e3]">Add Hero Slide</h3>
-                                    <p className="text-[9px] uppercase tracking-[0.4em] text-gray-600 mt-4 group-hover/add-card:text-gray-400">Recommended size: 2564 x 1440px</p>
+                                    <h3 className="font-serif text-xl uppercase tracking-widest text-gray-500 group-hover/add-card:text-[#e8e8e3]">Add Hero Slide</h3>
+                                    <p className="text-[8px] uppercase tracking-[0.4em] text-gray-600 mt-2 group-hover/add-card:text-gray-400">Recommended size: 2564 x 1440px</p>
                                 </button>
                             </div>
                         </section>
                     </div>
 
-                    {/* HORIZONTAL PRODUCT SELECTION SECTIONS */}
+                    {/* GALLERY CURATION */}
                     <div className="space-y-12">
                         <div className="flex items-center gap-8 mb-12">
                             <h2 className="text-3xl font-serif uppercase tracking-[0.3em] whitespace-nowrap">Gallery Curation</h2>
@@ -594,7 +646,6 @@ export default function HomepageDesignPage() {
                     </div>
                 </div>
 
-                {/* BOTTOM SAVE BUTTON */}
                 <div className="mt-24 pt-12 border-t border-white/10 flex justify-end">
                     <Button
                         onClick={handleSave}
@@ -608,12 +659,10 @@ export default function HomepageDesignPage() {
             </div>
 
             <style jsx global>{`
-                /* Prevent page-level horizontal movement */
                 html, body {
                     overflow-x: hidden !important;
                     position: relative;
                 }
-                
                 .custom-scrollbar::-webkit-scrollbar {
                     display: none;
                 }
@@ -621,7 +670,6 @@ export default function HomepageDesignPage() {
                     -ms-overflow-style: none;
                     scrollbar-width: none;
                 }
-                
                 .no-scrollbar::-webkit-scrollbar {
                     display: none;
                 }

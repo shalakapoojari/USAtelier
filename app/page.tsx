@@ -39,6 +39,8 @@ function SectionProductCard({ product }: { product: any }) {
   )
 }
 
+import { ProductSkeleton } from "@/components/product-skeleton"
+
 function CollectionSection({ title, subtitle, products }: { title: string, subtitle: string, products: any[] }) {
   return (
     <div className="flex flex-col justify-center px-6 md:px-24">
@@ -54,7 +56,13 @@ function CollectionSection({ title, subtitle, products }: { title: string, subti
               <SectionProductCard key={p.id} product={p} />
             ))
           ) : (
-            <p className="text-sm uppercase tracking-widest text-gray-700 italic">Assembling collection...</p>
+            <div className="flex gap-8 md:gap-12 w-full">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="w-[200px] md:w-[280px] shrink-0">
+                  <ProductSkeleton />
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
