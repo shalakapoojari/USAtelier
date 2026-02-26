@@ -26,7 +26,7 @@ export default function CollectionsPage() {
 
       {/* ================= COLLECTION GRID ================= */}
       <main className="px-6 md:px-12 pb-32">
-        <div className="max-w-[1400px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-12">
+        <div className="max-w-[1400px] mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-12">
           {collections.map((collection) => (
             <Link
               key={collection.id}

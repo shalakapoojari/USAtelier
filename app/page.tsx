@@ -1,40 +1,72 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react" // Added useCallback
 import Image from "next/image"
 import Link from "next/link"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
+import useEmblaCarousel from 'embla-carousel-react' // New import
+import { ChevronLeft, ChevronRight } from "lucide-react" // New import
 
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { Preloader } from "@/components/preloader"
 
+gsap.registerPlugin(ScrollTrigger)
 
-function RunwayImage() {
-  const [liked, setLiked] = useState(false)
-  const imgStyle: React.CSSProperties = liked
-    ? { filter: "sepia(0.15) hue-rotate(80deg) saturate(1.2) contrast(0.95)", transition: "filter 250ms ease" }
-    : { filter: "grayscale(100%) opacity(0.5)", transition: "filter 250ms ease" }
+function SectionProductCard({ product }: { product: any }) {
+  const images = typeof product.images === 'string' ? JSON.parse(product.images) : product.images
+  const imageUrl = images && images[0] ? images[0] : "/placeholder.jpg"
 
   return (
-    <div
-      className="relative w-full h-full"
-      onMouseEnter={() => setLiked(true)}
-      onMouseLeave={() => setLiked(false)}
-    >
-      <Image
-        src="https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=2576"
-        alt=""
-        fill
-        style={imgStyle}
-        className="object-cover z-0"
-      />
+    <div className="group relative w-[200px] md:w-[280px] aspect-[3/4] overflow-hidden bg-white/5 border border-white/5 hover:border-white/20 transition-all duration-500 flex-shrink-0">
+      <Link href={`/product/${product.id}`}>
+        <Image
+          src={imageUrl}
+          alt={product.name}
+          fill
+          className="object-cover transition-transform duration-700 group-hover:scale-110 opacity-70 group-hover:opacity-100"
+        />
+        <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/80 to-transparent translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
+          <p className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-2">{product.category}</p>
+          <h3 className="text-2xl font-serif italic text-white drop-shadow-md mb-2">
+            {product.name}
+          </h3>
+          <p className="uppercase text-xs text-white/80 tracking-widest font-bold">₹{product.price.toLocaleString()}</p>
+        </div>
+      </Link>
     </div>
   )
 }
 
-gsap.registerPlugin(ScrollTrigger)
+function CollectionSection({ title, subtitle, products }: { title: string, subtitle: string, products: any[] }) {
+  return (
+    <div className="flex flex-col justify-center px-6 md:px-24">
+      <div className="max-w-[1600px] w-full mx-auto">
+        <div className="mb-12">
+          <h2 className="text-3xl md:text-5xl font-serif font-light mb-6 uppercase tracking-[0.2em]">{title}</h2>
+          <div className="h-px w-32 bg-white/20" />
+        </div>
+
+        <div className="flex gap-8 md:gap-12 pb-12 overflow-x-auto no-scrollbar scroll-smooth">
+          {products.length > 0 ? (
+            products.map((p) => (
+              <SectionProductCard key={p.id} product={p} />
+            ))
+          ) : (
+            <p className="text-sm uppercase tracking-widest text-gray-700 italic">Assembling collection...</p>
+          )}
+        </div>
+
+        <div className="mt-8">
+          <Link href="/view-all" className="text-xs uppercase tracking-widest border-b border-white/20 pb-1 hover:border-white transition-all text-gray-400 hover:text-white">
+            View Entire Collection →
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function HomePage() {
   const [API_BASE, setApiBase] = useState("")
@@ -44,12 +76,40 @@ export default function HomePage() {
   }, [])
 
   const rootRef = useRef<HTMLDivElement | null>(null)
-  const horizontalRef = useRef<HTMLDivElement | null>(null)
-  const manifestoRef = useRef<HTMLParagraphElement | null>(null)
+  // const manifestoRef = useRef<HTMLParagraphElement | null>(null) // Removed
+  // const horizontalRef = useRef<HTMLDivElement | null>(null) // Removed
+  // const panelsContainerRef = useRef<HTMLDivElement | null>(null) // Removed
 
   const [config, setConfig] = useState<any>(null)
-  const [runwayProducts, setRunwayProducts] = useState<any[]>([])
+  const [bestsellers, setBestsellers] = useState<any[]>([])
+  const [featured, setFeatured] = useState<any[]>([])
+  const [newArrivals, setNewArrivals] = useState<any[]>([])
   const [loadingConfig, setLoadingConfig] = useState(true)
+
+  // Embla setup
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true })
+  const [selectedIndex, setSelectedIndex] = useState(0) // New state for slide indicators
+
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return
+    setSelectedIndex(emblaApi.selectedScrollSnap())
+  }, [emblaApi])
+
+  useEffect(() => {
+    if (!emblaApi) return
+    onSelect()
+    emblaApi.on('select', onSelect)
+
+    const interval = setInterval(() => {
+      emblaApi.scrollNext()
+    }, 3000)
+
+    return () => {
+      emblaApi.off('select', onSelect)
+      clearInterval(interval)
+    }
+  }, [emblaApi, onSelect])
+
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -60,13 +120,25 @@ export default function HomePage() {
           const data = await res.json()
           setConfig(data)
 
-          if (data.featured_product_ids && data.featured_product_ids.length > 0) {
-            const productPromises = data.featured_product_ids.map((id: string) =>
+          // Fetch category products
+          const fetchCategory = async (ids: string[]) => {
+            if (!ids || ids.length === 0) return []
+            const promises = ids.map(id =>
               fetch(`${API_BASE}/api/products/${id}`).then(r => r.ok ? r.json() : null)
             )
-            const products = await Promise.all(productPromises)
-            setRunwayProducts(products.filter(Boolean))
+            const results = await Promise.all(promises)
+            return results.filter(Boolean)
           }
+
+          const [b, f, n] = await Promise.all([
+            fetchCategory(data.bestseller_product_ids),
+            fetchCategory(data.featured_product_ids),
+            fetchCategory(data.new_arrival_product_ids)
+          ])
+
+          setBestsellers(b)
+          setFeatured(f)
+          setNewArrivals(n)
         }
       } catch (err) {
         console.error("Failed to fetch homepage config:", err)
@@ -77,7 +149,7 @@ export default function HomePage() {
     fetchConfig()
   }, [API_BASE])
 
-  /* ================= HERO (EXACT HTML BEHAVIOR) ================= */
+  /* ================= HERO ANIMATION ================= */
   useEffect(() => {
     if (loadingConfig) return
     let ctxHost: gsap.Context | null = null
@@ -86,12 +158,11 @@ export default function HomePage() {
       ctxHost = gsap.context(() => {
         const tl = gsap.timeline({ delay: 0 })
 
-        // Reveal lines from bottom (MASKED) — faster and tighter
         tl.to(".hero-line span", {
           y: "0%",
           duration: 0.9,
           ease: "power3.out",
-          stagger: 0.08,
+          stagger: 0.1,
         }).to(
           ".hero-cta",
           {
@@ -102,228 +173,147 @@ export default function HomePage() {
           "-=0.45"
         )
 
-        // Background parallax (unchanged feel)
-        gsap.to(".hero-bg", {
-          yPercent: 30,
-          scrollTrigger: {
-            trigger: ".hero",
-            start: "top top",
-            end: "bottom top",
-            scrub: true,
-          },
-        })
+        // Removed: gsap.to(".hero-bg", { yPercent: 30, scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: true, }, })
       }, rootRef)
     }
 
-    const onDone = () => runHero()
+    const onPreloaderDone = () => runHero()
 
     if ((window as any).__PRELOADER_DONE__) {
       runHero()
     } else {
-      window.addEventListener("preloader:done", onDone)
+      window.addEventListener("preloader:done", onPreloaderDone)
     }
 
     return () => {
-      window.removeEventListener("preloader:done", onDone)
+      window.removeEventListener("preloader:done", onPreloaderDone)
       if (ctxHost) ctxHost.revert()
     }
   }, [loadingConfig])
 
-  /* ================= HORIZONTAL SCROLL ================= */
-  useEffect(() => {
-    if (loadingConfig || !horizontalRef.current) return
-
-    const panels = gsap.utils.toArray(".panel")
-    if (panels.length <= 1) return
-
-    const tween = gsap.to(panels, {
-      xPercent: -100 * (panels.length - 1),
-      ease: "none",
-      scrollTrigger: {
-        trigger: horizontalRef.current,
-        pin: true,
-        scrub: 1,
-        invalidateOnRefresh: true,
-        end: () =>
-          "+=" + (horizontalRef.current?.offsetWidth || 0),
-      },
-    })
-
-    return () => {
-      tween.scrollTrigger?.kill()
-      tween.kill()
+  const slides = config?.hero_slides || [
+    {
+      image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=2564&auto=format&fit=crop",
+      subtitle: "Fall Winter 2025",
+      title1: "ETHEREAL",
+      title2: "SHADOWS",
+      cta_text: "View The Lookbook",
+      cta_link: "/view-all"
     }
-  }, [loadingConfig, runwayProducts])
-
-  /* ================= MANIFESTO (STABLE) ================= */
-  useEffect(() => {
-    if (loadingConfig || !manifestoRef.current) return
-
-    const words = manifestoRef.current.querySelectorAll("span")
-    gsap.set(words, { opacity: 0.15 })
-
-    const ctx = gsap.context(() => {
-      gsap.to(words, {
-        opacity: 1,
-        stagger: 0.08,
-        ease: "none",
-        scrollTrigger: {
-          trigger: manifestoRef.current,
-          start: "top 80%",
-          end: "bottom 55%",
-          scrub: true,
-          invalidateOnRefresh: true,
-        },
-      })
-    }, manifestoRef)
-
-    ScrollTrigger.refresh()
-    return () => ctx.revert()
-  }, [loadingConfig, config])
-
-  // Fallbacks
-  const heroData = {
-    image: config?.hero_image || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=2564&auto=format&fit=crop",
-    subtitle: config?.hero_subtitle || "Fall Winter 2025",
-    title1: config?.hero_title_1 || "ETHEREAL",
-    title2: config?.hero_title_2 || "SHADOWS",
-    ctaText: config?.hero_cta_text || "View The Lookbook",
-    ctaLink: config?.hero_cta_link || "/view-all"
-  }
-
-  const manifestoText = config?.manifesto_text || "We believe in the quiet power of silence. In a world of noise, U.S ATELIER is the absence of it. We strip away the unnecessary to reveal the essential structure of the human form. This is not just clothing; this is architecture for the soul."
+  ]
 
   return (
     <>
       <Preloader />
 
-      <div ref={rootRef} className="bg-[#030303] text-[#e8e8e3] overflow-x-hidden">
+      <div ref={rootRef} className="bg-[#030303] text-[#e8e8e3] overflow-x-hidden min-h-screen">
         <SiteHeader />
+        <style jsx global>{`
+          ::-webkit-scrollbar {
+            display: none !important;
+          }
+          body {
+            -ms-overflow-style: none !important;
+            scrollbar-width: none !important;
+          }
+        `}</style>
 
-        {/* ================= HERO ================= */}
-        <section className="hero relative h-screen flex items-center justify-center overflow-hidden">
-          <Image
-            src={heroData.image}
-            alt="Hero"
-            fill
-            priority
-            className="hero-bg object-cover opacity-60 scale-110"
-          />
+        {/* HERO CAROUSEL */}
+        <section className="relative h-screen overflow-hidden bg-[#030303] flex items-center justify-center">
+          <div className="embla w-full h-full" ref={emblaRef}>
+            <div className="embla__container h-full flex">
+              {slides.map((slide: any, idx: number) => (
+                <div key={idx} className="embla__slide relative flex-[0_0_100%] h-full flex items-center justify-center p-6 md:p-12">
+                  {/* Full Size Hero Image Background */}
+                  <div className="absolute inset-0 w-full h-full overflow-hidden bg-[#030303]">
+                    <Image
+                      src={slide.image || "/placeholder.jpg"}
+                      alt={`Hero Slide ${idx}`}
+                      fill
+                      priority={idx === 0}
+                      className="object-cover opacity-60 scale-100"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40" />
+                  </div>
 
-          <div className="relative z-10 text-center mix-blend-difference pt-32">
-            <div className="overflow-hidden mb-4">
-              <p className="uppercase tracking-[0.5em] text-xs text-gray-300 translate-y-full hero-line">
-                <span className="block translate-y-full">{heroData.subtitle}</span>
-              </p>
-            </div>
+                  {/* Overlay Narrative */}
+                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center mix-blend-difference px-4 pt-24">
+                    <div className="overflow-hidden mb-6">
+                      <p className="uppercase tracking-[0.6em] text-[10px] md:text-xs text-gray-300 hero-line">
+                        <span className="block">{slide.subtitle}</span>
+                      </p>
+                    </div>
 
-            <div className="overflow-hidden">
-              <h1 className="text-[14vw] leading-[0.8] font-serif hero-line">
-                <span className="block translate-y-full">{heroData.title1}</span>
-              </h1>
-            </div>
+                    <div className="overflow-hidden">
+                      <h1 className="text-[12vw] md:text-[10vw] leading-[0.8] font-serif hero-line">
+                        <span className="block">{slide.title1}</span>
+                      </h1>
+                    </div>
 
-            <div className="overflow-hidden">
-              <h1 className="text-[14vw] leading-[0.8] font-serif italic text-gray-400 hero-line">
-                <span className="block translate-y-full">{heroData.title2}</span>
-              </h1>
-            </div>
+                    <div className="overflow-hidden">
+                      <h1 className="text-[12vw] md:text-[10vw] leading-[0.8] font-serif italic text-gray-400 hero-line">
+                        <span className="block">{slide.title2}</span>
+                      </h1>
+                    </div>
 
-            <div className="hero-cta mt-14 opacity-0 translate-y-6">
-              <Link
-                href={heroData.ctaLink}
-                className="inline-block px-10 py-4 border border-white/50 rounded-full uppercase tracking-widest text-xs hover:bg-white hover:text-black transition-all"
-              >
-                {heroData.ctaText}
-              </Link>
-            </div>
-          </div>
-
-          <div className="absolute bottom-10 left-10 hidden md:block">
-            <p className="text-[10px] uppercase tracking-widest w-32 leading-relaxed opacity-60">
-              Designed in Paris.
-              <br />
-              Crafted in Milan.
-              <br />
-              Worn in Darkness.
-            </p>
-          </div>
-        </section>
-
-        {/* ================= MANIFESTO ================= */}
-        <section className="min-h-screen flex items-center justify-center px-6 md:px-32">
-          <p
-            ref={manifestoRef}
-            className="manifesto text-3xl md:text-5xl font-serif text-center leading-relaxed text-gray-300"
-          >
-            {manifestoText.split(" ").map((word: string, i: number) => (
-              <span key={i} className="inline-block mr-2">
-                {word}
-              </span>
-            ))}
-          </p>
-        </section>
-
-        {/* ================= HORIZONTAL RUNWAY ================= */}
-        <section ref={horizontalRef} className="overflow-hidden">
-          <div className="flex w-fit h-screen">
-            {/* Panel 1 */}
-            <div className="panel w-screen h-full flex items-center justify-center px-6 relative flex-shrink-0">
-              <span className="absolute text-9xl opacity-10 top-10 left-10 font-serif">01</span>
-
-              <div className="text-center max-w-xl relative z-20">
-                <h2 className="text-6xl font-serif mb-6">The Runway</h2>
-                <p className="uppercase text-xs tracking-widest text-gray-400 max-w-sm mx-auto mb-8">
-                  Featuring raw hems, structured shoulders, liquid silk drapes.
-                </p>
-                <span className="text-xs border-b">Scroll to Explore →</span>
-              </div>
-
-              <div className="absolute right-0 top-0 w-1/2 h-full z-10">
-                <RunwayImage />
-              </div>
-            </div>
-
-            {/* Dynamic Panels */}
-            {runwayProducts.map((p, idx) => {
-              const image = p.images ? (typeof p.images === 'string' ? JSON.parse(p.images)[0] : p.images[0]) : ''
-              return (
-                <div key={p.id || idx} className="panel w-screen h-full flex items-center justify-center flex-shrink-0">
-                  <div className="relative w-[400px] h-[600px] group overflow-hidden">
-                    <Link href={`/product/${p.id}`}>
-                      <Image
-                        src={image}
-                        alt={p.name}
-                        fill
-                        className="object-cover transition-transform duration-700 group-hover:scale-110"
-                      />
-                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <div className="absolute bottom-6 left-6 z-10">
-                        <h3 className="text-3xl font-serif italic text-white drop-shadow-md">
-                          {p.name}
-                        </h3>
-                        <p className="uppercase text-xs mt-2 text-white/80 tracking-widest font-bold">₹{p.price.toLocaleString()}</p>
-                      </div>
-                    </Link>
+                    <div className="hero-cta mt-16 opacity-0 translate-y-8">
+                      <Link
+                        href={slide.cta_link}
+                        className="inline-block px-12 py-4 border border-white/40 rounded-full uppercase tracking-widest text-[10px] hover:bg-white hover:text-black transition-all duration-500 backdrop-blur-sm"
+                      >
+                        {slide.cta_text}
+                      </Link>
+                    </div>
                   </div>
                 </div>
-              )
-            })}
-
-            {/* Final Panel */}
-            <div className="panel w-screen h-full flex items-center justify-center flex-shrink-0">
-              <div className="text-center">
-                <h2 className="text-8xl font-serif mb-8 text-white/10 uppercase tracking-[0.2em]">Fin</h2>
-                <Link
-                  href="/view-all"
-                  className="inline-block px-14 py-5 border border-white/20 rounded-full uppercase tracking-widest text-sm hover:bg-white hover:text-black transition-all"
-                >
-                  Shop The Full Collection
-                </Link>
-              </div>
+              ))}
             </div>
           </div>
+
+          {/* Navigation Arrows - Moved to edges and resized - Increased visibility */}
+          <div className="absolute inset-x-4 md:inset-x-10 top-1/2 -translate-y-1/2 flex justify-between pointer-events-none z-20">
+            <button
+              onClick={() => emblaApi?.scrollPrev()}
+              className="size-10 md:size-12 rounded-full border border-white/40 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 hover:border-white/60 transition-all pointer-events-auto backdrop-blur-md"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <button
+              onClick={() => emblaApi?.scrollNext()}
+              className="size-10 md:size-12 rounded-full border border-white/40 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 hover:border-white/60 transition-all pointer-events-auto backdrop-blur-md"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+
+          {/* Slide Indicators */}
+          <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex gap-4 z-20">
+            {slides.map((_: any, idx: number) => (
+              <button
+                key={idx}
+                onClick={() => emblaApi?.scrollTo(idx)}
+                className={`h-1 transition-all duration-700 rounded-full ${idx === selectedIndex ? 'w-12 bg-white' : 'w-3 bg-white/10 hover:bg-white/30'}`}
+              />
+            ))}
+          </div>
         </section>
+
+        {/* VERTICAL SECTIONS */}
+        <section className="py-24 space-y-40 bg-[#030303]">
+          <CollectionSection title="Best Selling" subtitle="The Collection Essentials" products={bestsellers} />
+          <CollectionSection title="Featured Pieces" subtitle="Editorial Spotlight" products={featured} />
+          <CollectionSection title="New Arrivals" subtitle="Latest Drop" products={newArrivals} />
+        </section>
+
+        <div className="py-40 text-center border-t border-white/5 bg-[#030303]">
+          <h2 className="text-8xl font-serif mb-12 text-white/5 uppercase tracking-[0.2em]">U.S ATELIER</h2>
+          <Link
+            href="/view-all"
+            className="inline-block px-14 py-5 border border-white/10 rounded-full uppercase tracking-widest text-xs hover:bg-white hover:text-black transition-all"
+          >
+            Shop The Full Collection
+          </Link>
+        </div>
 
         <SiteFooter />
       </div>

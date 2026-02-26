@@ -8,6 +8,9 @@ import razorpay
 from datetime import datetime
 from bson.objectid import ObjectId
 from flask_pymongo import PyMongo
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
 load_dotenv()
 
@@ -25,7 +28,16 @@ CORS(app, supports_credentials=True, origins=[
     "http://127.0.0.1:5173",
 ])
 
+# Cloudinary Configuration
+cloudinary.config(
+  cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME'),
+  api_key = os.getenv('CLOUDINARY_API_KEY'),
+  api_secret = os.getenv('CLOUDINARY_API_SECRET'),
+  secure = True
+)
+
 # Upload Configuration
+# UPLOAD_FOLDER is kept for compatibility if needed, but we'll use Cloudinary
 UPLOAD_FOLDER = os.path.join(os.getcwd(), 'public', 'uploads')
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -217,15 +229,15 @@ def upload_file():
         return jsonify({"error": "No selected file"}), 400
         
     if file and allowed_file(file.filename):
-        from werkzeug.utils import secure_filename
-        filename = secure_filename(file.filename)
-        # Add timestamp to avoid collisions
-        filename = f"{int(datetime.utcnow().timestamp())}_{filename}"
-        file.save(os.path.join(UPLOAD_FOLDER, filename))
-        return jsonify({
-            "success": True,
-            "url": f"/uploads/{filename}"
-        }), 200
+        try:
+            upload_result = cloudinary.uploader.upload(file, folder="ecommerce_products")
+            return jsonify({
+                "success": True,
+                "url": upload_result.get("secure_url")
+            }), 200
+        except Exception as e:
+            print(f"Error uploading to Cloudinary: {str(e)}")
+            return jsonify({"error": f"Cloudinary upload failed: {str(e)}"}), 500
         
     return jsonify({"error": "File type not allowed"}), 400
 
@@ -753,20 +765,42 @@ def delete_subcategory(cat_id):
 def get_homepage_config():
     print("DEBUG: Fetching homepage config")
     config = db.homepage_config.find_one({"type": "main"})
+    
+    # Default fallback
+    default_config = {
+        "type": "main",
+        "hero_slides": [
+            {
+                "image": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=2564&auto=format&fit=crop",
+                "subtitle": "Fall Winter 2025",
+                "title1": "ETHEREAL",
+                "title2": "SHADOWS",
+                "cta_text": "View The Lookbook",
+                "cta_link": "/view-all"
+            }
+        ],
+        "manifesto_text": "We believe in the quiet power of silence. In a world of noise, U.S ATELIER is the absence of it. We strip away the unnecessary to reveal the essential structure of the human form. This is not just clothing; this is architecture for the soul.",
+        "bestseller_product_ids": [],
+        "featured_product_ids": [],
+        "new_arrival_product_ids": []
+    }
+
     if not config:
-        # Default starting config
         print("DEBUG: No config found, using default")
-        config = {
-            "type": "main",
-            "hero_image": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=2564&auto=format&fit=crop",
-            "hero_subtitle": "Fall Winter 2025",
-            "hero_title_1": "ETHEREAL",
-            "hero_title_2": "SHADOWS",
-            "hero_cta_text": "View The Lookbook",
-            "hero_cta_link": "/shop",
-            "manifesto_text": "We believe in the quiet power of silence. In a world of noise, U.S ATELIER is the absence of it. We strip away the unnecessary to reveal the essential structure of the human form. This is not just clothing; this is architecture for the soul.",
-            "featured_product_ids": [] 
-        }
+        return jsonify(serialize_doc(default_config))
+    
+    # Migration: If old structure exists and hero_slides is empty/missing
+    if 'hero_slides' not in config or not config['hero_slides']:
+        print("DEBUG: Migrating old config to hero_slides array")
+        config['hero_slides'] = [{
+            "image": config.get('hero_image', default_config['hero_slides'][0]['image']),
+            "subtitle": config.get('hero_subtitle', default_config['hero_slides'][0]['subtitle']),
+            "title1": config.get('hero_title_1', default_config['hero_slides'][0]['title1']),
+            "title2": config.get('hero_title_2', default_config['hero_slides'][0]['title2']),
+            "cta_text": config.get('hero_cta_text', default_config['hero_slides'][0]['cta_text']),
+            "cta_link": config.get('hero_cta_link', default_config['hero_slides'][0]['cta_link'])
+        }]
+    
     return jsonify(serialize_doc(config))
 
 @app.route('/api/homepage', methods=['POST'])
@@ -782,14 +816,11 @@ def update_homepage_config():
     print(f"DEBUG: New homepage data: {data}")
     
     update_data = {
-        "hero_image": data.get('hero_image'),
-        "hero_subtitle": data.get('hero_subtitle'),
-        "hero_title_1": data.get('hero_title_1'),
-        "hero_title_2": data.get('hero_title_2'),
-        "hero_cta_text": data.get('hero_cta_text'),
-        "hero_cta_link": data.get('hero_cta_link'),
+        "hero_slides": data.get('hero_slides', []),
         "manifesto_text": data.get('manifesto_text'),
+        "bestseller_product_ids": data.get('bestseller_product_ids', []),
         "featured_product_ids": data.get('featured_product_ids', []),
+        "new_arrival_product_ids": data.get('new_arrival_product_ids', []),
         "updated_at": datetime.utcnow()
     }
     

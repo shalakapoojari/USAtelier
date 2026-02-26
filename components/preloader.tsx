@@ -27,8 +27,8 @@ export function Preloader() {
 
     tl.to(progress, {
       value: 100,
-      duration: 2,
-      ease: "power2.out",
+      duration: 0.8,
+      ease: "power2.inOut",
       onUpdate: () => {
         if (barRef.current && percentRef.current) {
           barRef.current.style.width = `${progress.value}%`
@@ -38,7 +38,7 @@ export function Preloader() {
     })
       .to(preloaderRef.current, {
         yPercent: -100,
-        duration: 1.2,
+        duration: 0.8,
         ease: "power4.inOut",
       })
       .set(preloaderRef.current, { display: "none" })
@@ -51,14 +51,14 @@ export function Preloader() {
   return (
     <div
       ref={preloaderRef}
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black text-white"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black text-white"
     >
       <div className="text-center">
         <h1 className="text-4xl font-serif tracking-widest mb-4">
           U.S ATELIER
         </h1>
 
-        <div className="w-48 h-[1px] bg-gray-800 overflow-hidden relative">
+        <div className="w-48 h-px bg-gray-800 overflow-hidden relative">
           <div
             ref={barRef}
             className="absolute top-0 left-0 h-full bg-white"
