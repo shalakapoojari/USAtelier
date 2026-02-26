@@ -102,7 +102,7 @@ export default function HomePage() {
 
     const interval = setInterval(() => {
       emblaApi.scrollNext()
-    }, 3000)
+    }, 6000)
 
     return () => {
       emblaApi.off('select', onSelect)
@@ -236,32 +236,20 @@ export default function HomePage() {
                     <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40" />
                   </div>
 
-                  {/* Overlay Narrative */}
-                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center mix-blend-difference px-4 pt-24">
-                    <div className="overflow-hidden mb-6">
-                      <p className="uppercase tracking-[0.6em] text-[10px] md:text-xs text-gray-300 hero-line">
-                        <span className="block">{slide.subtitle}</span>
-                      </p>
-                    </div>
-
-                    <div className="overflow-hidden">
-                      <h1 className="text-[12vw] md:text-[10vw] leading-[0.8] font-serif hero-line">
-                        <span className="block">{slide.title1}</span>
+                  {/* Overlay Narrative - Simplified */}
+                  <div className="absolute inset-x-0 bottom-32 z-10 flex flex-col items-center justify-center text-center mix-blend-difference px-6">
+                    <div className="max-w-4xl mx-auto overflow-hidden text-center">
+                      <h1 className="text-[4vw] md:text-[3vw] leading-[1.2] font-serif hero-line mb-10 tracking-wider">
+                        <span className="block">{slide.content || "Editorial Piece"}</span>
                       </h1>
                     </div>
 
-                    <div className="overflow-hidden">
-                      <h1 className="text-[12vw] md:text-[10vw] leading-[0.8] font-serif italic text-gray-400 hero-line">
-                        <span className="block">{slide.title2}</span>
-                      </h1>
-                    </div>
-
-                    <div className="hero-cta mt-16 opacity-0 translate-y-8">
+                    <div className="hero-cta opacity-0 translate-y-8">
                       <Link
-                        href={slide.cta_link}
-                        className="inline-block px-12 py-4 border border-white/40 rounded-full uppercase tracking-widest text-[10px] hover:bg-white hover:text-black transition-all duration-500 backdrop-blur-sm"
+                        href={`/product/${slide.product_id}`}
+                        className="inline-block px-12 py-4 border border-white/40 rounded-none uppercase tracking-[0.3em] text-[10px] hover:bg-white hover:text-black transition-all duration-500 backdrop-blur-sm"
                       >
-                        {slide.cta_text}
+                        Shop Now
                       </Link>
                     </div>
                   </div>

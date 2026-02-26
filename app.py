@@ -772,11 +772,8 @@ def get_homepage_config():
         "hero_slides": [
             {
                 "image": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=2564&auto=format&fit=crop",
-                "subtitle": "Fall Winter 2025",
-                "title1": "ETHEREAL",
-                "title2": "SHADOWS",
-                "cta_text": "View The Lookbook",
-                "cta_link": "/view-all"
+                "content": "ETHEREAL SHADOWS: FALL WINTER 2025",
+                "product_id": ""
             }
         ],
         "manifesto_text": "We believe in the quiet power of silence. In a world of noise, U.S ATELIER is the absence of it. We strip away the unnecessary to reveal the essential structure of the human form. This is not just clothing; this is architecture for the soul.",
@@ -789,16 +786,13 @@ def get_homepage_config():
         print("DEBUG: No config found, using default")
         return jsonify(serialize_doc(default_config))
     
-    # Migration: If old structure exists and hero_slides is empty/missing
+    # Migration: If old structure exists or hero_slides needs schema update
     if 'hero_slides' not in config or not config['hero_slides']:
         print("DEBUG: Migrating old config to hero_slides array")
         config['hero_slides'] = [{
             "image": config.get('hero_image', default_config['hero_slides'][0]['image']),
-            "subtitle": config.get('hero_subtitle', default_config['hero_slides'][0]['subtitle']),
-            "title1": config.get('hero_title_1', default_config['hero_slides'][0]['title1']),
-            "title2": config.get('hero_title_2', default_config['hero_slides'][0]['title2']),
-            "cta_text": config.get('hero_cta_text', default_config['hero_slides'][0]['cta_text']),
-            "cta_link": config.get('hero_cta_link', default_config['hero_slides'][0]['cta_link'])
+            "content": f"{config.get('hero_title_1', 'ETHEREAL')} {config.get('hero_title_2', 'SHADOWS')}",
+            "product_id": ""
         }]
     
     return jsonify(serialize_doc(config))

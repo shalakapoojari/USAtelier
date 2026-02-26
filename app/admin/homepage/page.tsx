@@ -15,14 +15,19 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
+import { Search, Plus } from "lucide-react"
 
 type HeroSlide = {
     image: string
-    subtitle: string
-    title1: string
-    title2: string
-    cta_text: string
-    cta_link: string
+    content: string
+    product_id: string
 }
 
 type ConfigType = {
@@ -36,12 +41,14 @@ type ConfigType = {
 function HeroSlideEditor({
     slide,
     index,
+    products,
     onUpdate,
     onRemove,
     onUpload
 }: {
     slide: HeroSlide,
     index: number,
+    products: any[],
     onUpdate: (index: number, data: Partial<HeroSlide>) => void,
     onRemove: (index: number) => void,
     onUpload: (index: number, file: File) => void
@@ -89,52 +96,77 @@ function HeroSlideEditor({
                 </div>
 
                 <div className="flex-1 space-y-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="space-y-6">
                         <div className="space-y-2">
-                            <Label className="text-[9px] uppercase tracking-[0.3em] text-gray-500">Subtitle</Label>
-                            <Input
-                                value={slide.subtitle}
-                                onChange={(e) => onUpdate(index, { subtitle: e.target.value })}
-                                className="bg-transparent border-white/10 h-10 rounded-none text-xs"
-                                placeholder="Subtitle"
+                            <Label className="text-[9px] uppercase tracking-[0.3em] text-gray-500">Editorial Content</Label>
+                            <Textarea
+                                value={slide.content}
+                                onChange={(e) => onUpdate(index, { content: e.target.value })}
+                                className="bg-transparent border-white/10 min-h-[100px] rounded-none text-xs resize-none"
+                                placeholder="e.g. Classical and Royal Finishing Sweatshirt"
                             />
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-[9px] uppercase tracking-[0.3em] text-gray-500">CTA Link</Label>
-                            <Input
-                                value={slide.cta_link}
-                                onChange={(e) => onUpdate(index, { cta_link: e.target.value })}
-                                className="bg-transparent border-white/10 h-10 rounded-none text-xs"
-                                placeholder="Link"
-                            />
+
+                        <div className="flex flex-wrap gap-4">
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button variant="outline" className="bg-white/5 border-white/10 hover:bg-white/8 hover:border-white/20 rounded-none uppercase text-[9px] tracking-widest px-6 h-10 transition-all">
+                                        <Search size={14} className="mr-2 text-gray-400" /> Select From Products
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="bg-[#030303] border-white/10 text-white max-w-4xl max-h-[80vh] overflow-y-auto custom-scrollbar">
+                                    <DialogHeader>
+                                        <DialogTitle className="font-serif text-2xl uppercase tracking-widest mb-6 px-4 pt-4">Select Product Image</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4">
+                                        {products.map(p => {
+                                            const images = typeof p.images === 'string' ? JSON.parse(p.images) : p.images
+                                            const imgUrl = images?.[0] || "/placeholder.jpg"
+                                            return (
+                                                <div
+                                                    key={p.id}
+                                                    onClick={() => {
+                                                        onUpdate(index, { image: imgUrl, product_id: p.id })
+                                                    }}
+                                                    className="group cursor-pointer space-y-2"
+                                                >
+                                                    <div className="relative aspect-3/4 border border-white/5 group-hover:border-white/40 transition-all overflow-hidden bg-white/5">
+                                                        <Image src={imgUrl} alt={p.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                            <span className="text-[8px] uppercase tracking-widest">Select</span>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-[8px] uppercase tracking-widest text-gray-500 truncate">{p.name}</p>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
+
+                            <div className="relative">
+                                <Input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0]
+                                        if (file) onUpload(index, file)
+                                    }}
+                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                />
+                                <Button variant="outline" className="bg-white/5 border-white/10 hover:bg-white/8 hover:border-white/20 rounded-none uppercase text-[9px] tracking-widest px-6 h-10 transition-all">
+                                    <Upload size={14} className="mr-2 text-gray-400" /> Custom Upload
+                                </Button>
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-[9px] uppercase tracking-[0.3em] text-gray-500">Title 1 (Bold)</Label>
-                            <Input
-                                value={slide.title1}
-                                onChange={(e) => onUpdate(index, { title1: e.target.value })}
-                                className="bg-transparent border-white/10 h-10 rounded-none text-xs"
-                                placeholder="Title 1"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-[9px] uppercase tracking-[0.3em] text-gray-500">Title 2 (Italic)</Label>
-                            <Input
-                                value={slide.title2}
-                                onChange={(e) => onUpdate(index, { title2: e.target.value })}
-                                className="bg-transparent border-white/10 h-10 rounded-none text-xs"
-                                placeholder="Title 2"
-                            />
-                        </div>
-                        <div className="space-y-2 lg:col-span-2">
-                            <Label className="text-[9px] uppercase tracking-[0.3em] text-gray-500">CTA Text</Label>
-                            <Input
-                                value={slide.cta_text}
-                                onChange={(e) => onUpdate(index, { cta_text: e.target.value })}
-                                className="bg-transparent border-white/10 h-10 rounded-none text-xs"
-                                placeholder="CTA Text"
-                            />
-                        </div>
+
+                        {slide.product_id && (
+                            <div className="flex items-center gap-2 p-3 bg-white/5 border border-white/5">
+                                <Check size={12} className="text-green-500" />
+                                <span className="text-[9px] uppercase tracking-widest text-gray-400"> Linked to Product ID: </span>
+                                <span className="text-[9px] font-mono text-gray-500">{slide.product_id}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -218,7 +250,7 @@ function ProductSelectionRow({
                                 <div
                                     key={p.id}
                                     onClick={() => onToggle(p.id, listKey)}
-                                    className={`relative flex-shrink-0 w-[180px] md:w-[240px] aspect-[3/4] cursor-pointer transition-all border group/card ${isSelected ? 'border-[#e8e8e3]' : 'border-white/5 hover:border-white/20'}`}
+                                    className={`relative flex-shrink-0 w-[180px] md:w-[210px] aspect-[3/4] cursor-pointer transition-all border group/card ${isSelected ? 'border-[#e8e8e3]' : 'border-white/5 hover:border-white/20'}`}
                                 >
                                     <Image
                                         src={imageUrl}
@@ -325,11 +357,8 @@ export default function HomepageDesignPage() {
                 ...prev.hero_slides,
                 {
                     image: "",
-                    subtitle: "New Collection",
-                    title1: "NEW",
-                    title2: "SEASON",
-                    cta_text: "Shop Now",
-                    cta_link: "/view-all"
+                    content: "Enter editorial content here",
+                    product_id: ""
                 }
             ]
         }))
@@ -416,13 +445,14 @@ export default function HomepageDesignPage() {
     }
 
     return (
-        <div className="bg-[#030303] text-[#e8e8e3] min-h-screen px-4 md:px-12 py-16 overflow-x-hidden relative">
-            <div className="max-w-[1700px] mx-auto">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 pb-12 border-b border-white/5 gap-8">
+        <div className="bg-[#030303] text-[#e8e8e3] min-h-screen relative overflow-x-hidden">
+            {/* STICKY HEADER */}
+            <div className="sticky top-0 z-50 bg-[#030303]/80 backdrop-blur-xl border-b border-white/5 py-8 md:py-10 mb-12">
+                <div className="max-w-[1100px] pl-10 md:pl-32 pr-8 md:pr-12 flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
                     <div>
-                        <p className="uppercase tracking-[0.5em] text-xs text-gray-500 mb-4">Admin / Surface</p>
-                        <h1 className="font-serif text-5xl md:text-6xl font-light">Homepage Design</h1>
-                        <p className="mt-4 text-sm tracking-widest text-gray-500">
+                        <p className="uppercase tracking-[0.5em] text-[10px] text-gray-500 mb-3">Admin / Surface</p>
+                        <h1 className="font-serif text-4xl md:text-5xl font-light tracking-tight">Homepage Design</h1>
+                        <p className="mt-3 text-[10px] tracking-[0.3em] text-gray-500 uppercase">
                             Curate the primary editorial narrative and visual assembly.
                         </p>
                     </div>
@@ -430,28 +460,31 @@ export default function HomepageDesignPage() {
                     <Button
                         onClick={handleSave}
                         disabled={saving}
-                        className="bg-[#e8e8e3] text-black hover:bg-white px-10 py-7 md:py-8 uppercase tracking-widest text-xs rounded-none transition-all flex items-center gap-3 w-full md:w-auto"
+                        className="bg-[#e8e8e3] text-black hover:bg-white px-10 py-7 md:py-8 uppercase tracking-widest text-xs rounded-none transition-all flex items-center gap-3 w-full md:w-auto shadow-2xl"
                     >
                         {saving ? <Loader2 className="animate-spin size-4" /> : <Save size={18} />}
                         Save Work
                     </Button>
                 </div>
+            </div>
+
+            <div className="max-w-[1100px] pl-10 md:pl-32 pr-8 md:pr-12 pb-24">
 
                 <div className="space-y-16">
                     {/* HERO CAROUSEL */}
-                    <div className="max-w-[1400px]">
+                    <div className="w-full">
                         <section className="space-y-12">
                             <div className="flex justify-between items-end">
                                 <div>
                                     <h2 className="text-3xl font-serif mb-4 uppercase tracking-widest">Hero Carousel</h2>
                                     <p className="text-[10px] text-gray-500 uppercase tracking-widest">Manage multiple high-impact editorial slides</p>
                                 </div>
-                                <Button
+                                {/* <Button
                                     onClick={handleAddSlide}
                                     className="bg-transparent border border-white/20 hover:bg-white/5 text-[#e8e8e3] px-8 py-6 rounded-none uppercase text-[10px] tracking-widest transition-all"
                                 >
                                     + Add New Slide
-                                </Button>
+                                </Button> */}
                             </div>
 
                             <div className="grid grid-cols-1 gap-10">
@@ -460,11 +493,24 @@ export default function HomepageDesignPage() {
                                         key={idx}
                                         index={idx}
                                         slide={slide}
+                                        products={products}
                                         onUpdate={handleSlideUpdate}
                                         onRemove={handleRemoveSlide}
                                         onUpload={handleFileUpload}
                                     />
                                 ))}
+
+                                {/* Add Slide Action Card */}
+                                <button
+                                    onClick={handleAddSlide}
+                                    className="w-full flex flex-col items-center justify-center p-16 border border-dashed border-white/10 bg-white/1 hover:bg-white/3 hover:border-white/20 transition-all group/add-card"
+                                >
+                                    <div className="size-16 rounded-full border border-white/10 flex items-center justify-center mb-6 group-hover/add-card:scale-110 transition-all">
+                                        <Plus className="text-gray-500 group-hover/add-card:text-[#e8e8e3]" size={32} strokeWidth={1} />
+                                    </div>
+                                    <h3 className="font-serif text-2xl uppercase tracking-widest text-gray-500 group-hover/add-card:text-[#e8e8e3]">Add Hero Slide</h3>
+                                    <p className="text-[9px] uppercase tracking-[0.4em] text-gray-600 mt-4 group-hover/add-card:text-gray-400">Recommended size: 2564 x 1440px</p>
+                                </button>
                             </div>
                         </section>
                     </div>
@@ -515,6 +561,18 @@ export default function HomepageDesignPage() {
                             onClear={clearSelection}
                         />
                     </div>
+                </div>
+
+                {/* BOTTOM SAVE BUTTON */}
+                <div className="mt-24 pt-12 border-t border-white/10 flex justify-end">
+                    <Button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="bg-[#e8e8e3] text-black hover:bg-white px-12 py-8 uppercase tracking-widest text-xs rounded-none transition-all flex items-center gap-3 w-full md:w-auto shadow-2xl"
+                    >
+                        {saving ? <Loader2 className="animate-spin size-4" /> : <Save size={18} />}
+                        Save Work
+                    </Button>
                 </div>
             </div>
 
