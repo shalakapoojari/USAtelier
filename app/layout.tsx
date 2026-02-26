@@ -30,6 +30,8 @@ export const viewport: Viewport = {
   initialScale: 1,
 }
 
+import { LenisProvider } from "@/components/lenis-provider"
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -41,7 +43,9 @@ export default function RootLayout({
         <AuthProvider>
           <WishlistProvider>
             <CartProvider>
-              <ToastProvider>{children}</ToastProvider>
+              <ToastProvider>
+                <LenisProvider>{children}</LenisProvider>
+              </ToastProvider>
             </CartProvider>
           </WishlistProvider>
         </AuthProvider>
