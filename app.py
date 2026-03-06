@@ -23,6 +23,7 @@ from mail_utils import (
     send_new_arrival_notification
 )
 from models_mysql import db_mysql, User, Product as ProductSQL, Category as CategorySQL, Order as OrderSQL, OrderItem, CartItem, WishlistItem
+from borzo_utils import create_delivery_order
 
 load_dotenv()
 
@@ -1241,6 +1242,235 @@ def update_order_status(order_id):
         send_order_status_update(mail, user['email'], order_id, new_status, tracking_link)
         
     return jsonify({"success": True, "message": f"Order status updated to {new_status}"}), 200
+
+@app.route('/api/admin/orders/<order_id>/dispatch', methods=['POST'])
+def dispatch_borzo_order(order_id):
+    is_admin = session.get('is_admin')
+    if 'user_id' not in session or not (is_admin is True or str(is_admin).lower() == 'true'):
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    order = db.orders.find_one({"id": order_id})
+    if not order:
+        return jsonify({"error": "Order not found"}), 404
+        
+    if order.get("borzo_order_id"):
+        return jsonify({"error": "Order already dispatched via Borzo"}), 400
+
+    user = db.users.find_one({"_id": ObjectId(order['user_id'])})
+    shipping_address = order.get('shipping_address', {})
+    
+    # Format exactly as Borzo expects: full written address
+    deliver_to = f"{shipping_address.get('address', '')}, {shipping_address.get('city', '')}, {shipping_address.get('state', '')} {shipping_address.get('zip', '')}"
+    pickup_from = os.getenv("STORE_ADDRESS", "Main Store Address, City, State ZIP")
+    
+    customer_phone = user.get('phone', '9999999999') if user else '9999999999'
+    customer_name = shipping_address.get('firstName', '') + ' ' + shipping_address.get('lastName', '')
+
+    try:
+        dispatch_res = create_delivery_order(
+            order_id=order_id,
+            pickup_address=pickup_from,
+            delivery_address=deliver_to,
+            customer_phone=customer_phone,
+            customer_name=customer_name
+        )
+        
+        if dispatch_res.get("success"):
+            borzo_id = dispatch_res["borzo_order_id"]
+            tracking_url = dispatch_res["tracking_url"]
+            
+            # Update Mongo
+            db.orders.update_one(
+                {"id": order_id},
+                {"$set": {
+                    "status": "Shipped",
+                    "borzo_order_id": borzo_id,
+                    "borzo_tracking_url": tracking_url
+                }}
+            )
+            
+            # Update MySQL
+            order_sql = OrderSQL.query.filter_by(order_number=order_id).first()
+            if order_sql:
+                order_sql.status = "Shipped"
+                order_sql.borzo_order_id = str(borzo_id)
+                order_sql.borzo_tracking_url = tracking_url
+                db_mysql.session.commit()
+                
+            # Send Notification
+            if user:
+                send_order_status_update(mail, user['email'], order_id, "Shipped", tracking_url)
+
+            return jsonify({"success": True, "message": "Dispatched via Borzo", "tracking_url": tracking_url}), 200
+        else:
+            return jsonify({"error": f"Borzo API Error: {dispatch_res.get('error')}"}), 500
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/webhooks/borzo', methods=['POST'])
+def borzo_webhook():
+    # Borzo sends tracking updates here
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": True}), 200
+        
+    order_data = data.get("order", {})
+    borzo_id = order_data.get("order_id")
+    status = order_data.get("status") # e.g., 'available', 'active', 'completed', 'canceled'
+    
+    if borzo_id and status:
+        internal_status = "Shipped"
+        if status == "completed":
+            internal_status = "Delivered"
+        elif status == "canceled":
+            internal_status = "Cancelled"
+            
+        # Update Mongo
+        db.orders.update_one(
+            {"borzo_order_id": borzo_id},
+            {"$set": {"status": internal_status}}
+        )
+        
+        # Update MySQL
+        try:
+            order_sql = OrderSQL.query.filter_by(borzo_order_id=str(borzo_id)).first()
+            if order_sql:
+                order_sql.status = internal_status
+                db_mysql.session.commit()
+        except Exception as e:
+            db_mysql.session.rollback()
+            print(f"Webhook MySQL update error: {e}")
+            
+    return jsonify({"success": True}), 200
+
+# ==================== CUSTOMERS ====================
+
+@app.route('/api/admin/customers', methods=['GET'])
+def get_customers():
+    is_admin = session.get('is_admin')
+    if 'user_id' not in session or not (is_admin is True or str(is_admin).lower() == 'true'):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    # 1. Get all non-admin users
+    users = list(db.users.find({"is_admin": {"$ne": True}}))
+    
+    # 2. For each user, aggregate their orders
+    customer_data = []
+    for user in users:
+        user_id_str = str(user['_id'])
+        
+        # Aggregate totals from orders
+        pipeline = [
+            {"$match": {"user_id": user_id_str}},
+            {"$group": {
+                "_id": None,
+                "total_orders": {"$sum": 1},
+                "total_spent": {"$sum": "$total"}
+            }}
+        ]
+        
+        agg_result = list(db.orders.aggregate(pipeline))
+        stats = agg_result[0] if len(agg_result) > 0 else {"total_orders": 0, "total_spent": 0}
+        
+        customer_data.append({
+            "id": user_id_str,
+            "name": f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "Unknown",
+            "email": user.get("email"),
+            "phone": user.get("phone", "N/A"),
+            "date_joined": user.get("created_at"),
+            "is_blocked": user.get("is_blocked", False),
+            "total_orders": stats["total_orders"],
+            "total_spent": stats["total_spent"]
+        })
+        
+    return jsonify(serialize_doc(customer_data)), 200
+
+@app.route('/api/admin/customers/<customer_id>', methods=['GET'])
+def get_customer_profile(customer_id):
+    is_admin = session.get('is_admin')
+    if 'user_id' not in session or not (is_admin is True or str(is_admin).lower() == 'true'):
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    try:
+        user = db.users.find_one({"_id": ObjectId(customer_id)})
+        if not user:
+            return jsonify({"error": "Customer not found"}), 404
+            
+        # Get all their orders
+        orders = list(db.orders.find({"user_id": customer_id}).sort("created_at", -1))
+        
+        # Calculate stats
+        total_orders = len(orders)
+        total_spent = sum(o.get('total', 0) for o in orders)
+        avg_order_value = total_spent / total_orders if total_orders > 0 else 0
+        
+        # Extract default address from first order if possible, else empty
+        address = None
+        for o in orders:
+            if o.get("shipping_address"):
+                address = o["shipping_address"]
+                break
+                
+        customer_profile = {
+            "id": str(user["_id"]),
+            "first_name": user.get("first_name", ""),
+            "last_name": user.get("last_name", ""),
+            "email": user.get("email"),
+            "phone": user.get("phone", "N/A"),
+            "date_joined": user.get("created_at"),
+            "is_blocked": user.get("is_blocked", False),
+            "address": address,
+            "stats": {
+                "total_orders": total_orders,
+                "total_spent": total_spent,
+                "avg_order_value": avg_order_value
+            },
+            "orders": [serialize_doc(o) for o in orders]
+        }
+        
+        return jsonify(serialize_doc(customer_profile)), 200
+        
+    except Exception as e:
+        return jsonify({"error": f"Invalid ID format: {str(e)}"}), 400
+
+@app.route('/api/admin/customers/<customer_id>/status', methods=['PUT'])
+def update_customer_status(customer_id):
+    is_admin = session.get('is_admin')
+    if 'user_id' not in session or not (is_admin is True or str(is_admin).lower() == 'true'):
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    data = request.get_json()
+    is_blocked = data.get('is_blocked')
+    
+    if is_blocked is None:
+        return jsonify({"error": "is_blocked status is required"}), 400
+        
+    try:
+        # Update MongoDB
+        db.users.update_one(
+            {"_id": ObjectId(customer_id)},
+            {"$set": {"is_blocked": is_blocked}}
+        )
+        
+        # Try to sync to MySQL if it exists there
+        mysql_user = User.query.filter_by(id=customer_id).first()
+        if not mysql_user:
+            # Maybe lookup by email instead since ID might differ across DBs
+            mongo_user = db.users.find_one({"_id": ObjectId(customer_id)})
+            if mongo_user:
+                mysql_user = User.query.filter_by(email=mongo_user['email']).first()
+                
+        if mysql_user:
+            mysql_user.is_blocked = is_blocked
+            db_mysql.session.commit()
+            
+        action = "blocked" if is_blocked else "unblocked"
+        return jsonify({"success": True, "message": f"Customer successfully {action}."}), 200
+        
+    except Exception as e:
+        db_mysql.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 # ==================== CATEGORIES ====================
 

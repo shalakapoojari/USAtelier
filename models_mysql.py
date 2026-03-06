@@ -14,6 +14,7 @@ class User(db_mysql.Model):
     phone = db_mysql.Column(db_mysql.String(20))
     profile_pic = db_mysql.Column(db_mysql.Text) # Add this line
     is_admin = db_mysql.Column(db_mysql.Boolean, default=False)
+    is_blocked = db_mysql.Column(db_mysql.Boolean, default=False)
     created_at = db_mysql.Column(db_mysql.DateTime, default=datetime.utcnow)
 
 class Category(db_mysql.Model):
@@ -75,6 +76,8 @@ class Order(db_mysql.Model):
     status = db_mysql.Column(db_mysql.String(50), default='Pending')
     payment_status = db_mysql.Column(db_mysql.String(50), default='Pending')
     shipping_address_json = db_mysql.Column(db_mysql.Text)
+    borzo_order_id = db_mysql.Column(db_mysql.String(100))
+    borzo_tracking_url = db_mysql.Column(db_mysql.String(500))
     created_at = db_mysql.Column(db_mysql.DateTime, default=datetime.utcnow)
 
     items = db_mysql.relationship('OrderItem', backref='order', lazy=True)

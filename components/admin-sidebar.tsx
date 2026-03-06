@@ -32,9 +32,9 @@ export function AdminSidebar() {
                         <Link
                             key={href}
                             href={href}
-                            className={`flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest transition-all rounded-sm ${isActive
-                                    ? "bg-white text-black"
-                                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                            className={`flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest rounded-sm ${isActive
+                                ? "text-white bg-white/5"
+                                : "text-gray-400"
                                 }`}
                         >
                             <Icon size={14} />
@@ -48,7 +48,7 @@ export function AdminSidebar() {
             <div className="px-4 py-8 border-t border-white/5">
                 <Link
                     href="/"
-                    className="flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-gray-500 hover:text-white transition-colors"
+                    className="flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-gray-500"
                 >
                     <ArrowLeft size={14} />
                     Back to Store

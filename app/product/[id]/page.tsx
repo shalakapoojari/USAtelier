@@ -350,7 +350,7 @@ export default function ProductPage({
                   disabled={!isInStock}
                   className={`flex-1 py-4 flex items-center justify-center gap-2 uppercase tracking-widest text-xs font-medium transition-all duration-500 ${addedToCart
                     ? "bg-green-500 text-white border border-green-500"
-                    : "border border-white/40 hover:bg-white hover:text-black"
+                    : "bg-white text-black border border-white"
                     } disabled:opacity-40 disabled:cursor-not-allowed`}
                 >
                   {addedToCart ? (
@@ -372,7 +372,7 @@ export default function ProductPage({
                   onClick={handleWishlistToggle}
                   className={`px-4 py-4 border transition-all duration-300 ${isWishlisted(product.id)
                     ? "border-red-400 text-red-400"
-                    : "border-white/20 text-gray-400 hover:border-white/60 hover:text-white"
+                    : "border-white/60 text-white"
                     }`}
                   title="Add to Favourites"
                 >
@@ -383,7 +383,7 @@ export default function ProductPage({
               {isInStock && (
                 <button
                   onClick={handleBuyNow}
-                  className="w-full py-4 bg-[#facc15] text-black border border-[#facc15] uppercase tracking-widest text-xs font-bold transition-all duration-300 hover:bg-transparent hover:text-[#facc15]"
+                  className="w-full py-4 bg-transparent text-[#facc15] border border-[#facc15] uppercase tracking-widest text-xs font-bold transition-all duration-300"
                 >
                   Buy Now
                 </button>

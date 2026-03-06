@@ -56,9 +56,27 @@ export default function OrderDetailPage({
                   })}
                 </p>
               </div>
-              <span className={`px-4 py-1.5 border uppercase tracking-widest text-xs ${getStatusStyle(order.status)}`}>
-                {order.status}
-              </span>
+              <div className="flex flex-col items-end gap-3">
+                <span className={`px-4 py-1.5 border uppercase tracking-widest text-xs ${getStatusStyle(order.status)}`}>
+                  {order.status}
+                </span>
+
+                {/* Wefast/Borzo Tracking Button */}
+                {order.borzo_tracking_url ? (
+                  <a
+                    href={order.borzo_tracking_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex justify-center items-center px-4 py-2 border border-blue-500 bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-all uppercase tracking-widest text-[10px]"
+                  >
+                    Track Live Delivery
+                  </a>
+                ) : order.status === "shipped" ? (
+                  <span className="text-[10px] text-gray-500 uppercase tracking-widest">
+                    Awaiting Courier Link
+                  </span>
+                ) : null}
+              </div>
             </div>
 
             {/* Items */}
@@ -104,9 +122,9 @@ export default function OrderDetailPage({
             </div>
           </div>
         </AccountSidebar>
-      </div>
+      </div >
 
       <SiteFooter />
-    </div>
+    </div >
   )
 }

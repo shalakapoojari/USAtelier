@@ -50,7 +50,7 @@ export function AccountSidebar({ children }: SidebarProps) {
                     {isAdmin && (
                         <Link
                             href="/admin"
-                            className="flex items-center gap-3 px-6 py-3.5 text-xs uppercase tracking-widest text-amber-400 hover:text-amber-300 hover:bg-amber-400/5 transition-all border-b border-white/5 mb-1"
+                            className="flex items-center gap-3 px-6 py-3.5 text-xs uppercase tracking-widest text-amber-400 transition-all border-b border-white/5 mb-1"
                         >
                             <LayoutDashboard size={14} strokeWidth={1.5} />
                             <span>Admin Panel</span>
@@ -65,14 +65,14 @@ export function AccountSidebar({ children }: SidebarProps) {
                                 href={item.href}
                                 className={`flex items-center gap-3 px-6 py-3.5 text-xs uppercase tracking-widest transition-all group ${active
                                     ? "text-white border-r-2 border-white bg-white/5"
-                                    : "text-gray-500 hover:text-white hover:bg-white/5"
+                                    : "text-gray-500"
                                     }`}
                             >
                                 <item.icon size={14} strokeWidth={1.5} />
                                 <span>{item.label}</span>
                                 <ChevronRight
                                     size={12}
-                                    className={`ml-auto transition-opacity ${active ? "opacity-100" : "opacity-0 group-hover:opacity-50"}`}
+                                    className={`ml-auto transition-opacity ${active ? "opacity-100" : "opacity-0"}`}
                                 />
                             </Link>
                         )
@@ -81,7 +81,7 @@ export function AccountSidebar({ children }: SidebarProps) {
                     {/* Sign Out — directly below Settings */}
                     <button
                         onClick={handleLogout}
-                        className="flex items-center gap-3 w-full px-6 py-3.5 text-xs uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-all"
+                        className="flex items-center gap-3 w-full px-6 py-3.5 text-xs uppercase tracking-widest text-gray-500 transition-all"
                     >
                         <LogOut size={14} strokeWidth={1.5} />
                         <span>Sign Out</span>

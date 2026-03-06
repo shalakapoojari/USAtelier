@@ -49,6 +49,8 @@ export type Order = {
     zip: string
     country: string
   }
+  borzo_order_id?: string
+  borzo_tracking_url?: string
 }
 
 // Mock Products Data

@@ -265,7 +265,7 @@ export default function ShopPage() {
               }}
               className={`px-4 py-2 border text-xs tracking-widest transition-all ${selectedSizes.includes(size)
                 ? "border-white text-white"
-                : "border-white/20 text-gray-400 hover:text-white"
+                : "border-white/20 text-white"
                 }`}
             >
               {size}
@@ -355,7 +355,7 @@ export default function ShopPage() {
           {/* Desktop Filters - Only shown if products exist */}
           {!loading && filteredProducts.length > 0 && (
             <aside className="hidden lg:block w-70 shrink-0">
-              <div className="sticky top-24 h-[calc(100vh-96px)] overflow-y-auto overflow-x-hidden no-scrollbar scroll-smooth">
+              <div className="sticky top-24 pb-12">
                 <FilterContent />
               </div>
             </aside>

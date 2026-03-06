@@ -99,8 +99,8 @@ export function ProductCard({ product }: ProductCardProps) {
           )}
         </div>
 
-        {/* Hover CTA */}
-        <div className="absolute inset-x-0 bottom-0 translate-y-full group-hover:translate-y-0 transition-transform duration-300 bg-black/80 backdrop-blur-sm py-3 text-center">
+        {/* CTA */}
+        <div className="absolute inset-x-0 bottom-0 translate-y-0 transition-transform duration-300 bg-black/80 backdrop-blur-sm py-3 text-center">
           <span className="text-xs uppercase tracking-widest text-white">View Details</span>
         </div>
       </div>

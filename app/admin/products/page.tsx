@@ -345,7 +345,7 @@ export default function ProductsPage() {
           }
         }}>
           <DialogTrigger asChild>
-            <Button className="bg-[#e8e8e3] text-black px-8 py-6 uppercase tracking-widest text-xs hover:bg-white transition-all rounded-none">
+            <Button className="bg-white text-black px-8 py-6 uppercase tracking-widest text-xs transition-all rounded-none">
               Add Product
             </Button>
           </DialogTrigger>

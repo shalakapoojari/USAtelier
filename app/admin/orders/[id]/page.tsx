@@ -36,6 +36,28 @@ export default function OrderDetailPage({
     }
   };
 
+  const handleDispatchBorzo = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/admin/orders/${id}/dispatch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        alert("Order Dispatched via Borzo!\nTracking Link: " + data.tracking_url);
+        setStatus("Shipped" as any);
+      } else {
+        alert("Borzo Error: " + data.error);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to dispatch order.");
+    }
+  };
+
   if (!order) {
     return (
       <div className="bg-[#030303] text-[#e8e8e3] min-h-screen px-8 py-16">
@@ -162,6 +184,19 @@ export default function OrderDetailPage({
               >
                 Update Status
               </button>
+
+              <div className="mt-8 pt-6 border-t border-white/10">
+                <button
+                  onClick={handleDispatchBorzo}
+                  disabled={status === 'delivered' || status === 'cancelled' || status === 'shipped'}
+                  className="w-full py-4 bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)] disabled:opacity-50 disabled:grayscale uppercase tracking-widest text-xs font-bold transition-all"
+                >
+                  Dispatch via Wefast
+                </button>
+                <p className="text-[10px] text-gray-500 mt-3 text-center uppercase tracking-widest leading-relaxed">
+                  Automatically calls a Borzo courier to pickup and deliver this order.
+                </p>
+              </div>
             </div>
           </div>
         </div>
