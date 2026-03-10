@@ -13,7 +13,7 @@ import { useWishlist } from "@/lib/wishlist-context"
 import { useToast } from "@/lib/toast-context"
 import { useAuth } from "@/lib/auth-context"
 
-import { ChevronDown, ChevronUp, ShoppingBag, Heart, Star, Check, Sparkles, Award, ArrowLeft, Loader2 } from "lucide-react"
+import { ChevronDown, ChevronUp, ShoppingBag, Heart, Star, Check, Sparkles, Award, ArrowLeft, Loader2, Share2 } from "lucide-react"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"
 
@@ -38,6 +38,7 @@ export default function ProductPage({
   const [showDetails, setShowDetails] = useState(false)
   const [showShipping, setShowShipping] = useState(false)
   const [addedToCart, setAddedToCart] = useState(false)
+  const [showShareTooltip, setShowShareTooltip] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -146,6 +147,14 @@ export default function ProductPage({
     } else {
       showToast("Saved to favourites", "wishlist", product.name)
     }
+  }
+
+  const handleShare = () => {
+    const url = window.location.href
+    navigator.clipboard.writeText(url).then(() => {
+      setShowShareTooltip(true)
+      setTimeout(() => setShowShareTooltip(false), 2000)
+    })
   }
 
   const handleBuyNow = () => {
@@ -378,6 +387,22 @@ export default function ProductPage({
                 >
                   <Heart size={16} className={isWishlisted(product.id) ? "fill-red-400" : ""} />
                 </button>
+
+                <div className="relative">
+                  <button
+                    onClick={handleShare}
+                    className="px-4 py-4 border border-white/60 text-white transition-all duration-300 hover:border-white"
+                    title="Share Product"
+                  >
+                    <Share2 size={16} />
+                  </button>
+                  {showShareTooltip && (
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white text-black text-[10px] uppercase tracking-widest px-3 py-1.5 whitespace-nowrap animate-in fade-in slide-in-from-bottom-2 duration-300 shadow-xl z-10">
+                      Link copied
+                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white rotate-45" />
+                    </div>
+                  )}
+                </div>
               </div>
 
               {isInStock && (
