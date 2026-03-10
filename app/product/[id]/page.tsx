@@ -13,7 +13,7 @@ import { useWishlist } from "@/lib/wishlist-context"
 import { useToast } from "@/lib/toast-context"
 import { useAuth } from "@/lib/auth-context"
 
-import { ChevronDown, ChevronUp, ShoppingBag, Heart, Star, Check, Sparkles, Award, ArrowLeft, Loader2, Share2 } from "lucide-react"
+import { ChevronDown, ChevronUp, ShoppingBag, Heart, Star, Check, Sparkles, Award, ArrowLeft, Loader2, Share2, MessageCircle, Twitter, Facebook, Link2 } from "lucide-react"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"
 
@@ -38,7 +38,8 @@ export default function ProductPage({
   const [showDetails, setShowDetails] = useState(false)
   const [showShipping, setShowShipping] = useState(false)
   const [addedToCart, setAddedToCart] = useState(false)
-  const [showShareTooltip, setShowShareTooltip] = useState(false)
+  const [showShareMenu, setShowShareMenu] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -150,11 +151,53 @@ export default function ProductPage({
   }
 
   const handleShare = () => {
+    setShowShareMenu(!showShareMenu)
+  }
+
+  const handleCopyLink = () => {
     const url = window.location.href
     navigator.clipboard.writeText(url).then(() => {
-      setShowShareTooltip(true)
-      setTimeout(() => setShowShareTooltip(false), 2000)
+      setLinkCopied(true)
+      setTimeout(() => {
+        setLinkCopied(false)
+        setShowShareMenu(false)
+      }, 1500)
     })
+  }
+
+  const handleShareTo = (platform: string) => {
+    const url = window.location.href
+    const origin = window.location.origin
+    const siteName = "U.S-ATELIER"
+    const productName = product.name
+
+    // Map categories to collections for "More like this" links
+    const collectionMap: Record<string, string> = {
+      "Basics": "essentials",
+      "Knitwear": "knitwear",
+      "Trousers": "tailoring",
+      "Shirts": "tailoring",
+    }
+    const colSlug = collectionMap[product.category]
+    const collectionLink = colSlug ? `${origin}/collections/${colSlug}` : `${origin}/view-all`
+
+    // Professional Flipkart-inspired message with clear URL separation
+    const message = `Take a look at this ${productName} on ${siteName}:\n${url}\n\nMore from ${product.category}:\n${collectionLink}`
+
+    let shareUrl = ""
+    if (platform === "whatsapp") {
+      shareUrl = `https://wa.me/?text=${encodeURIComponent(message)}`
+    } else if (platform === "twitter") {
+      const tweetText = `Take a look at this ${productName} on ${siteName}`
+      shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(tweetText)}`
+    } else if (platform === "facebook") {
+      shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`
+    }
+
+    if (shareUrl) {
+      window.open(shareUrl, "_blank")
+    }
+    setShowShareMenu(false)
   }
 
   const handleBuyNow = () => {
@@ -391,15 +434,51 @@ export default function ProductPage({
                 <div className="relative">
                   <button
                     onClick={handleShare}
-                    className="px-4 py-4 border border-white/60 text-white transition-all duration-300 hover:border-white"
+                    className={`px-4 py-4 border transition-all duration-300 ${showShareMenu ? "border-white bg-white text-black" : "border-white/60 text-white hover:border-white"
+                      }`}
                     title="Share Product"
                   >
                     <Share2 size={16} />
                   </button>
-                  {showShareTooltip && (
-                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white text-black text-[10px] uppercase tracking-widest px-3 py-1.5 whitespace-nowrap animate-in fade-in slide-in-from-bottom-2 duration-300 shadow-xl z-10">
-                      Link copied
-                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white rotate-45" />
+
+                  {showShareMenu && (
+                    <div className="absolute -top-16 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-black/95 border border-white/20 p-1.5 shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      <button
+                        onClick={() => handleShareTo("whatsapp")}
+                        className="p-2 hover:bg-white/10 text-green-500 transition-colors"
+                        title="Share on WhatsApp"
+                      >
+                        <MessageCircle size={18} fill="currentColor" fillOpacity={0.1} />
+                      </button>
+                      <button
+                        onClick={() => handleShareTo("twitter")}
+                        className="p-2 hover:bg-white/10 text-sky-400 transition-colors"
+                        title="Share on Twitter"
+                      >
+                        <Twitter size={18} fill="currentColor" fillOpacity={0.1} />
+                      </button>
+                      <button
+                        onClick={() => handleShareTo("facebook")}
+                        className="p-2 hover:bg-white/10 text-blue-600 transition-colors"
+                        title="Share on Facebook"
+                      >
+                        <Facebook size={18} fill="currentColor" fillOpacity={0.1} />
+                      </button>
+                      <div className="w-px h-4 bg-white/10 mx-1" />
+                      <button
+                        onClick={handleCopyLink}
+                        className="p-2 hover:bg-white/10 text-white transition-colors relative"
+                        title="Copy Link"
+                      >
+                        {linkCopied ? <Check size={18} className="text-green-500" /> : <Link2 size={18} />}
+                        {linkCopied && (
+                          <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-white text-black text-[9px] uppercase tracking-tighter px-2 py-0.5 whitespace-nowrap font-bold">
+                            Copied
+                          </span>
+                        )}
+                      </button>
+                      {/* Arrow Down */}
+                      <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-black border-r border-b border-white/20 rotate-45" />
                     </div>
                   )}
                 </div>
