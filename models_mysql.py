@@ -15,7 +15,30 @@ class User(db_mysql.Model):
     profile_pic = db_mysql.Column(db_mysql.Text) # Add this line
     is_admin = db_mysql.Column(db_mysql.Boolean, default=False)
     is_blocked = db_mysql.Column(db_mysql.Boolean, default=False)
+    addresses_json = db_mysql.Column(db_mysql.Text, default='[]')
     created_at = db_mysql.Column(db_mysql.DateTime, default=datetime.utcnow)
+
+    @property
+    def JSON_addresses(self):
+        return json.loads(self.addresses_json) if self.addresses_json else []
+
+    @JSON_addresses.setter
+    def JSON_addresses(self, value):
+        self.addresses_json = json.dumps(value)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'email': self.email,
+            'firstName': self.first_name,
+            'lastName': self.last_name,
+            'phone': self.phone,
+            'profilePic': self.profile_pic,
+            'isAdmin': self.is_admin,
+            'isBlocked': self.is_blocked,
+            'addresses': self.JSON_addresses,
+            'createdAt': self.created_at.isoformat() if self.created_at else None
+        }
 
 class Category(db_mysql.Model):
     __tablename__ = 'categories'
@@ -31,6 +54,14 @@ class Category(db_mysql.Model):
     @subcategories.setter
     def subcategories(self, value):
         self.subcategories_json = json.dumps(value)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'subcategories': self.subcategories,
+            'createdAt': self.created_at.isoformat() if self.created_at else None
+        }
 
 class Product(db_mysql.Model):
     __tablename__ = 'products'
@@ -67,6 +98,26 @@ class Product(db_mysql.Model):
     def sizes(self, value):
         self.sizes_json = json.dumps(value)
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'price': self.price,
+            'category': self.category,
+            'subcategory': self.subcategory,
+            'gender': self.gender,
+            'description': self.description,
+            'images': self.images,
+            'sizes': self.sizes,
+            'stock': self.stock,
+            'isFeatured': self.is_featured,
+            'isNew': self.is_new,
+            'isBestseller': self.is_bestseller,
+            'fabric': self.fabric,
+            'care': self.care,
+            'createdAt': self.created_at.isoformat() if self.created_at else None
+        }
+
 class Order(db_mysql.Model):
     __tablename__ = 'orders'
     id = db_mysql.Column(db_mysql.Integer, primary_key=True)
@@ -82,6 +133,26 @@ class Order(db_mysql.Model):
 
     items = db_mysql.relationship('OrderItem', backref='order', lazy=True)
 
+    @property
+    def shipping_address(self):
+        return json.loads(self.shipping_address_json) if self.shipping_address_json else {}
+
+    @shipping_address.setter
+    def shipping_address(self, value):
+        self.shipping_address_json = json.dumps(value)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'order_number': self.order_number,
+            'total': self.total,
+            'status': self.status,
+            'payment_status': self.payment_status,
+            'shipping_address': self.shipping_address,
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
+            'items': [item.to_dict() for item in self.items]
+        }
+
 class OrderItem(db_mysql.Model):
     __tablename__ = 'order_items'
     id = db_mysql.Column(db_mysql.Integer, primary_key=True)
@@ -92,6 +163,15 @@ class OrderItem(db_mysql.Model):
     price = db_mysql.Column(db_mysql.Float, nullable=False)
     size = db_mysql.Column(db_mysql.String(20))
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'product_name': self.product_name,
+            'quantity': self.quantity,
+            'price': self.price,
+            'size': self.size
+        }
+
 class CartItem(db_mysql.Model):
     __tablename__ = 'cart_items'
     id = db_mysql.Column(db_mysql.Integer, primary_key=True)
@@ -100,9 +180,90 @@ class CartItem(db_mysql.Model):
     quantity = db_mysql.Column(db_mysql.Integer, default=1)
     size = db_mysql.Column(db_mysql.String(20))
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'product_id': self.product_id_str, # In SQL it might still refer to string ID for compatibility
+            'quantity': self.quantity,
+            'size': self.size
+        }
+
 class WishlistItem(db_mysql.Model):
     __tablename__ = 'wishlist_items'
     id = db_mysql.Column(db_mysql.Integer, primary_key=True)
     user_id = db_mysql.Column(db_mysql.Integer, db_mysql.ForeignKey('users.id'))
     product_id_str = db_mysql.Column(db_mysql.String(50))
     created_at = db_mysql.Column(db_mysql.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'product_id': self.product_id_str,
+            'createdAt': self.created_at.isoformat() if self.created_at else None
+        }
+class Review(db_mysql.Model):
+    __tablename__ = 'reviews'
+    id = db_mysql.Column(db_mysql.Integer, primary_key=True)
+    user_id = db_mysql.Column(db_mysql.Integer, db_mysql.ForeignKey('users.id'))
+    user_email = db_mysql.Column(db_mysql.String(255))
+    product_id_str = db_mysql.Column(db_mysql.String(50))
+    rating = db_mysql.Column(db_mysql.Integer, nullable=False)
+    comment = db_mysql.Column(db_mysql.Text)
+    created_at = db_mysql.Column(db_mysql.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user': self.user_email,
+            'rating': self.rating,
+            'comment': self.comment,
+            'date': self.created_at.isoformat() if self.created_at else ''
+        }
+class HomepageConfig(db_mysql.Model):
+    __tablename__ = 'homepage_config'
+    id = db_mysql.Column(db_mysql.Integer, primary_key=True)
+    config_type = db_mysql.Column(db_mysql.String(50), unique=True, default='main')
+    hero_slides_json = db_mysql.Column(db_mysql.Text, default='[]')
+    manifesto_text = db_mysql.Column(db_mysql.Text)
+    bestseller_ids_json = db_mysql.Column(db_mysql.Text, default='[]')
+    featured_ids_json = db_mysql.Column(db_mysql.Text, default='[]')
+    new_arrival_ids_json = db_mysql.Column(db_mysql.Text, default='[]')
+    updated_at = db_mysql.Column(db_mysql.DateTime, default=datetime.utcnow)
+
+    @property
+    def hero_slides(self):
+        return json.loads(self.hero_slides_json) if self.hero_slides_json else []
+    @hero_slides.setter
+    def hero_slides(self, value):
+        self.hero_slides_json = json.dumps(value)
+
+    @property
+    def bestseller_ids(self):
+        return json.loads(self.bestseller_ids_json) if self.bestseller_ids_json else []
+    @bestseller_ids.setter
+    def bestseller_ids(self, value):
+        self.bestseller_ids_json = json.dumps(value)
+
+    @property
+    def featured_ids(self):
+        return json.loads(self.featured_ids_json) if self.featured_ids_json else []
+    @featured_ids.setter
+    def featured_ids(self, value):
+        self.featured_ids_json = json.dumps(value)
+
+    @property
+    def new_arrival_ids(self):
+        return json.loads(self.new_arrival_ids_json) if self.new_arrival_ids_json else []
+    @new_arrival_ids.setter
+    def new_arrival_ids(self, value):
+        self.new_arrival_ids_json = json.dumps(value)
+
+    def to_dict(self):
+        return {
+            'hero_slides': self.hero_slides,
+            'manifesto_text': self.manifesto_text,
+            'bestseller_product_ids': self.bestseller_ids,
+            'featured_product_ids': self.featured_ids,
+            'new_arrival_product_ids': self.new_arrival_ids,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
