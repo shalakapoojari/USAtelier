@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
-import { 
-  CreditCard, 
-  Search, 
-  RefreshCcw, 
-  CheckCircle2, 
-  XCircle, 
+import {
+  CreditCard,
+  Search,
+  RefreshCcw,
+  CheckCircle2,
+  XCircle,
   AlertCircle,
   ArrowUpRight,
   ExternalLink,
@@ -60,7 +60,7 @@ export default function AdminPaymentsPage() {
     fetchPayments()
   }, [])
 
-  const filteredPayments = payments.filter(p => 
+  const filteredPayments = payments.filter(p =>
     (p.razorpay_payment_id?.toLowerCase().includes(search.toLowerCase())) ||
     (p.email?.toLowerCase().includes(search.toLowerCase())) ||
     (p.status?.toLowerCase().includes(search.toLowerCase()))
@@ -108,13 +108,13 @@ export default function AdminPaymentsPage() {
             Payment processing logs and treasury management
           </p>
         </div>
-        
+
         <div className="flex items-center gap-8">
           <div className="text-right">
             <p className="text-[8px] uppercase tracking-[0.3em] text-gray-600 mb-1">Settled Treasury</p>
             <p className="text-2xl font-serif text-[#e8e8e3]">₹{totalRevenue.toLocaleString()}</p>
           </div>
-          <button 
+          <button
             onClick={fetchPayments}
             className={`p-3 border border-white/10 hover:bg-white/5 transition-all ${refreshing ? 'animate-spin' : ''}`}
           >
@@ -132,7 +132,7 @@ export default function AdminPaymentsPage() {
           </div>
           <p className="text-3xl font-serif">{payments.length}</p>
         </div>
-        
+
         <div className="bg-white/2 border border-white/5 p-8 space-y-4">
           <div className="flex items-center gap-3 text-green-500/50">
             <CheckCircle2 size={14} />
@@ -157,8 +157,8 @@ export default function AdminPaymentsPage() {
       {/* Search & Filter */}
       <div className="relative group">
         <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-[#e8e8e3] transition-colors" size={16} />
-        <input 
-          type="text" 
+        <input
+          type="text"
           placeholder="SEARCH BY PAYMENT ID, EMAIL OR STATUS..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -203,7 +203,7 @@ export default function AdminPaymentsPage() {
                   </td>
                   <td className="p-6">
                     {p.order_id ? (
-                      <Link 
+                      <Link
                         href={`/admin/orders/${p.order_id}`}
                         className="inline-flex items-center gap-2 text-[9px] uppercase tracking-widest text-[#e8e8e3] hover:text-white border-b border-white/10 hover:border-white transition-all pb-0.5"
                       >
@@ -224,7 +224,7 @@ export default function AdminPaymentsPage() {
                     </p>
                   </td>
                   <td className="p-6 text-right">
-                    <a 
+                    <a
                       href={`https://dashboard.razorpay.com/app/payments/${p.razorpay_payment_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -247,7 +247,7 @@ export default function AdminPaymentsPage() {
           </table>
         </div>
       </div>
-      
+
       {/* Footer Info */}
       <div className="pt-12 border-t border-white/5 flex justify-between items-center text-[8px] uppercase tracking-[0.4em] text-gray-700">
         <span>U.S ATELIER INTEL - RECONCILIATION SUITE V2.1</span>

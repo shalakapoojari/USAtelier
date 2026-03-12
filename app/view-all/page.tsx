@@ -369,8 +369,8 @@ function ShopContent() {
       )}
 
       {/* ================= CONTENT ================= */}
-      <main className={`px-6 md:px-12 pb-32 ${filteredProducts.length === 0 && !loading ? 'flex justify-center' : ''}`}>
-        <div className={`flex gap-16 ${filteredProducts.length === 0 && !loading ? 'w-full max-w-4xl justify-center' : 'w-full'}`}>
+      <main className="px-6 md:px-12 pb-32">
+        <div className="flex gap-16 w-full">
           {/* Desktop Filters */}
           {!loading && (
             <aside className="hidden lg:block w-70 shrink-0">
@@ -381,7 +381,7 @@ function ShopContent() {
           )}
 
           {/* Products area */}
-          <div className={filteredProducts.length > 0 ? "flex-1" : "w-full"}>
+          <div className="flex-1">
             {loading ? (
               <div className="flex flex-col items-center justify-center py-32 gap-4">
                 <Loader2 className="animate-spin text-gray-400" />

@@ -28,7 +28,27 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/lib/toast-context"
 
-const AVAILABLE_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "One Size"]
+const getSizesForCategory = (categoryName: string) => {
+  const cat = categoryName.toLowerCase();
+  
+  if (cat.includes("shirt") || cat.includes("top") || cat.includes("basics") || cat.includes("knitwear") || cat.includes("clothing")) {
+    return ["XS", "S", "M", "L", "XL", "2XL", "3XL"];
+  }
+  if (cat.includes("saree") || cat.includes("traditional")) {
+    return ["Free Size", "5.5m", "6.3m"];
+  }
+  if (cat.includes("purse") || cat.includes("bag") || cat.includes("handbag")) {
+    return ["Small", "Medium", "Large", "Tote", "Oversized", "Clutch"];
+  }
+  if (cat.includes("trouser") || cat.includes("pant") || cat.includes("jeans") || cat.includes("bottom")) {
+    return ["28", "30", "32", "34", "36", "38", "40"];
+  }
+  if (cat.includes("shoe") || cat.includes("footwear")) {
+    return ["IND 6", "IND 7", "IND 8", "IND 9", "IND 10", "IND 11", "IND 12"];
+  }
+  
+  return ["XS", "S", "M", "L", "XL", "2XL", "One Size"]; // Default fallback
+}
 
 type Category = {
   id: string
@@ -618,7 +638,7 @@ export default function ProductsPage() {
                           <Switch
                             checked={(formData as any)[item.key]}
                             onCheckedChange={(v) => setFormData(p => ({ ...p, [item.key]: v }))}
-                            className="data-[state=checked]:bg-[#e8e8e3]/80 border border-white/10"
+                            className="data-[state=checked]:bg-emerald-500/80 border border-white/10"
                           />
                         </div>
                       ))}
@@ -638,22 +658,30 @@ export default function ProductsPage() {
                   </div>
 
                   <div className="space-y-4">
-                    <p className="text-[10px] uppercase tracking-[0.3em] text-gray-500 border-b border-white/5 pb-2">Sizes</p>
-                    <div className="flex flex-wrap gap-2">
-                      {AVAILABLE_SIZES.map(size => (
-                        <button
-                          key={size}
-                          type="button"
-                          onClick={() => toggleSize(size)}
-                          className={`px-3 py-2 text-[10px] uppercase tracking-widest border transition-all ${formData.sizes.includes(size)
-                            ? "bg-[#e8e8e3] text-black border-[#e8e8e3]"
-                            : "border-white/20 text-gray-500 hover:text-white hover:border-white/40"
-                            }`}
-                        >
-                          {size}
-                        </button>
-                      ))}
-                    </div>
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-gray-500 border-b border-white/5 pb-2">
+                      Available Sizes for {formData.category || "Selected Category"}
+                    </p>
+                    {formData.category ? (
+                      <div className="flex flex-wrap gap-2">
+                        {getSizesForCategory(formData.category).map(size => (
+                          <button
+                            key={size}
+                            type="button"
+                            onClick={() => toggleSize(size)}
+                            className={`px-4 py-2 text-[10px] uppercase tracking-widest border transition-all ${formData.sizes.includes(size)
+                              ? "bg-[#e8e8e3] text-black border-[#e8e8e3]"
+                              : "border-white/20 text-gray-500 hover:text-white hover:border-white/40"
+                              }`}
+                          >
+                            {size}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-gray-600 italic tracking-widest">
+                        Please select a category first to view specific sizes.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
