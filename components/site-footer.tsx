@@ -37,9 +37,10 @@ export function SiteFooter() {
 
           {/* The House */}
           <div>
-            <p className="text-[10px] uppercase tracking-[0.4em] text-white mb-3">The House</p>
+            <p className="text-[10px] uppercase tracking-[0.4em] text-white mb-3">More Info</p>
             <ul className="space-y-2.5 text-xs uppercase tracking-widest text-gray-500">
               <li><Link href="/about" className="hover:text-white transition-colors">About Us</Link></li>
+              <li><Link href="/help" className="hover:text-white transition-colors">Help</Link></li>
             </ul>
           </div>
 

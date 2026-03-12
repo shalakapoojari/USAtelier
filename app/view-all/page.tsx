@@ -29,6 +29,8 @@ function ShopContent() {
   const [selectedSizes, setSelectedSizes] = useState<string[]>([])
   const [selectedGenders, setSelectedGenders] = useState<string[]>([])
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000])
+  const [localMin, setLocalMin] = useState<string>("0")
+  const [localMax, setLocalMax] = useState<string>("100000")
 
   const searchParams = useSearchParams()
   const urlCategory = searchParams.get("category")
@@ -131,7 +133,15 @@ function ShopContent() {
   // Reset price limit when category changes
   useEffect(() => {
     setPriceRange([0, categoryMaxPrice])
+    setLocalMin("0")
+    setLocalMax(categoryMaxPrice.toString())
   }, [categoryMaxPrice])
+
+  // Sync local inputs when slider moves priceRange
+  useEffect(() => {
+    setLocalMin(priceRange[0].toString())
+    setLocalMax(priceRange[1].toString())
+  }, [priceRange])
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
@@ -298,10 +308,16 @@ function ShopContent() {
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-white transition-colors text-[10px]">₹</span>
               <Input
                 type="number"
-                value={priceRange[0]}
+                value={localMin}
                 onChange={(e) => {
-                  const val = parseInt(e.target.value) || 0
-                  setPriceRange([val, priceRange[1]])
+                  const val = e.target.value
+                  setLocalMin(val)
+                  // Simple debounce
+                  const timeout = setTimeout(() => {
+                    const num = parseInt(val) || 0
+                    setPriceRange([num, priceRange[1]])
+                  }, 500)
+                  return () => clearTimeout(timeout)
                 }}
                 className="h-9 pl-7 bg-white/5 border-white/10 text-white rounded-none border-0 border-b focus-visible:ring-0 focus-visible:border-white/30 transition-all text-xs font-mono"
                 placeholder="0"
@@ -315,10 +331,16 @@ function ShopContent() {
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-white transition-colors text-[10px]">₹</span>
               <Input
                 type="number"
-                value={priceRange[1]}
+                value={localMax}
                 onChange={(e) => {
-                  const val = parseInt(e.target.value) || 0
-                  setPriceRange([priceRange[0], val])
+                  const val = e.target.value
+                  setLocalMax(val)
+                  // Simple debounce
+                  const timeout = setTimeout(() => {
+                    const num = parseInt(val) || 0
+                    setPriceRange([priceRange[0], num])
+                  }, 500)
+                  return () => clearTimeout(timeout)
                 }}
                 className="h-9 pl-7 bg-white/5 border-white/10 text-white rounded-none border-0 border-b focus-visible:ring-0 focus-visible:border-white/30 transition-all text-xs font-mono"
                 placeholder={categoryMaxPrice.toString()}

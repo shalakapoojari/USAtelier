@@ -139,8 +139,8 @@ export function SiteHeader() {
           U.S ATELIER.
         </Link>
 
-        {/* Search Box - Growing to fill center */}
-        <form onSubmit={handleSearchSubmit} className="flex-1 max-w-4xl relative group items-center hidden md:flex mx-4">
+        {/* Enlarged Search Box */}
+        <form onSubmit={handleSearchSubmit} className="flex-1 max-w-5xl relative group items-center hidden md:flex mx-4">
           <input
             type="text"
             placeholder={placeholder}
@@ -153,19 +153,20 @@ export function SiteHeader() {
           <button type="submit" className="hidden">Search</button>
         </form>
 
-        <div className="flex items-center gap-3 ml-auto">
+        {/* Navigation Group - Even gaps */}
+        <div className="flex items-center gap-6 md:gap-8">
           {/* About Link */}
           <Link
             href="/about"
-            className="text-[10px] uppercase tracking-[0.2em] text-gray-400 hover:text-white transition-colors mr-2 hidden lg:block"
+            className="text-[10px] uppercase tracking-[0.25em] text-gray-400 hover:text-white transition-colors hidden lg:block"
           >
             About
           </Link>
 
-          {/* Help Link Moved Here */}
+          {/* Help Link */}
           <Link
             href="/help"
-            className="text-[10px] uppercase tracking-[0.2em] text-gray-400 hover:text-white transition-colors mr-2 hidden lg:block"
+            className="text-[10px] uppercase tracking-[0.25em] text-gray-400 hover:text-white transition-colors hidden lg:block"
           >
             Help
           </Link>
@@ -173,15 +174,15 @@ export function SiteHeader() {
           {/* Favourites icon */}
           <button
             onClick={handleFavouritesClick}
-            className="relative flex items-center gap-2 px-3 h-9 text-gray-400 hover:text-white transition-colors group"
+            className="relative flex items-center gap-2 px-1 h-9 text-gray-400 hover:text-white transition-colors group"
             title="Favourites"
           >
             <Heart
-              size={18}
+              size={17}
               strokeWidth={1.5}
               className={wishlistUnseen > 0 ? "fill-red-400 text-red-400" : ""}
             />
-            <span className="text-[10px] uppercase tracking-[0.2em] font-medium hidden lg:block">Favourites</span>
+            <span className="text-[10px] uppercase tracking-[0.2em] font-medium hidden xl:block">Favourites</span>
             {wishlistUnseen > 0 && (
               <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border border-black animate-pulse" />
             )}
@@ -190,89 +191,91 @@ export function SiteHeader() {
           {/* Cart icon */}
           <button
             onClick={handleCartClick}
-            className="relative flex items-center gap-2 px-3 h-9 text-gray-400 hover:text-white transition-colors group"
+            className="relative flex items-center gap-2 px-1 h-9 text-gray-400 hover:text-white transition-colors group"
             title="Cart"
           >
-            <ShoppingBag size={18} strokeWidth={1.5} />
-            <span className="text-[10px] uppercase tracking-[0.2em] font-medium hidden lg:block">Add to Cart</span>
+            <ShoppingBag size={17} strokeWidth={1.5} />
+            <span className="text-[10px] uppercase tracking-[0.2em] font-medium hidden xl:block">Cart</span>
             {cartUnseen > 0 && (
               <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-white rounded-full border border-black animate-pulse" />
             )}
           </button>
 
-          {/* Profile / Login */}
-          {!user ? (
-            <Link
-              href="/login"
-              className="text-[10px] uppercase tracking-[0.2em] text-gray-400 hover:text-white transition-colors ml-2"
-            >
-              Login
-            </Link>
-          ) : (
-            <div className="relative" ref={profileRef}>
-              <button
-                onClick={() => setProfileOpen((o) => !o)}
-                className="flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors"
-                title="Account"
+          {/* Profile / Login - Moved to the end */}
+          <div className="flex items-center ml-2">
+            {!user ? (
+              <Link
+                href="/login"
+                className="text-[10px] uppercase tracking-[0.2em] text-gray-400 hover:text-white transition-colors border border-white/10 px-4 py-2 hover:bg-white/5"
               >
-                <div className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center bg-white/5 hover:border-white/50 transition-colors">
-                  <User size={14} strokeWidth={1.5} />
-                </div>
-                <ChevronDown
-                  size={12}
-                  className={`transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`}
-                />
-              </button>
+                Login
+              </Link>
+            ) : (
+              <div className="relative" ref={profileRef}>
+                <button
+                  onClick={() => setProfileOpen((o) => !o)}
+                  className="flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors"
+                  title="Account"
+                >
+                  <div className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center bg-white/5 hover:border-white/50 transition-colors">
+                    <User size={14} strokeWidth={1.5} />
+                  </div>
+                  <ChevronDown
+                    size={12}
+                    className={`transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
 
-              {/* Dropdown */}
-              {profileOpen && (
-                <div className="absolute right-0 top-full mt-3 w-52 bg-[#0e0e0e] border border-white/10 shadow-2xl z-50">
-                  <div className="px-4 py-3 border-b border-white/10">
-                    <p className="text-xs uppercase tracking-widest text-gray-400 truncate">
-                      {user.email}
-                    </p>
-                  </div>
-                  <div className="py-1">
-                    {isAdmin && (
+                {/* Dropdown */}
+                {profileOpen && (
+                  <div className="absolute right-0 top-full mt-3 w-52 bg-[#0e0e0e] border border-white/10 shadow-2xl z-50">
+                    <div className="px-4 py-3 border-b border-white/10">
+                      <p className="text-xs uppercase tracking-widest text-gray-400 truncate">
+                        {user.email}
+                      </p>
+                    </div>
+                    <div className="py-1">
+                      {isAdmin && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setProfileOpen(false)}
+                          className="flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-amber-400 hover:text-amber-300 hover:bg-amber-400/5 transition-colors border-b border-white/5"
+                        >
+                          <LayoutDashboard size={13} />
+                          Admin Panel
+                        </Link>
+                      )}
                       <Link
-                        href="/admin"
+                        href="/account"
                         onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-amber-400 hover:text-amber-300 hover:bg-amber-400/5 transition-colors border-b border-white/5"
+                        className="flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
                       >
-                        <LayoutDashboard size={13} />
-                        Admin Panel
+                        <User size={13} />
+                        My Account
                       </Link>
-                    )}
-                    <Link
-                      href="/account"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
-                    >
-                      <User size={13} />
-                      My Account
-                    </Link>
-                    <Link
-                      href="/account/orders"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
-                    >
-                      <Package size={13} />
-                      Orders
-                    </Link>
+                      <Link
+                        href="/account/orders"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+                      >
+                        <Package size={13} />
+                        Orders
+                      </Link>
+                    </div>
+                    <div className="border-t border-white/10 py-1">
+                      <button
+                        onClick={handleLogout}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
+                      >
+                        <LogOut size={13} />
+                        Sign Out
+                      </button>
+                    </div>
                   </div>
-                  <div className="border-t border-white/10 py-1">
-                    <button
-                      onClick={handleLogout}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-xs uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
-                    >
-                      <LogOut size={13} />
-                      Sign Out
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
