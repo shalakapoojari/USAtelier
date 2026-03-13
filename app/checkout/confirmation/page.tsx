@@ -61,7 +61,7 @@ export default function ConfirmationPage() {
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen">
       <SiteHeader />
 
-      <main className="pt-40 pb-32 px-6 md:px-12 max-w-[900px] mx-auto">
+      <main className="pt-52 pb-32 px-6 md:px-12 max-w-[900px] mx-auto">
 
         {/* ── SUCCESS HEADER ── */}
         <div

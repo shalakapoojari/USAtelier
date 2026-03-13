@@ -4,6 +4,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import Link from "next/link"
 
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
@@ -41,6 +42,8 @@ export default function CheckoutPage() {
 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isProcessing, setIsProcessing] = useState(false)
+  const [checkoutTermsAccepted, setCheckoutTermsAccepted] = useState(false)
+  const [checkoutTermsError, setCheckoutTermsError] = useState("")
   const [qrData, setQrData] = useState<{ url: string; vpa: string; id: string } | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<"standard" | "upi_qr">("standard")
 
@@ -134,6 +137,12 @@ export default function CheckoutPage() {
   }
 
   const handlePlaceOrder = async () => {
+    if (!checkoutTermsAccepted) {
+      setCheckoutTermsError("Please accept the Terms & Conditions before placing your order")
+      return
+    }
+
+    setCheckoutTermsError("")
     setIsProcessing(true)
     try {
       // CASE 1: UPI QR Mode (Verify existing QR payment)
@@ -163,6 +172,7 @@ export default function CheckoutPage() {
                 image: item.image,
               })),
               shippingAddress: formData,
+              termsAccepted: checkoutTermsAccepted,
               razorpay_payment_id: verifyData.payment_id,
               // For VA, we don't have order_id or signature in the same way
             }),
@@ -225,6 +235,7 @@ export default function CheckoutPage() {
                 image: item.image,
               })),
               shippingAddress: formData,
+              termsAccepted: checkoutTermsAccepted,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_signature: response.razorpay_signature
@@ -294,7 +305,7 @@ export default function CheckoutPage() {
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen">
       <SiteHeader />
 
-      <main className="pt-48 pb-32 px-6 md:px-12">
+      <main className="pt-60 pb-32 px-6 md:px-12">
         <h1 className="font-serif text-5xl font-light mb-16 text-center">
           Checkout
         </h1>
@@ -505,9 +516,29 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
+                <div className="border border-white/10 p-4">
+                  <label className="flex items-start gap-3 text-xs text-gray-400 leading-relaxed">
+                    <input
+                      type="checkbox"
+                      checked={checkoutTermsAccepted}
+                      onChange={(e) => {
+                        setCheckoutTermsAccepted(e.target.checked)
+                        if (e.target.checked) setCheckoutTermsError("")
+                      }}
+                      className="mt-0.5 h-4 w-4 rounded border-white/30 bg-transparent"
+                    />
+                    <span>
+                      I agree to the <Link href="/terms&conditions" target="_blank" className="text-[#C8A45D] hover:text-white underline underline-offset-4">Terms & Conditions</Link> and authorize order placement.
+                    </span>
+                  </label>
+                  {checkoutTermsError && (
+                    <p className="mt-3 text-[10px] uppercase tracking-widest text-red-500">{checkoutTermsError}</p>
+                  )}
+                </div>
+
                 <Button
                   onClick={handlePlaceOrder}
-                  disabled={isProcessing}
+                  disabled={isProcessing || !checkoutTermsAccepted}
                   className="w-full border border-white/40 bg-transparent uppercase tracking-widest text-xs hover:bg-white hover:text-black transition-all py-8"
                 >
                   {isProcessing ? "Processing..." : paymentMethod === "upi_qr" ? "I have Paid · Verify" : `Pay ₹${grandTotal.toLocaleString("en-IN")}`}

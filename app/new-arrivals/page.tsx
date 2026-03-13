@@ -13,7 +13,7 @@ export default function NewArrivalsPage() {
       <SiteHeader />
 
       {/* ================= PAGE INTRO ================= */}
-      <section className="pt-48 pb-24 px-6 text-center">
+      <section className="pt-60 pb-24 px-6 text-center">
         <p className="uppercase tracking-[0.5em] text-xs text-gray-400 mb-6">
           Latest Drop
         </p>

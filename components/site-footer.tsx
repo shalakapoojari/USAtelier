@@ -57,13 +57,17 @@ export function SiteFooter() {
         </div>
 
         {/* Bottom bar */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] uppercase tracking-widest text-gray-700">
-          <span>© 2025 U.S ATELIER Maison. All Rights Reserved.</span>
-          <span>Crafted in India · Designed for the World</span>
+        <div className="flex flex-col md:flex-row justify-between items-center gap-6 text-[10px] uppercase tracking-widest text-gray-700">
+          <div className="flex items-center gap-4">
+            <div className="h-8 w-28 overflow-hidden flex items-center ml-2">
+              <img src="/logo/logo.png" alt="Logo" className="h-8 w-auto opacity-30 grayscale hover:grayscale-0 hover:opacity-100 transition-all scale-[4.5] origin-left object-contain object-left" />
+            </div>
+            <span>© 2025 U.S ATELIER Maison. All Rights Reserved.</span>
+          </div>
+          <span className="opacity-50">Crafted in India · Designed for the World</span>
           <div className="flex gap-8">
-            <a href="#" className="hover:text-gray-400 transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-gray-400 transition-colors">Cookie Settings</a>
-            <a href="#" className="hover:text-gray-400 transition-colors">Terms</a>
+            
+            <Link href="/terms&conditions" className="hover:text-gray-400 transition-colors">Terms & Conditions</Link>
           </div>
         </div>
       </div>

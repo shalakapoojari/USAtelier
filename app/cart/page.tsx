@@ -23,7 +23,7 @@ export default function CartPage() {
       <div className="bg-[#030303] text-[#e8e8e3] min-h-screen">
         <SiteHeader />
 
-        <main className="pt-48 pb-32 flex items-center justify-center px-6">
+        <main className="pt-60 pb-32 flex items-center justify-center px-6">
           <div className="text-center max-w-md">
             <h1 className="font-serif text-4xl font-light mb-6">
               Your Cart Is Empty
@@ -53,7 +53,7 @@ export default function CartPage() {
       <SiteHeader />
 
       {/* ================= CART ================= */}
-      <main className="pt-48 pb-32 px-6 md:px-12">
+      <main className="pt-60 pb-32 px-6 md:px-12">
         <h1 className="font-serif text-5xl font-light mb-20 text-center">
           Shopping Cart
         </h1>

@@ -46,7 +46,7 @@ export default function AboutPage() {
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen" ref={containerRef}>
       <SiteHeader />
 
-      <main className="pt-40">
+      <main className="pt-52">
         {/* Hero Section */}
         <section className="px-6 md:px-12 max-w-[1400px] mx-auto mb-40">
           <div className="overflow-hidden">

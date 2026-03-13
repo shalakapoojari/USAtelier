@@ -446,7 +446,16 @@ export default function ProductsPage() {
                         <Label className="text-[10px] uppercase tracking-widest text-gray-400">Category</Label>
                         <Select
                           value={formData.category}
-                          onValueChange={(v) => setFormData(p => ({ ...p, category: v, subcategory: "" }))}
+                          onValueChange={(v) => {
+                            const allowedForNewCategory = getSizesForCategory(v)
+                            setFormData((p) => ({
+                              ...p,
+                              category: v,
+                              subcategory: "",
+                              // Keep only sizes valid for the newly selected category.
+                              sizes: p.sizes.filter((s) => allowedForNewCategory.includes(s)),
+                            }))
+                          }}
                         >
                           <SelectTrigger className="bg-transparent border-white/10 focus:border-white/30 rounded-none h-12">
                             <SelectValue placeholder="Select" />

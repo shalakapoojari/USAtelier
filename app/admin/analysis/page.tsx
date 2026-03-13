@@ -23,13 +23,30 @@ import {
     RefreshCw,
 } from "lucide-react"
 
+interface CategoryStat {
+    name: string
+    count: number
+    total_stock: number
+    subcategories: {
+        name: string
+        count: number
+        total_stock: number
+        products: {
+            id: number
+            name: string
+            stock: number
+        }[]
+    }[]
+}
+
 interface AnalysisData {
     most_sold: any[]
     most_favorited: any[]
     most_added_to_cart: any[]
     low_stock: any[]
     all_stock: any[]
-    category_stats: any[]
+    category_stats: CategoryStat[]
+    pie_data: any[]
 }
 
 const COLORS = ["#e8e8e3", "#a1a1aa", "#71717a", "#52525b", "#3f3f46"]
@@ -40,6 +57,7 @@ export default function BusinessAnalysisPage() {
     const [data, setData] = useState<AnalysisData | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
 
     const fetchData = async () => {
         if (!API_BASE) return
@@ -51,71 +69,19 @@ export default function BusinessAnalysisPage() {
             if (!res.ok) throw new Error("Failed to fetch analysis data")
 
             const result = await res.json()
-
-            // Inject Static "Hero" Data for premium feel (Rupee values)
-            const basePrice = 12500
-            const enhancedData: AnalysisData = {
+            
+            // Map image placeholders and standardizing the data
+            const enriched = {
                 ...result,
-                most_sold: [
-                    ...result.most_sold.map((p: any) => ({
-                        ...p,
-                        price: basePrice,
-                        image: '/placeholder.jpg',
-                        sku: `US-AT-${Math.floor(Math.random() * 10000)}`,
-                        description: "A signature piece from our latest collection, blending timeless elegance with modern craftsmanship.",
-                        revenue: p.total_sold * basePrice,
-                        trend: '+12.5%'
-                    })),
-                    {
-                        name: "Premium Silk Scarf",
-                        total_sold: 85,
-                        price: 15500,
-                        image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=400',
-                        sku: 'SKU-SILK-001',
-
-                        description: "Hand-crafted from 100% pure Mulberry silk. Featuring a bespoke hand-rolled hem and artisanal patterns.",
-                        revenue: 1317500,
-                        trend: '+18.2%'
-                    },
-                    {
-                        name: "Signature Leather Belt",
-                        total_sold: 64,
-                        price: 8500,
-                        image: 'https://images.unsplash.com/photo-1550009158-9ebf69173e03?auto=format&fit=crop&q=80&w=400',
-                        sku: 'SKU-BELT-042',
-                        description: "Italian full-grain leather with a custom-engraved charcoal buckle. Built for longevity.",
-                        revenue: 544000,
-                        trend: '+5.4%'
-                    },
-                    {
-                        name: "Limited Edition Watch",
-                        total_sold: 42,
-                        price: 45000,
-                        image: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?auto=format&fit=crop&q=80&w=400',
-                        sku: 'SKU-WATCH-99',
-                        description: "Precision automatic movement with a sapphire crystal face. Individually numbered for exclusivity.",
-                        revenue: 1890000,
-                        trend: '+2.1%'
-                    },
-                    {
-                        name: "Cashmere Overcoat",
-                        total_sold: 38,
-                        price: 85000,
-                        image: 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?auto=format&fit=crop&q=80&w=400',
-                        sku: 'SKU-COAT-102',
-                        description: "Exquisite Loro Piana cashmere. Hand-stitched in our atelier for the ultimate silhouette.",
-                        revenue: 3230000,
-                        trend: '+9.7%'
-                    },
-                ].sort((a, b) => b.total_sold - a.total_sold).slice(0, 5)
-                ,
-                category_stats: [
-                    ...result.category_stats,
-                    { _id: "Luxury", count: 12 },
-                    { _id: "Exclusive", count: 8 },
-                ]
+                most_sold: result.most_sold.map((p: any) => ({
+                    ...p,
+                    price: p.price || 0,
+                    revenue: p.total_sold * (p.price || 0),
+                    image: '/placeholder.jpg',
+                    sku: `US-AT-${p.id || 'N/A'}`
+                }))
             }
-            setData(enhancedData)
+            setData(enriched)
         } catch (err: any) {
             setError(err.message)
         } finally {
@@ -131,7 +97,7 @@ export default function BusinessAnalysisPage() {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
                 <RefreshCw className="w-8 h-8 animate-spin text-white/20" />
-                <p className="text-[10px] uppercase tracking-[0.3em] text-gray-400">Loading Analysis...</p>
+                <p className="text-[10px] uppercase tracking-[0.3em] text-gray-400">Syncing Intelligence...</p>
             </div>
         )
     }
@@ -150,55 +116,57 @@ export default function BusinessAnalysisPage() {
         )
     }
 
+    const totalCategoryItems = data.pie_data.reduce((sum, category) => sum + category.count, 0)
+
     return (
-        <div className="p-8 lg:p-12 space-y-12 max-w-7xl mx-auto">
+        <div className="p-8 lg:p-12 space-y-12 max-w-7xl mx-auto bg-[#030303]">
             {/* Header */}
-            <div>
-                <h1 className="font-serif text-3xl tracking-widest mb-2 uppercase text-[#e8e8e3]">Business Analysis</h1>
-                <p className="text-xs text-gray-500 uppercase tracking-widest font-light">
-                    Global performance and inventory insights
-                </p>
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div>
+                    <h1 className="font-serif text-4xl tracking-widest mb-2 uppercase text-[#e8e8e3]">Business Analysis</h1>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-[0.34em] font-light">
+                        Global Performance & Inventory Architecture
+                    </p>
+                </div>
+                
+                {/* Low Stock Warning Bar */}
+                {data.low_stock.length > 0 && (
+                    <div className="flex items-center gap-4 bg-red-950/20 border border-red-900/40 px-6 py-3 rounded-sm animate-pulse">
+                        <AlertTriangle className="w-4 h-4 text-red-500" />
+                        <div>
+                            <p className="text-[10px] uppercase tracking-widest text-red-400 font-bold">Critical Alert</p>
+                            <p className="text-[9px] uppercase tracking-widest text-red-500/80">{data.low_stock.length} Items Below Minimum Threshold</p>
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* Top 5 Performance Table */}
+            {/* Performance Matrix */}
             <section className="bg-white/5 border border-white/10 rounded-sm overflow-hidden shadow-2xl">
                 <div className="p-8 border-b border-white/10 flex items-center justify-between bg-white/2">
                     <div className="flex items-center gap-4">
                         <TrendingUp className="w-5 h-5 text-[#e8e8e3]" />
-                        <h2 className="text-sm uppercase tracking-[0.3em] font-bold text-[#e8e8e3]">Top Performance Analysis</h2>
+                        <h2 className="text-sm uppercase tracking-[0.3em] font-bold text-[#e8e8e3]">Sales Volume</h2>
                     </div>
-                    <span className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-medium">Top 5 Products by Volume</span>
                 </div>
 
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="border-b border-white/5 text-[10px] uppercase tracking-[0.3em] text-gray-500">
-                                <th className="p-8 font-light">Product Details</th>
-                                <th className="p-8 font-light text-right">Price</th>
+                                <th className="p-8 font-light">Product</th>
                                 <th className="p-8 font-light text-right">Volume</th>
-                                <th className="p-8 font-light text-right">Revenue</th>
+                                <th className="p-8 font-light text-right">Contribution</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                            {data.most_sold.map((product, idx) => (
+                            {data.most_sold.length > 0 ? data.most_sold.map((product, idx) => (
                                 <tr key={idx} className="group hover:bg-white/2 transition-colors">
                                     <td className="p-8">
-                                        <div className="flex items-center gap-6">
-                                            <div className="w-16 h-20 bg-white/5 border border-white/10 shrink-0 overflow-hidden">
-                                                <img src={product.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-80 group-hover:opacity-100" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-sm font-serif text-[#e8e8e3] uppercase tracking-wider mb-1 group-hover:text-white">{product.name}</h3>
-                                                <div className="flex items-center gap-4 text-[9px] uppercase tracking-widest text-gray-500">
-                                                    <span>SKU: {product.sku}</span>
-                                                    <span>ID: #{idx + 1}</span>
-                                                </div>
-                                            </div>
+                                        <div>
+                                            <h3 className="text-sm font-serif text-[#e8e8e3] uppercase tracking-wider mb-1">{product.name}</h3>
+                                            <span className="text-[9px] uppercase tracking-widest text-gray-600">Performance ID: {idx + 1}</span>
                                         </div>
-                                    </td>
-                                    <td className="p-8 text-right font-mono text-xs text-[#e8e8e3]">
-                                        ₹{product.price.toLocaleString()}
                                     </td>
                                     <td className="p-8 text-right">
                                         <div className="inline-flex flex-col items-end">
@@ -207,35 +175,36 @@ export default function BusinessAnalysisPage() {
                                         </div>
                                     </td>
                                     <td className="p-8 text-right">
-                                        <div className="inline-flex flex-col items-end">
-                                            <span className="text-lg font-serif text-[#e8e8e3]">₹{product.revenue.toLocaleString()}</span>
-                                            <span className="text-[8px] uppercase tracking-widest text-green-500/80">{product.trend} Trend</span>
-                                        </div>
+                                        <span className="text-xs font-mono text-[#e8e8e3]">
+                                            {((product.total_sold / data.most_sold.reduce((s, p) => s + p.total_sold, 0)) * 100).toFixed(1)}%
+                                        </span>
                                     </td>
-
                                 </tr>
-                            ))}
+                            )) : (
+                                <tr>
+                                    <td colSpan={3} className="p-12 text-center text-[10px] uppercase tracking-widest text-gray-600">No Sales Data Available</td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
             </section>
             
-            {/* Category Analysis and Stock Distribution */}
+            {/* Distributed Architecture */}
             <div className="grid lg:grid-cols-2 gap-12">
                 {/* Category Doughnut Chart */}
                 <div className="bg-white/5 border border-white/10 rounded-sm p-8 shadow-2xl">
                     <div className="flex items-center gap-4 mb-10">
                         <TrendingUp className="w-5 h-5 text-[#e8e8e3]" />
-                        <h2 className="text-sm uppercase tracking-[0.3em] font-bold text-[#e8e8e3]">Category Distribution</h2>
+                        <h2 className="text-sm uppercase tracking-[0.3em] font-bold text-[#e8e8e3]">Category </h2>
                     </div>
 
                     <div className="flex flex-col md:flex-row items-center gap-12">
-                        {/* Doughnut Chart */}
                         <div className="w-full h-64 md:w-1/2">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie
-                                        data={data.category_stats}
+                                        data={data.pie_data}
                                         dataKey="count"
                                         nameKey="_id"
                                         innerRadius={60}
@@ -243,7 +212,7 @@ export default function BusinessAnalysisPage() {
                                         paddingAngle={5}
                                         stroke="none"
                                     >
-                                        {data.category_stats.map((entry, index) => (
+                                        {data.pie_data.map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
@@ -255,9 +224,8 @@ export default function BusinessAnalysisPage() {
                             </ResponsiveContainer>
                         </div>
 
-                        {/* Legend / List */}
                         <div className="w-full md:w-1/2 space-y-4">
-                            {data.category_stats.map((category, idx) => (
+                            {data.pie_data.map((category, idx) => (
                                 <div key={idx} className="flex items-center justify-between group">
                                     <div className="flex items-center gap-3">
                                         <div 
@@ -269,7 +237,7 @@ export default function BusinessAnalysisPage() {
                                         </span>
                                     </div>
                                     <span className="text-[10px] uppercase tracking-[0.2em] text-[#e8e8e3] font-bold group-hover:scale-110 transition-transform origin-right">
-                                        {category.count} {category.count === 1 ? 'ITEM' : 'ITEMS'}
+                                        {category.count} Items · {totalCategoryItems > 0 ? ((category.count / totalCategoryItems) * 100).toFixed(0) : 0}%
                                     </span>
                                 </div>
                             ))}
@@ -277,50 +245,82 @@ export default function BusinessAnalysisPage() {
                     </div>
                 </div>
 
-                {/* Stock Distribution Indicator */}
-                <div className="bg-white/5 border border-white/10 rounded-sm p-8 shadow-2xl">
+                {/* Stock Analytics with Dropdowns */}
+                <div className="bg-white/5 border border-white/10 rounded-sm p-8 shadow-2xl flex flex-col">
                     <div className="flex items-center gap-4 mb-8">
                         <Package className="w-5 h-5 text-[#e8e8e3]" />
-                        <h2 className="text-sm uppercase tracking-[0.3em] font-bold text-[#e8e8e3]">Stock Analytics</h2>
+                        <h2 className="text-sm uppercase tracking-[0.3em] font-bold text-[#e8e8e3]">Stock Anatomy</h2>
                     </div>
                     
-                    <div className="space-y-6 overflow-y-auto max-h-[250px] pr-4 custom-scrollbar">
-                        {data.all_stock.map((item, idx) => (
-                            <div key={idx} className="space-y-2">
-                                <div className="flex justify-between items-end text-[9px] uppercase tracking-widest">
-                                    <span className="text-gray-400 truncate max-w-[150px]">{item.name}</span>
-                                    <span className={item.stock <= 5 ? "text-red-500" : "text-gray-500"}>{item.stock} in stock</span>
-                                </div>
-                                <div className="h-[2px] w-full bg-white/5 overflow-hidden">
-                                    <div 
-                                        className={`h-full transition-all duration-1000 ${
-                                            item.stock <= 5 ? "bg-red-500/40" : 
-                                            item.stock <= 15 ? "bg-orange-400/30" : "bg-white/20"
-                                        }`}
-                                        style={{ width: `${Math.min((item.stock/50)*100, 100)}%` }}
-                                    />
-                                </div>
+                    <div className="flex-1 space-y-4 overflow-visible pr-4 pb-2">
+                        {data.category_stats.map((category, cIdx) => (
+                            <div key={cIdx} className="border border-white/5 rounded-sm overflow-hidden">
+                                <button 
+                                    onClick={() => setExpandedCategory(expandedCategory === category.name ? null : category.name)}
+                                    className="w-full flex items-center justify-between p-4 bg-white/2 hover:bg-white/5 transition-colors"
+                                >
+                                    <div className="text-left">
+                                        <p className="text-[10px] uppercase tracking-widest text-[#e8e8e3] font-bold">{category.name}</p>
+                                        <p className="text-[9px] uppercase tracking-widest text-gray-500">{category.count} Styles · {category.total_stock} Total Units</p>
+                                    </div>
+                                    <ArrowRight className={`w-3 h-3 text-gray-600 transition-transform duration-500 ${expandedCategory === category.name ? 'rotate-90' : ''}`} />
+                                </button>
+                                
+                                {expandedCategory === category.name && (
+                                    <div className="p-4 bg-black/40 space-y-6">
+                                        {category.subcategories.map((sub, sIdx) => (
+                                            <div key={sIdx} className="space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[9px] uppercase tracking-[0.2em] text-gray-400 font-bold">{sub.name}</span>
+                                                    <span className="text-[8px] uppercase tracking-widest text-gray-600">{sub.count} Products</span>
+                                                </div>
+                                                
+                                                <div className="space-y-4 pl-2 border-l border-white/10">
+                                                    {sub.products.map((p, pIdx) => (
+                                                        <div key={pIdx} className="space-y-1.5">
+                                                            <div className="flex justify-between items-end text-[8px] uppercase tracking-widest">
+                                                                <span className="text-gray-500 truncate max-w-[200px]">{p.name}</span>
+                                                                <span className={p.stock <= 5 ? "text-red-500 font-bold" : "text-gray-400"}>
+                                                                    {p.stock} units
+                                                                </span>
+                                                            </div>
+                                                            <div className="h-[1px] w-full bg-white/5 overflow-hidden">
+                                                                <div 
+                                                                    className={`h-full transition-all duration-1000 ${
+                                                                        p.stock <= 5 ? "bg-red-500" : 
+                                                                        p.stock <= 15 ? "bg-orange-400" : "bg-white/20"
+                                                                    }`}
+                                                                    style={{ width: `${Math.min((p.stock/50)*100, 100)}%` }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
 
                     <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <AlertTriangle className={`w-3 h-3 ${data.low_stock.length > 0 ? "text-red-500 animate-pulse" : "text-gray-700"}`} />
-                            <span className="text-[8px] uppercase tracking-widest text-gray-500">
-                                {data.low_stock.length} critically low items
-                            </span>
+                             <AlertTriangle className={`w-3 h-3 ${data.low_stock.length > 0 ? "text-red-500 animate-pulse" : "text-gray-700"}`} />
+                             <span className="text-[8px] uppercase tracking-widest text-gray-500 font-medium">
+                                 {data.low_stock.length} Styles Below Safety Threshold
+                             </span>
                         </div>
-                        <span className="text-[8px] uppercase tracking-widest text-gray-700">Managed Inventory System v1.2</span>
                     </div>
                 </div>
             </div>
 
             {/* Aesthetic Footer Note */}
             <div className="pt-12 border-t border-white/5 flex justify-between items-center text-[9px] uppercase tracking-[0.4em] text-gray-700">
-                <span>U.S ATELIER INTEL - AUTOMATED ANALYSIS</span>
-                <span>LAST SYNC: {new Date().toLocaleTimeString()}</span>
+                <span>U.S ATELIER INTEL - DYNAMIC ANALYSIS</span>
+                <span>GLOBAL SYNC: {new Date().toLocaleTimeString()}</span>
             </div>
         </div>
     )
 }
+

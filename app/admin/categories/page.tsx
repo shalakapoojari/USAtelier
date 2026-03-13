@@ -220,9 +220,8 @@ export default function CategoriesPage() {
                       />
                       <Button
                         size="sm"
-                        variant="outline"
                         onClick={() => handleSubcategorySubmit(cat.name)}
-                        className="border-white/20 hover:bg-[#e8e8e3] hover:text-black rounded-none h-10 px-6 uppercase text-[10px] tracking-widest"
+                        className="bg-[#e8e8e3] text-black hover:bg-white rounded-none h-10 px-6 uppercase text-[10px] tracking-widest"
                       >
                         <FolderPlus className="h-3 w-3 mr-2" /> Add
                       </Button>

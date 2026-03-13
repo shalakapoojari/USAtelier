@@ -20,6 +20,28 @@ import { Slider } from "@/components/ui/slider"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"
 
+const getAllowedSizesForCategory = (categoryName: string) => {
+  const cat = (categoryName || "").toLowerCase()
+
+  if (cat.includes("shoe") || cat.includes("footwear")) {
+    return ["IND 6", "IND 7", "IND 8", "IND 9", "IND 10", "IND 11", "IND 12"]
+  }
+  if (cat.includes("purse") || cat.includes("bag") || cat.includes("handbag")) {
+    return ["Small", "Medium", "Large", "Tote", "Oversized", "Clutch"]
+  }
+  if (cat.includes("trouser") || cat.includes("pant") || cat.includes("jeans") || cat.includes("bottom")) {
+    return ["28", "30", "32", "34", "36", "38", "40"]
+  }
+  if (cat.includes("saree") || cat.includes("traditional")) {
+    return ["Free Size", "5.5m", "6.3m"]
+  }
+  if (cat.includes("shirt") || cat.includes("top") || cat.includes("basics") || cat.includes("knitwear") || cat.includes("clothing")) {
+    return ["XS", "S", "M", "L", "XL", "2XL", "3XL"]
+  }
+
+  return null
+}
+
 function ShopContent() {
   const [products, setProducts] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
@@ -101,22 +123,56 @@ function ShopContent() {
   }, [jumpTo, loading, products])
 
   const allSizes = useMemo(() => {
-    const sizes = new Set<string>()
-    const relevantProducts = urlCategory
-      ? products.filter(p => (p.category || "").toLowerCase() === urlCategory.toLowerCase())
-      : products
+    const normalizeField = (str: any) => (str ?? "").toString().toLowerCase().trim()
 
-    relevantProducts.forEach((p) => {
+    // Build sizes from the active browsing context so users only see relevant sizes.
+    const scopedProducts = products.filter((p) => {
+      const categoryMatch =
+        (urlCategory ? normalizeField(p.category) === normalizeField(urlCategory) : true) &&
+        (selectedCategories.length === 0 || selectedCategories.some((c) => normalizeField(c) === normalizeField(p.category)))
+
+      const subcategoryMatch =
+        (urlSubcategory ? normalizeField(p.subcategory) === normalizeField(urlSubcategory) : true) &&
+        (selectedSubcategories.length === 0 || selectedSubcategories.some((s) => normalizeField(s) === normalizeField(p.subcategory)))
+
+      const genderMatch =
+        selectedGenders.length === 0 || selectedGenders.some((g) => normalizeField(g) === normalizeField(p.gender))
+
+      const searchMatch = !urlSearch || (() => {
+        const queryWords = normalizeField(urlSearch).split(/\s+/).filter(Boolean)
+        const searchableText = normalizeField(`${p.name || ""} ${p.description || ""} ${p.category || ""}`)
+        return queryWords.every((word) => searchableText.includes(word))
+      })()
+
+      return categoryMatch && subcategoryMatch && genderMatch && searchMatch
+    })
+
+    const sizes = new Set<string>()
+    scopedProducts.forEach((p) => {
       if (!p.sizes) return
+
+      const allowed = getAllowedSizesForCategory(p.category || "")
       try {
-        const parsed = typeof p.sizes === 'string' ? JSON.parse(p.sizes) : p.sizes
-        if (Array.isArray(parsed)) parsed.forEach(s => sizes.add(s))
+        const parsed = typeof p.sizes === "string" ? JSON.parse(p.sizes) : p.sizes
+        if (Array.isArray(parsed)) {
+          parsed.forEach((s) => {
+            const val = (s ?? "").toString().trim()
+            if (!val) return
+            if (allowed && !allowed.includes(val)) return
+            sizes.add(val)
+          })
+        }
       } catch {
-        // If not JSON, skip
+        // Ignore malformed size payloads from backend data.
       }
     })
-    return Array.from(sizes).sort()
-  }, [products, urlCategory])
+
+    return Array.from(sizes).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }))
+  }, [products, urlCategory, urlSubcategory, urlSearch, selectedCategories, selectedSubcategories, selectedGenders])
+
+  useEffect(() => {
+    setSelectedSizes((prev) => prev.filter((size) => allSizes.includes(size)))
+  }, [allSizes])
 
   const absoluteMaxPrice = useMemo(() => {
     if (products.length === 0) return 0
@@ -358,7 +414,7 @@ function ShopContent() {
     <>
       {/* ================= PAGE HEADER ================= */}
       {!loading && (
-        <section className="pt-44 pb-12 text-center px-6">
+        <section className="pt-56 pb-12 text-center px-6 lg:hidden">
           <h1 className="text-4xl md:text-6xl font-serif font-light mb-4 uppercase tracking-[0.2em]">
             {urlSearch ? `Search: ${urlSearch}` : (urlCategory ? urlCategory.toString().toUpperCase() : "VIEW ALL")}
           </h1>
@@ -369,12 +425,24 @@ function ShopContent() {
       )}
 
       {/* ================= CONTENT ================= */}
-      <main className="px-6 md:px-12 pb-32">
+      <main className="px-6 md:px-12 pb-32 pt-0 lg:pt-52">
+        {/* Desktop category heading — centered, full width */}
+        {!loading && (
+          <div className="hidden lg:block text-center mb-10">
+            <h1 className="text-5xl font-serif font-light mb-3 uppercase tracking-[0.2em]">
+              {urlSearch ? `Search: ${urlSearch}` : (urlCategory ? urlCategory.toString().toUpperCase() : "VIEW ALL")}
+            </h1>
+            <p className="text-gray-500 text-[10px] tracking-[0.3em] uppercase">
+              {filteredProducts.length} pieces available
+            </p>
+          </div>
+        )}
+
         <div className="flex gap-16 w-full">
           {/* Desktop Filters */}
-          {!loading && (
+          {!loading && filteredProducts.length > 0 && (
             <aside className="hidden lg:block w-70 shrink-0">
-              <div className="sticky top-24 pb-12">
+              <div className="sticky top-52 pb-12">
                 <FilterContent />
               </div>
             </aside>
@@ -382,13 +450,14 @@ function ShopContent() {
 
           {/* Products area */}
           <div className="flex-1">
+
             {loading ? (
               <div className="flex flex-col items-center justify-center py-32 gap-4">
                 <Loader2 className="animate-spin text-gray-400" />
                 <p className="text-xs uppercase tracking-[0.3em] text-gray-500">Discovering pieces...</p>
               </div>
             ) : filteredProducts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center animate-in fade-in duration-700">
+              <div className="w-full min-h-[70vh] flex flex-col items-center justify-center text-center animate-in fade-in duration-700">
                 <h2 className="text-3xl font-serif text-gray-400">Product Not Available</h2>
               </div>
             ) : (

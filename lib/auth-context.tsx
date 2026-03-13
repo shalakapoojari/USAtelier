@@ -1,8 +1,9 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { getApiBase } from "@/lib/api-base"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"
+const API_BASE = getApiBase()
 
 type User = {
   id: string
@@ -19,18 +20,29 @@ type User = {
 type AuthContextType = {
   user: User | null
   login: (email: string, password: string) => Promise<{ success: boolean; user?: User; message?: string }>
-  signup: (email: string, password: string, firstName: string, lastName: string, phone: string) => Promise<{ success: boolean; user?: User; message?: string }>
+  signup: (email: string, password: string, firstName: string, lastName: string, phone: string, termsAccepted: boolean) => Promise<{ success: boolean; user?: User; message?: string }>
   updateProfile: (data: { firstName: string; lastName: string; phone: string; profilePic?: string }) => Promise<{ success: boolean; message: string }>
   logout: () => void
   loginWithGoogle: () => void
   isAuthenticated: boolean
   isAdmin: boolean
+  isAuthLoading: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const SESSION_USER_KEY = "auth_user_session"
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window === "undefined") return null
+    try {
+      const raw = sessionStorage.getItem(SESSION_USER_KEY)
+      return raw ? (JSON.parse(raw) as User) : null
+    } catch {
+      return null
+    }
+  })
+  const [isAuthLoading, setIsAuthLoading] = useState(true)
 
   // On mount: restore session from Flask server
   useEffect(() => {
@@ -54,10 +66,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               addresses: data.addresses || [],
             }
             setUser(restored)
+            sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(restored))
+            return
           }
         }
+        setUser(null)
+        sessionStorage.removeItem(SESSION_USER_KEY)
       } catch {
-        // Flask not reachable — stay logged out
+        // Flask not reachable — keep sessionStorage snapshot for this tab
+      } finally {
+        setIsAuthLoading(false)
       }
     }
     restore()
@@ -90,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           addresses: data.addresses || [],
         }
         setUser(loggedIn)
+        sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(loggedIn))
         return { success: true, user: loggedIn }
       }
 
@@ -104,7 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     firstName: string,
     lastName: string,
-    phone: string
+    phone: string,
+    termsAccepted: boolean
   ): Promise<{ success: boolean; user?: User; message?: string }> => {
     if (!email || !password) {
       return { success: false, message: "Email and password are required" }
@@ -118,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password, firstName, lastName, phone }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password, firstName, lastName, phone, termsAccepted }),
       })
 
       const data = await res.json()
@@ -133,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: "user",
         }
         setUser(newUser)
+        sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(newUser))
         // Clear stale local data for new user
         localStorage.removeItem("cart")
         localStorage.removeItem("wishlist")
@@ -157,7 +178,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const json = await res.json()
       if (res.ok && json.success) {
         if (user) {
-          setUser({ ...user, ...data })
+          const updatedUser = { ...user, ...data }
+          setUser(updatedUser)
+          sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(updatedUser))
         }
         return { success: true, message: json.message }
       }
@@ -177,6 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Ignore network errors on logout
     }
     setUser(null)
+    sessionStorage.removeItem(SESSION_USER_KEY)
     // Clear stale local data on logout
     localStorage.removeItem("cart")
     localStorage.removeItem("wishlist")
@@ -197,6 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginWithGoogle,
         isAuthenticated: !!user,
         isAdmin: user?.role === "admin",
+        isAuthLoading,
       }}
     >
       {children}

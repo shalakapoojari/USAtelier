@@ -28,7 +28,7 @@ export default function LoginPage() {
     const result = await login(email, password)
 
     if (result.success && result.user) {
-      router.push(result.user.role === "admin" ? "/admin" : "/account")
+      router.push(result.user.role === "admin" ? "/admin" : "/")
     } else {
       setError(result.message || "Invalid email or password")
     }
@@ -56,8 +56,8 @@ export default function LoginPage() {
               Email
             </label>
             <Input
-              type="email"
-              placeholder="you@example.com"
+              type="text"
+              placeholder="Email or Username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

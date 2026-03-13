@@ -16,6 +16,22 @@ export default function AccountPage() {
   const { count: wishlistCount } = useWishlist()
   const [userOrders, setUserOrders] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [showHelloGreeting, setShowHelloGreeting] = useState(false)
+
+  useEffect(() => {
+    if (!user?.id) return
+
+    const greetingSeenKey = `account_greeting_seen_${user.id}`
+    const alreadySeen = sessionStorage.getItem(greetingSeenKey)
+
+    if (!alreadySeen) {
+      setShowHelloGreeting(true)
+      sessionStorage.setItem(greetingSeenKey, "1")
+      return
+    }
+
+    setShowHelloGreeting(false)
+  }, [user?.id])
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -40,7 +56,7 @@ export default function AccountPage() {
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen">
       <SiteHeader />
 
-      <div className="pt-40">
+      <div className="pt-52">
         <AccountSidebar>
           <div className="p-10 max-w-3xl">
 
@@ -48,7 +64,7 @@ export default function AccountPage() {
             <div className="mb-10 pb-8 border-b border-white/10">
               <p className="uppercase tracking-[0.4em] text-xs text-gray-500 mb-2">Dashboard</p>
               <h1 className="font-serif text-4xl font-light">
-                {user?.isNewSignup ? "Hello" : "Welcome back"}
+                {showHelloGreeting ? "Hello" : "Welcome back"}
                 {user?.firstName ? `, ${user.firstName}` : ""}
               </h1>
             </div>

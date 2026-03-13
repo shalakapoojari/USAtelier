@@ -21,9 +21,11 @@ export default function SignupPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [termsAccepted, setTermsAccepted] = useState(false)
 
   const { signup, loginWithGoogle } = useAuth()
   const router = useRouter()
+  const strongPasswordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -35,6 +37,12 @@ export default function SignupPage() {
       return
     }
 
+    // Strong password validation
+    if (!strongPasswordRegex.test(password)) {
+      setError("Password must be at least 8 characters and include a letter, a number, and a special character")
+      return
+    }
+
     // 10-digit validation
     const phoneClean = phone.replace(/\D/g, "")
     if (phoneClean.length !== 10) {
@@ -42,10 +50,15 @@ export default function SignupPage() {
       return
     }
 
+    if (!termsAccepted) {
+      setError("Please accept the Terms & Conditions to continue")
+      return
+    }
+
     setLoading(true)
 
     try {
-      const result = await signup(email, password, firstName, lastName, phoneClean)
+      const result = await signup(email, password, firstName, lastName, phoneClean, termsAccepted)
 
       if (result?.success) {
         router.push("/account")
@@ -123,8 +136,8 @@ export default function SignupPage() {
               Email
             </label>
             <Input
-              type="email"
-              placeholder="you@example.com"
+              type="text"
+              placeholder="Email or Username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -139,7 +152,7 @@ export default function SignupPage() {
             <div className="relative">
               <Input
                 type={showPassword ? "text" : "password"}
-                placeholder="Min. 6 characters"
+                placeholder="Min. 8, include letter, number, special"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -183,6 +196,19 @@ export default function SignupPage() {
           {error && (
             <p className="text-xs uppercase tracking-widest text-red-500">{error}</p>
           )}
+
+          <label className="flex items-start gap-3 text-xs text-gray-400 leading-relaxed">
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-white/30 bg-transparent"
+              required
+            />
+            <span>
+              I agree to the <Link href="/terms&conditions" className="text-[#C8A45D] hover:text-white underline underline-offset-4">Terms & Conditions</Link>.
+            </span>
+          </label>
 
           <Button
             type="submit"

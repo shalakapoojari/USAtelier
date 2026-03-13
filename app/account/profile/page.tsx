@@ -157,7 +157,7 @@ export default function ProfilePage() {
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen">
       <SiteHeader />
 
-      <div className="pt-40">
+      <div className="pt-52">
         <AccountSidebar>
           <div className="p-10 max-w-xl">
             {/* Header */}

@@ -29,7 +29,7 @@ export default function FavouritesPage() {
         <div className="bg-[#030303] text-[#e8e8e3] min-h-screen">
             <SiteHeader />
 
-            <main className="pt-48 pb-32 px-6 md:px-12 max-w-[1400px] mx-auto">
+            <main className="pt-60 pb-32 px-6 md:px-12 max-w-[1400px] mx-auto">
                 {/* Header */}
                 <div className="flex items-end justify-between mb-20">
                     <div>

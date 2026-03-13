@@ -3,7 +3,7 @@
 import type React from "react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
-import { User, Package, Heart, Settings, LogOut, ChevronRight, LayoutDashboard } from "lucide-react"
+import { User, Package, Heart, Settings, LogOut, ChevronRight, LayoutDashboard, ArrowLeft } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
 type SidebarProps = {
@@ -81,11 +81,20 @@ export function AccountSidebar({ children }: SidebarProps) {
                     {/* Sign Out — directly below Settings */}
                     <button
                         onClick={handleLogout}
-                        className="flex items-center gap-3 w-full px-6 py-3.5 text-xs uppercase tracking-widest text-gray-500 transition-all"
+                        className="flex items-center gap-3 w-full px-6 py-3.5 text-xs uppercase tracking-widest text-gray-500 transition-all border-b border-white/5"
                     >
                         <LogOut size={14} strokeWidth={1.5} />
                         <span>Sign Out</span>
                     </button>
+
+                    {/* Back to Home */}
+                    <Link
+                        href="/"
+                        className="flex items-center gap-3 w-full px-6 py-5 text-xs uppercase tracking-[0.2em] text-white/50 hover:text-white transition-all mt-auto"
+                    >
+                        <ArrowLeft size={14} strokeWidth={1.5} />
+                        <span>Back to Store</span>
+                    </Link>
                 </nav>
             </aside>
 

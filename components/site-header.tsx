@@ -8,8 +8,9 @@ import { Heart, ShoppingBag, User, LogOut, Package, ChevronDown, LayoutDashboard
 import { useAuth } from "@/lib/auth-context"
 import { useCart } from "@/lib/cart-context"
 import { useWishlist } from "@/lib/wishlist-context"
+import { getApiBase } from "@/lib/api-base"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"
+const API_BASE = getApiBase()
 
 export function SiteHeader() {
   const navRef = useRef<HTMLDivElement | null>(null)
@@ -134,9 +135,15 @@ export function SiteHeader() {
   return (
     <header className="fixed top-0 left-0 w-full z-100 bg-[#030303]">
       {/* ── ROW 1: BRAND | SEARCH | ICONS ── */}
-      <div className="w-full px-8 py-4 flex items-center gap-8 md:gap-12 border-b border-white/5">
-        <Link href="/" className="text-2xl font-serif tracking-widest font-bold shrink-0">
-          U.S ATELIER.
+      <div className="w-full px-3 md:px-8 py-3 md:py-4 flex items-center gap-3 md:gap-12 border-b border-white/5">
+        <Link href="/" className="shrink-0 -ml-1">
+          <div className="h-10 md:h-12 w-32 sm:w-40 md:w-56 overflow-hidden flex items-center justify-center">
+            <img
+              src="/logo/logo.png"
+              alt="U.S ATELIER"
+              className="h-10 md:h-12 w-auto object-contain object-center hover:opacity-80 transition-opacity scale-[3] sm:scale-[3.8] md:scale-[4.5] origin-center"
+            />
+          </div>
         </Link>
 
         {/* Enlarged Search Box */}
@@ -154,21 +161,13 @@ export function SiteHeader() {
         </form>
 
         {/* Navigation Group - Even gaps */}
-        <div className="flex items-center gap-6 md:gap-8">
+        <div className="flex items-center gap-3 sm:gap-4 md:gap-8 ml-auto">
           {/* About Link */}
           <Link
             href="/about"
             className="text-[10px] uppercase tracking-[0.25em] text-gray-400 hover:text-white transition-colors hidden lg:block"
           >
             About
-          </Link>
-
-          {/* Help Link */}
-          <Link
-            href="/help"
-            className="text-[10px] uppercase tracking-[0.25em] text-gray-400 hover:text-white transition-colors hidden lg:block"
-          >
-            Help
           </Link>
 
           {/* Favourites icon */}
@@ -200,6 +199,14 @@ export function SiteHeader() {
               <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-white rounded-full border border-black animate-pulse" />
             )}
           </button>
+
+          {/* Help Link */}
+          <Link
+            href="/help"
+            className="text-[10px] uppercase tracking-[0.25em] text-gray-400 hover:text-white transition-colors hidden lg:block"
+          >
+            Help
+          </Link>
 
           {/* Profile / Login - Moved to the end */}
           <div className="flex items-center ml-2">
@@ -280,49 +287,53 @@ export function SiteHeader() {
       </div>
 
       {/* ── ROW 2: COMBINED NAV & CATEGORIES ── */}
-      <div className="w-full bg-[#030303]/80 backdrop-blur-md border-b border-white/5 py-4 px-8 relative">
-        <div className="max-w-[1400px] mx-auto flex items-center justify-center gap-8 md:gap-12 whitespace-nowrap text-[10px] uppercase tracking-[0.25em] font-medium font-sans">
+      <div className="w-full bg-[#030303]/80 backdrop-blur-md border-b border-white/5 py-3 md:py-4 px-3 md:px-8 relative">
+        <div className="max-w-[1400px] mx-auto flex items-center gap-4 md:gap-8 text-[8px] sm:text-[9px] md:text-[10px] uppercase tracking-[0.25em] font-medium font-sans">
           <Link
             href="/view-all"
-            className="text-white hover:text-gray-400 transition-colors"
+            className="text-white hover:text-gray-400 transition-colors shrink-0 whitespace-nowrap"
           >
             View All
           </Link>
 
-          <div className="h-4 w-px bg-white/10 hidden md:block" />
+          <span className="text-[#C8A45D] text-[20px] md:text-[28px] leading-none shrink-0" aria-hidden="true">|</span>
 
-          {dynamicCategories.map((cat) => (
-            <div key={cat.id || cat.name} className="relative group">
-              <Link
-                href={`/view-all?category=${cat.name}`}
-                className="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5 py-4 px-1"
-              >
-                {cat.name}
-                {cat.subcategories && cat.subcategories.length > 0 && (
-                  <ChevronDown size={10} className="group-hover:rotate-180 transition-transform duration-300 opacity-50" />
-                )}
-              </Link>
+          <div className="flex-1 overflow-x-auto overflow-y-visible no-scrollbar">
+            <div className="flex min-w-max items-center gap-5 md:gap-12 whitespace-nowrap pr-2">
+              {dynamicCategories.map((cat) => (
+                <div key={cat.id || cat.name} className="relative group">
+                  <Link
+                    href={`/view-all?category=${cat.name}`}
+                    className="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5 py-2 md:py-4 px-1"
+                  >
+                    {cat.name}
+                    {cat.subcategories && cat.subcategories.length > 0 && (
+                      <ChevronDown size={10} className="group-hover:rotate-180 transition-transform duration-300 opacity-50" />
+                    )}
+                  </Link>
 
-              {/* Subcategories Dropdown */}
-              {cat.subcategories && cat.subcategories.length > 0 && (
-                <div className="absolute left-0 top-[100%] pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-[110]">
-                  <div className="bg-[#0e0e0e] border border-white/10 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.8)] min-w-[200px] backdrop-blur-xl">
-                    <div className="flex flex-col gap-3">
-                      {cat.subcategories.map((sub: string) => (
-                        <Link
-                          key={sub}
-                          href={`/view-all?category=${cat.name}&jumpTo=${sub}`}
-                          className="text-gray-500 hover:text-white transition-all text-[11px] tracking-[0.25em] hover:translate-x-2 duration-300"
-                        >
-                          {sub}
-                        </Link>
-                      ))}
+                  {/* Subcategories Dropdown */}
+                  {cat.subcategories && cat.subcategories.length > 0 && (
+                    <div className="absolute left-0 top-full pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-110">
+                      <div className="bg-[#0e0e0e] border border-white/10 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.8)] min-w-[200px] backdrop-blur-xl">
+                        <div className="flex flex-col gap-3">
+                          {cat.subcategories.map((sub: string) => (
+                            <Link
+                              key={sub}
+                              href={`/view-all?category=${cat.name}&jumpTo=${sub}`}
+                              className="text-gray-500 hover:text-white transition-all text-[11px] tracking-[0.25em] hover:translate-x-2 duration-300"
+                            >
+                              {sub}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       </div>
     </header>

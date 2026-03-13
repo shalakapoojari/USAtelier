@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import os
 import json
 import time
+import re
 import razorpay
 from datetime import datetime
 from flask_mail import Mail
@@ -24,6 +25,8 @@ from models_mysql import (
 )
 from borzo_utils import create_delivery_order
 
+PASSWORD_POLICY_REGEX = re.compile(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$')
+
 load_dotenv()
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
@@ -41,6 +44,9 @@ else:
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:5000",
+        re.compile(r"http://192\.168\.\d{1,3}\.\d{1,3}(:\d+)?"),
+        re.compile(r"http://10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?"),
+        re.compile(r"http://172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}(:\d+)?"),
     ]
 
 # CORS must specify origins when supports_credentials=True
@@ -199,9 +205,16 @@ def signup():
     first_name = data.get('firstName', '').strip()
     last_name = data.get('lastName', '').strip()
     phone = data.get('phone', '').strip()
+    terms_accepted = bool(data.get('termsAccepted'))
     
     if not email or not password:
         return jsonify({"error": "Email and password required"}), 400
+
+    if not PASSWORD_POLICY_REGEX.match(password):
+        return jsonify({"error": "Password must be at least 8 characters and include a letter, a number, and a special character"}), 400
+
+    if not terms_accepted:
+        return jsonify({"error": "Terms and Conditions must be accepted"}), 400
         
     if User.query.filter_by(email=email).first():
         return jsonify({"error": "Email already registered"}), 400
@@ -245,6 +258,7 @@ def login():
     email = data.get('email', '').strip().lower()
     password = data.get('password')
     
+    print(f"DEBUG: Login Attempt - Email: '{email}', Password: '{password}'")
     user = User.query.filter_by(email=email).first()
     
     password_ok = False
@@ -412,12 +426,15 @@ def change_password():
     
     if not current_password or not new_password:
         return jsonify({"error": "Current and new password required"}), 400
+
+    if not PASSWORD_POLICY_REGEX.match(new_password):
+        return jsonify({"error": "New password must be at least 8 characters and include a letter, a number, and a special character"}), 400
         
     user = User.query.get(int(session['user_id']))
     if not user:
         return jsonify({"error": "User not found"}), 404
         
-    if not check_password_hash(user.password_hash, current_password):
+    if not check_password_hash(user.password, current_password):
         return jsonify({"error": "Incorrect current password"}), 400
         
     try:
@@ -502,8 +519,8 @@ def google_callback():
     session['user_id'] = str(user.id)
     session['is_admin'] = bool(user.is_admin)
     
-    # Redirect to account page
-    return redirect(f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/account")
+    # Redirect to Landing Page
+    return redirect(f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/")
 
 @app.route('/api/auth/user', methods=['GET', 'PUT'])
 def user_profile():
@@ -1163,6 +1180,10 @@ def create_order():
         return jsonify({"error": "Login required"}), 401
         
     data = request.get_json()
+    terms_accepted = bool(data.get('termsAccepted'))
+
+    if not terms_accepted:
+        return jsonify({"error": "Terms and Conditions must be accepted before placing an order"}), 400
     
     # Razorpay Verification
     razorpay_payment_id = data.get('razorpay_payment_id')
@@ -1408,6 +1429,113 @@ def borzo_webhook():
             print(f"Webhook MySQL update error: {e}")
             
     return jsonify({"success": True}), 200
+
+# ==================== ANALYSIS ====================
+
+@app.route('/api/admin/analysis', methods=['GET'])
+def get_analysis_data():
+    is_admin = session.get('is_admin')
+    if 'user_id' not in session or not (is_admin is True or str(is_admin).lower() == 'true'):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    try:
+        from sqlalchemy import func
+
+        # 1. Most Sold Products
+        most_sold_raw = db_mysql.session.query(
+            OrderItem.product_name, 
+            func.sum(OrderItem.quantity).label('total_sold')
+        ).group_by(OrderItem.product_name).order_by(func.sum(OrderItem.quantity).desc()).limit(10).all()
+        
+        most_sold = [{"name": r[0], "total_sold": int(r[1])} for r in most_sold_raw]
+
+        # 2. Most Favorited
+        most_favorited_raw = db_mysql.session.query(
+            WishlistItem.product_id_str, 
+            func.count(WishlistItem.id).label('total_favorites')
+        ).group_by(WishlistItem.product_id_str).order_by(func.count(WishlistItem.id).desc()).limit(10).all()
+        
+        most_favorited = []
+        for p_id_str, count in most_favorited_raw:
+             p = ProductSQL.query.get(int(p_id_str)) if p_id_str.isdigit() else None
+             most_favorited.append({"name": p.name if p else "Unknown", "count": count})
+
+        # 3. Most Added to Cart
+        most_added_raw = db_mysql.session.query(
+            CartItem.product_id_str, 
+            func.count(CartItem.id).label('total_carts')
+        ).group_by(CartItem.product_id_str).order_by(func.count(CartItem.id).desc()).limit(10).all()
+        
+        most_added_to_cart = []
+        for p_id_str, count in most_added_raw:
+             p = ProductSQL.query.get(int(p_id_str)) if p_id_str.isdigit() else None
+             most_added_to_cart.append({"name": p.name if p else "Unknown", "count": count})
+
+        # 4. Stock Levels
+        all_products = ProductSQL.query.all()
+        all_stock = [{"name": p.name, "stock": p.stock, "category": p.category, "subcategory": p.subcategory} for p in all_products]
+        low_stock = [p for p in all_stock if p['stock'] <= 5]
+
+        # 5. Category distribution for pie chart & dropdowns
+        # Hierarchical: Category -> Subcategory -> List of Products
+        cat_map = {}
+        for p in all_products:
+            c = p.category or "Uncategorized"
+            s = p.subcategory or "General"
+            
+            if c not in cat_map:
+                cat_map[c] = {
+                    "name": c, 
+                    "count": 0, 
+                    "total_stock": 0, 
+                    "subcategories": {}
+                }
+            
+            cat_map[c]["count"] += 1
+            cat_map[c]["total_stock"] += p.stock
+            
+            if s not in cat_map[c]["subcategories"]:
+                cat_map[c]["subcategories"][s] = {
+                    "name": s, 
+                    "count": 0, 
+                    "total_stock": 0,
+                    "products": []
+                }
+            
+            cat_map[c]["subcategories"][s]["count"] += 1
+            cat_map[c]["subcategories"][s]["total_stock"] += p.stock
+            cat_map[c]["subcategories"][s]["products"].append({
+                "id": p.id,
+                "name": p.name,
+                "stock": p.stock
+            })
+
+        # Process into final list structure
+        category_stats = []
+        for c_name, c_data in cat_map.items():
+            subs = []
+            for s_name, s_data in c_data["subcategories"].items():
+                subs.append(s_data)
+            
+            c_data["subcategories"] = subs
+            category_stats.append(c_data)
+
+        # Simplified pie chart data (needs _id for the chart component)
+        pie_data = [{"_id": c["name"], "count": c["count"]} for c in category_stats]
+
+        return jsonify({
+            "most_sold": most_sold,
+            "most_favorited": most_favorited,
+            "most_added_to_cart": most_added_to_cart,
+            "low_stock": low_stock,
+            "all_stock": all_stock,
+            "category_stats": category_stats,
+            "pie_data": pie_data
+        })
+
+    except Exception as e:
+        print(f"Analysis API Error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 # ==================== CUSTOMERS ====================
 

@@ -35,19 +35,21 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, isAuthLoading } = useAuth()
   const [isAuthorizing, setIsAuthorizing] = useState(true)
 
   useEffect(() => {
-    // Wait for auth to initialize
-    if (isAuthenticated !== undefined) {
-      if (!isAuthenticated || user?.role !== "admin") {
-        router.push("/login")
-      } else {
-        setIsAuthorizing(false)
-      }
+    if (isAuthLoading) {
+      return
     }
-  }, [isAuthenticated, user, router])
+
+    if (!isAuthenticated || user?.role !== "admin") {
+      router.replace("/login")
+      return
+    }
+
+    setIsAuthorizing(false)
+  }, [isAuthLoading, isAuthenticated, user, router])
 
   if (isAuthorizing) {
     return (
@@ -62,9 +64,17 @@ export default function AdminLayout({
       {/* ── SIDEBAR (desktop) ── */}
       <aside className="hidden lg:flex w-72 flex-col border-r border-white/10 px-8 py-10 fixed top-0 left-0 h-full z-40 bg-[#030303]">
         {/* Brand */}
-        <div className="mb-12">
-          <p className="font-serif text-lg tracking-widest">U.S ATELIER</p>
-          <p className="text-[10px] uppercase tracking-[0.3em] text-gray-500 mt-1">Admin</p>
+        <div className="mb-16">
+          <Link href="/" className="block w-full">
+            <div className="mx-auto h-16 w-56 overflow-hidden flex items-center justify-center mb-6">
+              <img
+                src="/logo/logo.png"
+                alt="U.S ATELIER"
+                className="h-16 w-auto object-contain object-center scale-[4.5] origin-center"
+              />
+            </div>
+          </Link>
+          <p className="text-[10px] uppercase tracking-[0.3em] text-gray-500 text-center mt-3">Admin Panel</p>
         </div>
 
         {/* Nav links */}
