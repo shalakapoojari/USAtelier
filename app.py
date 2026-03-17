@@ -31,7 +31,8 @@ from borzo_utils import create_delivery_order
 
 PASSWORD_POLICY_REGEX = re.compile(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$')
 
-load_dotenv()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 is_production = os.getenv('NODE_ENV') == 'production' or os.getenv('FLASK_ENV') == 'production'
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
@@ -79,11 +80,28 @@ def is_origin_allowed(origin: str) -> bool:
             return True
     return False
 
+
+def is_password_valid(stored_password: str, candidate_password: str) -> bool:
+    if not stored_password or candidate_password is None:
+        return False
+    try:
+        return check_password_hash(stored_password, candidate_password)
+    except (ValueError, TypeError):
+        # Backward compatibility for any legacy plain-text records.
+        return stored_password == candidate_password
+
+
+def is_password_hashed(password_value: str) -> bool:
+    if not password_value:
+        return False
+    return password_value.startswith('pbkdf2:') or password_value.startswith('scrypt:')
+
 # Parse allowed origins from environment (comma separated) or use default local config
 allowed_origins_env = os.getenv('ALLOWED_ORIGINS')
 if allowed_origins_env:
     origins = [origin.strip() for origin in allowed_origins_env.split(',')]
 else:
+    frontend_url = os.getenv('FRONTEND_URL', '').strip().rstrip('/')
     origins = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
@@ -93,10 +111,14 @@ else:
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:5000",
+        "https://usatelier08.vercel.app",
+        re.compile(r"https://[a-zA-Z0-9-]+\.vercel\.app"),
         re.compile(r"http://192\.168\.\d{1,3}\.\d{1,3}(:\d+)?"),
         re.compile(r"http://10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?"),
         re.compile(r"http://172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}(:\d+)?"),
     ]
+    if frontend_url:
+        origins.insert(0, frontend_url)
 
 # CORS must specify origins when supports_credentials=True
 # Wildcard "*" is NOT allowed with credentials.
@@ -344,12 +366,20 @@ def login():
     password = data.get('password')
     
     user = User.query.filter_by(email=email).first()
-    
-    password_ok = bool(user and check_password_hash(user.password, password))
+
+    password_ok = bool(user and is_password_valid(user.password, password))
 
     if user and password_ok:
         if user.is_blocked:
             return jsonify({"error": "Your account has been blocked. Please contact support."}), 403
+
+        # If this account was on a legacy plain-text password, migrate now.
+        if not is_password_hashed(user.password):
+            try:
+                user.password = generate_password_hash(password)
+                db_mysql.session.commit()
+            except Exception:
+                db_mysql.session.rollback()
 
         session.permanent = False # Change to False for session-only persistence
         session['user_id'] = str(user.id)
@@ -1962,11 +1992,12 @@ def get_business_analysis():
 def seed_database():
     # ── ALWAYS SYNC ADMIN CREDENTIALS ──
     admin_email = "admin@123.com"
+    admin_password = "admin123"
     admin = User.query.filter_by(email=admin_email).first()
     if not admin:
         admin = User(
             email=admin_email,
-            password="admin123", # PLAIN TEXT AS REQUESTED
+            password=generate_password_hash(admin_password),
             is_admin=True,
             first_name="Admin",
             last_name="User"
@@ -1974,7 +2005,7 @@ def seed_database():
         db_mysql.session.add(admin)
         print(f"Created new admin: {admin_email}")
     else:
-        admin.password = generate_password_hash("admin123")
+        admin.password = generate_password_hash(admin_password)
         admin.is_admin = True
         print(f"Synced credentials for admin: {admin_email}")
 
@@ -2017,11 +2048,12 @@ def after_request(response):
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     return response
 
+
+with app.app_context():
+    try:
+        seed_database()
+    except Exception as e:
+        print(f"Seeding failed: {e}")
+
 if __name__ == '__main__':
-    with app.app_context():
-        try:
-            seed_database()
-        except Exception as e:
-            print(f"Seeding failed: {e}")
-            
     app.run(host='0.0.0.0', port=5000, debug=not is_production)

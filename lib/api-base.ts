@@ -1,8 +1,28 @@
+function normalizeApiBase(raw: string): string {
+  const value = raw.trim().replace(/\/+$/, "")
+  if (!value) return value
+
+  // Avoid mixed content in production (HTTPS page cannot call HTTP API).
+  if (value.startsWith("http://") && !value.includes("localhost") && !value.includes("127.0.0.1")) {
+    return `https://${value.slice("http://".length)}`
+  }
+  return value
+}
+
 export function getApiBase(): string {
-  if (process.env.NEXT_PUBLIC_API_BASE) return process.env.NEXT_PUBLIC_API_BASE
+  const envBase = process.env.NEXT_PUBLIC_API_BASE
+  if (envBase) return normalizeApiBase(envBase)
 
   if (typeof window !== "undefined") {
-    return `http://${window.location.hostname}:5000`
+    const host = window.location.hostname
+    const isLocalHost = host === "localhost" || host === "127.0.0.1"
+
+    if (isLocalHost) {
+      return `http://${host}:5000`
+    }
+
+    // Production fallback for this deployment when env vars are missing.
+    return "https://shalakapoojari.pythonanywhere.com"
   }
 
   return "http://localhost:5000"
