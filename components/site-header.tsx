@@ -23,6 +23,12 @@ function normalizeSubcategories(value: unknown): string[] {
     return value.map((v) => String(v).trim()).filter(Boolean)
   }
 
+  if (value && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>)
+      .map((v) => String(v).trim())
+      .filter(Boolean)
+  }
+
   if (typeof value === "string") {
     const raw = value.trim()
     if (!raw) return []
@@ -441,7 +447,7 @@ export function SiteHeader() {
       </div>
 
       {/* ── ROW 2: COMBINED NAV & CATEGORIES ── */}
-      <div className="hidden md:block w-full bg-[#030303]/80 backdrop-blur-md border-b border-white/5 py-3 md:py-4 px-3 md:px-8 relative">
+      <div className="hidden md:block w-full bg-[#030303]/80 backdrop-blur-md border-b border-white/5 py-3 md:py-4 px-3 md:px-8 relative z-140">
         <div className="max-w-350 mx-auto flex items-center gap-4 md:gap-8 text-[8px] sm:text-[9px] md:text-[10px] uppercase tracking-[0.25em] font-medium font-sans">
           <Link
             href="/view-all"
@@ -467,6 +473,11 @@ export function SiteHeader() {
                 >
                   <Link
                     href={`/view-all?category=${encodeURIComponent(cat.name)}`}
+                    onClick={(e) => {
+                      if (!hasSubcategories) return
+                      e.preventDefault()
+                      setActiveDesktopCategory((current) => (current === cat.name ? null : cat.name))
+                    }}
                     className="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5 py-2 md:py-4 px-1"
                   >
                     {cat.name}
@@ -477,7 +488,7 @@ export function SiteHeader() {
 
                   {/* Subcategories Dropdown */}
                   {hasSubcategories && (
-                    <div className={`absolute left-0 top-full z-110 pt-0 transition-all duration-200 ${isOpen ? "visible opacity-100" : "invisible opacity-0 pointer-events-none"}`}>
+                    <div className={`absolute left-0 top-full z-200 pt-0 transition-all duration-200 ${isOpen ? "visible opacity-100" : "invisible opacity-0 pointer-events-none"}`}>
                       <div className={`mt-0 bg-[#0e0e0e] border border-white/10 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.8)] min-w-50 backdrop-blur-xl transition-transform duration-200 ${isOpen ? "translate-y-0" : "translate-y-2"}`}>
                         <div className="flex flex-col gap-3">
                           {cat.subcategories.map((sub: string) => (
