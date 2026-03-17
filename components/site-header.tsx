@@ -193,8 +193,8 @@ export function SiteHeader() {
 
       gsap.fromTo(
         mobileMenuRef.current,
-        { y: -24, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.42, ease: "power3.out" },
+        { x: 48, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.42, ease: "power3.out" },
       )
 
       gsap.fromTo(
@@ -450,37 +450,70 @@ export function SiteHeader() {
 
       {/* ── MOBILE DRAWER: ALL NAV CONTENT ── */}
       {mobileMenuOpen && (
-        <div ref={mobileMenuOverlayRef} className="md:hidden fixed inset-0 bg-black/90 backdrop-blur-sm z-120">
-          <div ref={mobileMenuRef} className="h-full w-full bg-[#020202] px-6 pt-10 pb-8 overflow-y-auto">
-            <div className="mx-auto max-w-160 flex min-h-full flex-col">
-              <div className="mobile-menu-item flex items-center justify-between text-[7vw] sm:text-3xl uppercase tracking-[0.12em] font-serif text-[#e6e6e2]">
+        <div ref={mobileMenuOverlayRef} className="md:hidden fixed inset-0 bg-black/45 backdrop-blur-[1px] z-120" onClick={closeMobileMenu}>
+          <div
+            ref={mobileMenuRef}
+            onClick={(e) => e.stopPropagation()}
+            className="fixed right-0 top-0 h-dvh w-[86vw] max-w-110 bg-[#020202] border-l border-white/10 px-6 pt-10 pb-8 overflow-y-auto overscroll-y-contain touch-pan-y"
+            style={{ WebkitOverflowScrolling: "touch" }}
+          >
+            <div className="mx-auto max-w-120 flex min-h-full flex-col">
+              <div className="mobile-menu-item flex items-center justify-between text-[20px] sm:text-[22px] uppercase tracking-[0.12em] font-serif text-[#e6e6e2]">
                 <span>Menu</span>
                 <button onClick={closeMobileMenu} className="text-[#e6e6e2] hover:text-white transition-colors" aria-label="Close menu">
                   Close
                 </button>
               </div>
 
-              <div className="mt-16 flex flex-col gap-8">
-                <Link href="/collections" onClick={closeMobileMenu} className="mobile-menu-item font-serif text-[14vw] leading-none text-[#e8e8e3] hover:text-white transition-colors">
-                  Collections
+              <div className="mt-16 flex flex-col gap-6">
+                <Link href="/about" onClick={closeMobileMenu} className="mobile-menu-item font-serif text-[20px] sm:text-[22px] leading-none text-[#e8e8e3] hover:text-white transition-colors">
+                  About
                 </Link>
-                <Link href="/new-arrivals" onClick={closeMobileMenu} className="mobile-menu-item font-serif text-[14vw] leading-none text-[#e8e8e3] hover:text-white transition-colors">
-                  Campaign
+                <Link href="/help" onClick={closeMobileMenu} className="mobile-menu-item font-serif text-[20px] sm:text-[22px] leading-none text-[#e8e8e3] hover:text-white transition-colors">
+                  Help
                 </Link>
-                <Link href="/about" onClick={closeMobileMenu} className="mobile-menu-item font-serif text-[14vw] leading-none text-[#e8e8e3] hover:text-white transition-colors">
-                  Maison
+                <Link href="/view-all" onClick={closeMobileMenu} className="mobile-menu-item font-serif text-[20px] sm:text-[22px] leading-none text-[#e8e8e3] hover:text-white transition-colors">
+                  View All
                 </Link>
-                <Link href="/view-all" onClick={closeMobileMenu} className="mobile-menu-item font-serif text-[14vw] leading-none text-[#e8e8e3] hover:text-white transition-colors">
-                  Shop
-                </Link>
-                <button onClick={handleMobileCartClick} className="mobile-menu-item text-left font-serif text-[14vw] leading-none text-[#e8e8e3] hover:text-white transition-colors">
+                <button onClick={handleMobileFavouritesClick} className="mobile-menu-item text-left font-serif text-[20px] sm:text-[22px] leading-none text-[#e8e8e3] hover:text-white transition-colors">
+                  Favourites
+                </button>
+                <button onClick={handleMobileCartClick} className="mobile-menu-item text-left font-serif text-[20px] sm:text-[22px] leading-none text-[#e8e8e3] hover:text-white transition-colors">
                   Cart ({cartUnseen})
                 </button>
               </div>
 
               <div className="mobile-menu-item mt-14 h-px bg-white/12" />
 
-              <div className="mobile-menu-item mt-8 flex flex-col gap-4 text-[8vw] sm:text-2xl font-serif text-[#e6e6e2]">
+              <div className="mt-8 flex flex-col gap-5">
+                {dynamicCategories.map((cat) => (
+                  <div key={cat.id || cat.name} className="mobile-menu-item space-y-2">
+                    <Link
+                      href={`/view-all?category=${cat.name}`}
+                      onClick={closeMobileMenu}
+                      className="font-serif text-[17px] sm:text-[18px] leading-none text-[#d4d4cf] hover:text-white transition-colors"
+                    >
+                      {cat.name}
+                    </Link>
+                    {cat.subcategories && cat.subcategories.length > 0 && (
+                      <div className="pl-3 border-l border-white/10 flex flex-col gap-2 text-[10px] uppercase tracking-[0.18em]">
+                        {cat.subcategories.map((sub: string) => (
+                          <Link
+                            key={sub}
+                            href={`/view-all?category=${cat.name}&jumpTo=${sub}`}
+                            onClick={closeMobileMenu}
+                            className="text-gray-500 hover:text-gray-300 transition-colors"
+                          >
+                            {sub}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="mobile-menu-item mt-8 flex flex-col gap-4 text-[18px] sm:text-[20px] font-serif text-[#e6e6e2]">
                 {!user ? (
                   <Link href="/login" onClick={closeMobileMenu} className="hover:text-white transition-colors">
                     Login
