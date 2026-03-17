@@ -317,7 +317,7 @@ export default function HomePage() {
               type="button"
               aria-label="Previous hero slide"
               onClick={() => emblaApi?.scrollPrev()}
-              className="absolute left-6 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center border border-white/20 bg-black/35 p-3 text-white/80 backdrop-blur-sm transition-all hover:border-white/60 hover:text-white md:flex"
+              className="absolute left-6 top-1/2 z-40 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white/80 backdrop-blur-sm transition-all hover:border-white/60 hover:text-white md:flex"
             >
               <ChevronLeft size={20} />
             </button>
@@ -326,7 +326,7 @@ export default function HomePage() {
               type="button"
               aria-label="Next hero slide"
               onClick={() => emblaApi?.scrollNext()}
-              className="absolute right-6 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center border border-white/20 bg-black/35 p-3 text-white/80 backdrop-blur-sm transition-all hover:border-white/60 hover:text-white md:flex"
+              className="absolute right-6 top-1/2 z-40 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white/80 backdrop-blur-sm transition-all hover:border-white/60 hover:text-white md:flex"
             >
               <ChevronRight size={20} />
             </button>
@@ -338,7 +338,7 @@ export default function HomePage() {
           <div className="max-w-5xl mx-auto text-center">
             <p className="text-[8vw] sm:text-5xl md:text-6xl leading-[1.35] md:leading-[1.3] font-serif text-[#d8d8d6]">
               U.S Atelier is premium menswear designed for the modern man who values style, comfort, and craftsmanship with innovative tailoring to deliver clothing that makes a statement—confident, stylish, and refined.
-            </p>
+            </p>s
             <p className="mt-8 text-sm md:text-base uppercase tracking-[0.3em] text-[#a99d73] font-light">
               &ldquo;Made with Pride, Worn with Confidence&rdquo;
             </p>
