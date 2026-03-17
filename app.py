@@ -127,7 +127,7 @@ limiter = Limiter(key_func=get_remote_address, app=app, default_limits=[])
 
 # Upload Configuration
 # UPLOAD_FOLDER is kept for compatibility if needed, but we'll use Cloudinary
-UPLOAD_FOLDER = os.path.join(os.getcwd(), 'public', 'uploads')
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'public', 'uploads')
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
@@ -209,7 +209,17 @@ with app.app_context():
 # ==================== STATIC ASSETS ====================
 @app.route('/static/uploads/<path:filename>')
 def serve_uploads(filename):
-    return send_from_directory(os.path.join(os.getcwd(), 'public', 'uploads'), filename)
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+
+@app.route('/uploads/<path:filename>')
+def serve_uploads_short(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+
+@app.errorhandler(413)
+def handle_file_too_large(_err):
+    return jsonify({"error": "File too large. Maximum allowed size is 10 MB."}), 413
 
 # ==================== ROUTES ====================
 

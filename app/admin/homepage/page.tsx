@@ -447,25 +447,37 @@ export default function HomepageDesignPage() {
 
     const fetchData = async () => {
         try {
-            const [configRes, productsRes, catsRes] = await Promise.all([
-                fetch(`${API_BASE}/api/homepage`),
-                fetch(`${API_BASE}/api/products`),
-                fetch(`${API_BASE}/api/categories`)
+            const [configRes, productsRes, catsRes] = await Promise.allSettled([
+                fetch(`${API_BASE}/api/homepage`, { credentials: "include" }),
+                fetch(`${API_BASE}/api/products`, { credentials: "include" }),
+                fetch(`${API_BASE}/api/categories`, { credentials: "include" })
             ])
 
-            if (configRes.ok) {
-                const data = await configRes.json()
-                setConfig(prev => ({ ...prev, ...data }))
+            let hasAnyFailure = false
+
+            if (configRes.status === "fulfilled" && configRes.value.ok) {
+                const data = await configRes.value.json()
+                setConfig((prev) => ({ ...prev, ...data }))
+            } else {
+                hasAnyFailure = true
             }
 
-            if (productsRes.ok) {
-                const data = await productsRes.json()
+            if (productsRes.status === "fulfilled" && productsRes.value.ok) {
+                const data = await productsRes.value.json()
                 setProducts(data)
+            } else {
+                hasAnyFailure = true
             }
 
-            if (catsRes.ok) {
-                const data = await catsRes.json()
+            if (catsRes.status === "fulfilled" && catsRes.value.ok) {
+                const data = await catsRes.value.json()
                 setCategories(data)
+            } else {
+                hasAnyFailure = true
+            }
+
+            if (hasAnyFailure) {
+                showToast("Some settings could not be loaded. Please retry after reload.", "info")
             }
         } catch (err) {
             console.error("Failed to fetch data:", err)
@@ -516,6 +528,11 @@ export default function HomepageDesignPage() {
 
     const handleFileUpload = async (index: number, file: File) => {
         if (!API_BASE) return
+        if (file.size > 10 * 1024 * 1024) {
+            showToast("File too large. Max allowed size is 10 MB.", "info")
+            return
+        }
+
         const data = new FormData()
         data.append("file", file)
 
@@ -525,9 +542,20 @@ export default function HomepageDesignPage() {
                 credentials: "include",
                 body: data,
             })
-            const result = await res.json()
+
+            const raw = await res.text()
+            let result: any = {}
+            try {
+                result = raw ? JSON.parse(raw) : {}
+            } catch {
+                result = { error: raw || "Upload failed" }
+            }
+
             if (res.ok && result.success) {
-                handleSlideUpdate(index, { image: result.url })
+                const nextImage = typeof result.url === "string" && result.url.startsWith("/")
+                    ? `${API_BASE}${result.url}`
+                    : result.url
+                handleSlideUpdate(index, { image: nextImage })
                 showToast("Image uploaded", "info")
             } else {
                 showToast(result.error || "Upload failed", "info")
