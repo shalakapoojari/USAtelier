@@ -1,8 +1,28 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import json
+import os
 
 db_mysql = SQLAlchemy()
+
+
+def _backend_base() -> str:
+    return os.getenv('BACKEND_URL', '').strip().rstrip('/')
+
+
+def _public_asset_url(value):
+    if value is None:
+        return value
+    raw = str(value).strip()
+    if not raw:
+        return raw
+    if raw.startswith('http://') or raw.startswith('https://') or raw.startswith('data:') or raw.startswith('blob:'):
+        return raw
+    if not raw.startswith('/'):
+        raw = f'/{raw}'
+
+    base = _backend_base()
+    return f'{base}{raw}' if base else raw
 
 class User(db_mysql.Model):
     __tablename__ = 'users'
@@ -100,6 +120,7 @@ class Product(db_mysql.Model):
         self.sizes_json = json.dumps(value)
 
     def to_dict(self):
+        normalized_images = [_public_asset_url(img) for img in self.images]
         return {
             'id': self.id,
             'name': self.name,
@@ -108,7 +129,7 @@ class Product(db_mysql.Model):
             'subcategory': self.subcategory,
             'gender': self.gender,
             'description': self.description,
-            'images': self.images,
+            'images': normalized_images,
             'sizes': self.sizes,
             'stock': self.stock,
             'isFeatured': self.is_featured,
@@ -116,7 +137,7 @@ class Product(db_mysql.Model):
             'isBestseller': self.is_bestseller,
             'fabric': self.fabric,
             'care': self.care,
-            'sizeGuideImage': self.size_guide_image,
+            'sizeGuideImage': _public_asset_url(self.size_guide_image),
             'createdAt': self.created_at.isoformat() if self.created_at else None
         }
 
@@ -299,8 +320,17 @@ class HomepageConfig(db_mysql.Model):
         self.new_arrival_ids_json = json.dumps(value)
 
     def to_dict(self):
+        normalized_slides = []
+        for slide in self.hero_slides:
+            if isinstance(slide, dict):
+                next_slide = dict(slide)
+                next_slide['image'] = _public_asset_url(next_slide.get('image'))
+                normalized_slides.append(next_slide)
+            else:
+                normalized_slides.append(slide)
+
         return {
-            'hero_slides': self.hero_slides,
+            'hero_slides': normalized_slides,
             'manifesto_text': self.manifesto_text,
             'bestseller_product_ids': self.bestseller_ids,
             'featured_product_ids': self.featured_ids,

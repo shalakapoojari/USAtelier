@@ -21,7 +21,7 @@ export function SiteFooter() {
         U.S ATELIER
       </span>
 
-      <div className="relative z-10 max-w-[1400px] mx-auto">
+      <div className="relative z-10 max-w-350 mx-auto">
         {/* Top grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 mb-6 pb-6 border-b border-white/5">
           {/* Shop */}
@@ -59,9 +59,9 @@ export function SiteFooter() {
         {/* Bottom bar */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-6 text-[10px] uppercase tracking-widest text-gray-700">
           <div className="flex items-center gap-4">
-            <div className="ml-2 flex h-8 w-32 items-center overflow-hidden md:w-40">
+            <Link href="/" className="ml-2 flex h-8 w-32 items-center overflow-hidden md:w-40">
               <img src="/logo/us-atelier-wordmark.svg" alt="U.S ATELIER" className="h-full w-full object-contain object-left opacity-45 transition-opacity hover:opacity-100" />
-            </div>
+            </Link>
             <span>© 2025 U.S ATELIER Maison. All Rights Reserved.</span>
           </div>
           <span className="opacity-50">Crafted in India · Designed for the World</span>

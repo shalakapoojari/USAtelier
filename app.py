@@ -478,9 +478,11 @@ def upload_file():
             file.save(filepath)
             
             # Return relative path for frontend
+            relative_url = f"/uploads/products/{filename}"
             return jsonify({
                 "success": True,
-                "url": f"/uploads/products/{filename}"
+                "url": f"{get_backend_base_url()}{relative_url}",
+                "path": relative_url
             }), 200
         except Exception as e:
             print(f"Error saving product file locally: {str(e)}")
@@ -515,7 +517,8 @@ def upload_profile_pic():
             
             return jsonify({
                 "success": True,
-                "url": f"/uploads/profiles/{filename}"
+                "url": f"{get_backend_base_url()}/uploads/profiles/{filename}",
+                "path": f"/uploads/profiles/{filename}"
             }), 200
         except Exception as e:
             print(f"Error saving profile pic locally: {str(e)}")
