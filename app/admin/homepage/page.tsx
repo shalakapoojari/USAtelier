@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog"
 import { Search, Plus } from "lucide-react"
 import { getApiBase } from "@/lib/api-base"
+import { resolveMediaUrl } from "@/lib/media-url"
 
 type HeroSlide = {
     image: string
@@ -111,9 +112,9 @@ function HeroSlideEditor({
             </div>
 
             <div className="px-8 pb-8 flex flex-col 2xl:flex-row gap-8">
-                <div className="relative w-full 2xl:w-48 aspect-[3/4] bg-white/5 border border-white/10 overflow-hidden group/image shadow-lg shrink-0">
+                <div className="relative w-full 2xl:w-48 aspect-3/4 bg-white/5 border border-white/10 overflow-hidden group/image shadow-lg shrink-0">
                     {slide.image ? (
-                        <Image src={slide.image} alt="Hero" fill className="object-cover" />
+                        <Image src={resolveMediaUrl(slide.image)} alt="Hero" fill className="object-cover" />
                     ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-gray-700">
                             <ImageIcon size={32} />
@@ -144,7 +145,7 @@ function HeroSlideEditor({
                             <Textarea
                                 value={slide.content}
                                 onChange={(e) => onUpdate(index, { content: e.target.value })}
-                                className="bg-transparent border-white/10 min-h-[100px] rounded-none text-xs resize-none"
+                                className="bg-transparent border-white/10 min-h-25 rounded-none text-xs resize-none"
                                 placeholder="e.g. Classical and Royal Finishing Sweatshirt"
                             />
                         </div>
@@ -181,7 +182,7 @@ function HeroSlideEditor({
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4">
                                         {filteredProducts.map(p => {
                                             const images = typeof p.images === 'string' ? JSON.parse(p.images) : p.images
-                                            const imgUrl = images?.[0] || "/placeholder.jpg"
+                                            const imgUrl = resolveMediaUrl(images?.[0] || "/placeholder.jpg")
                                             return (
                                                 <div
                                                     key={p.id}
@@ -286,7 +287,7 @@ function ProductSelectionRow({
                 {/* ADD BUTTON CARD */}
                 <button
                     onClick={() => setIsPickerOpen(true)}
-                    className="relative flex-shrink-0 w-[180px] md:w-[215px] aspect-[3/4] border border-dashed border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/20 transition-all flex flex-col items-center justify-center gap-3 group/add"
+                    className="relative shrink-0 w-45 md:w-53.75 aspect-3/4 border border-dashed border-white/10 bg-white/2 hover:bg-white/5 hover:border-white/20 transition-all flex flex-col items-center justify-center gap-3 group/add"
                 >
                     <div className="size-10 rounded-full border border-white/10 flex items-center justify-center group-hover/add:scale-110 transition-all">
                         <Plus className="text-gray-500 group-hover/add:text-white" size={18} strokeWidth={1} />
@@ -296,11 +297,11 @@ function ProductSelectionRow({
 
                 {selectedProducts.map(p => {
                     const images = typeof p.images === 'string' ? JSON.parse(p.images) : p.images
-                    const imageUrl = images && images[0] ? images[0] : "/placeholder.jpg"
+                    const imageUrl = resolveMediaUrl(images && images[0] ? images[0] : "/placeholder.jpg")
                     return (
                         <div
                             key={p.id}
-                            className="relative flex-shrink-0 w-[180px] md:w-[215px] aspect-[3/4] border border-white/5 group/card"
+                            className="relative shrink-0 w-45 md:w-53.75 aspect-3/4 border border-white/5 group/card"
                         >
                             <Image
                                 src={imageUrl}
@@ -310,7 +311,7 @@ function ProductSelectionRow({
                             />
                             <div className="absolute inset-x-0 bottom-0 bg-black/80 p-4 backdrop-blur-sm border-t border-white/5">
                                 <p className="text-[10px] uppercase tracking-[0.2em] font-medium truncate mb-1">{p.name}</p>
-                                <p className="text-[8px] uppercase tracking-widest text-gray-500 font-mono text-[7px]">ID: {p.id}</p>
+                                <p className="text-[7px] uppercase tracking-widest text-gray-500 font-mono">ID: {p.id}</p>
                             </div>
                             <button
                                 onClick={() => onToggle(String(p.id), listKey)}
@@ -323,7 +324,7 @@ function ProductSelectionRow({
                 })}
 
                 {selectedIds.length === 0 && (
-                    <div className="flex-1 min-w-[300px] flex items-center justify-center border border-white/5 bg-white/[0.01]">
+                    <div className="flex-1 min-w-75 flex items-center justify-center border border-white/5 bg-white/1">
                         <p className="text-[9px] uppercase tracking-[0.4em] text-gray-700 italic">No pieces currently curated in this section</p>
                     </div>
                 )}
@@ -389,7 +390,7 @@ function ProductPickerDialog({
                     {filteredProducts.map(p => {
                         const isSelected = selectedIds.includes(p.id)
                         const images = typeof p.images === 'string' ? JSON.parse(p.images) : p.images
-                        const imgUrl = images?.[0] || "/placeholder.jpg"
+                        const imgUrl = resolveMediaUrl(images?.[0] || "/placeholder.jpg")
                         return (
                             <div
                                 key={p.id}
@@ -622,9 +623,9 @@ export default function HomepageDesignPage() {
                 <div className="max-w-275 pl-10 md:pl-32 pr-8 md:pr-12 flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
                     <div>
                         <p className="uppercase tracking-[0.5em] text-[10px] text-gray-500 mb-3">Admin / Surface</p>
-                        <h1 className="font-serif text-4xl md:text-5xl font-light tracking-tight">Homepage Collections</h1>
+                        <h1 className="font-serif text-4xl md:text-5xl font-light tracking-tight">Homepage Design</h1>
                         <p className="mt-3 text-[10px] tracking-[0.3em] text-gray-500 uppercase">
-                            Curate the three homepage product rails only.
+                            Curate the hero carousel and homepage product rails.
                         </p>
                     </div>
 
@@ -643,10 +644,48 @@ export default function HomepageDesignPage() {
 
             <div className="max-w-275 pl-10 md:pl-32 pr-8 md:pr-12 pb-24">
                 <div className="space-y-16">
+                    {/* HERO CAROUSEL */}
+                    <div className="w-full">
+                        <section className="space-y-12">
+                            <div>
+                                <h2 className="text-3xl font-serif mb-4 uppercase tracking-widest">Hero Carousel</h2>
+                                <p className="text-[10px] text-gray-500 uppercase tracking-widest">Manage multiple high-impact editorial slides</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-10">
+                                {config.hero_slides.map((slide, idx) => (
+                                    <HeroSlideEditor
+                                        key={idx}
+                                        index={idx}
+                                        total={config.hero_slides.length}
+                                        slide={slide}
+                                        products={products}
+                                        categories={categories}
+                                        onUpdate={handleSlideUpdate}
+                                        onRemove={handleRemoveSlide}
+                                        onUpload={handleFileUpload}
+                                        onMove={handleSlideMove}
+                                    />
+                                ))}
+
+                                <button
+                                    onClick={handleAddSlide}
+                                    className="w-full flex flex-col items-center justify-center p-8 border border-dashed border-white/10 bg-white/1 hover:bg-white/3 hover:border-white/20 transition-all group/add-card"
+                                >
+                                    <div className="size-12 rounded-full border border-white/10 flex items-center justify-center mb-4 group-hover/add-card:scale-110 transition-all">
+                                        <Plus className="text-gray-500 group-hover/add-card:text-[#e8e8e3]" size={24} strokeWidth={1} />
+                                    </div>
+                                    <h3 className="font-serif text-xl uppercase tracking-widest text-gray-500 group-hover/add-card:text-[#e8e8e3]">Add Hero Slide</h3>
+                                    <p className="text-[8px] uppercase tracking-[0.4em] text-gray-600 mt-2 group-hover/add-card:text-gray-400">Recommended size: 2564 x 1440px</p>
+                                </button>
+                            </div>
+                        </section>
+                    </div>
+
                     {/* GALLERY CURATION */}
                     <div className="space-y-12">
                         <div className="flex items-center gap-8 mb-12">
-                            <h2 className="text-3xl font-serif uppercase tracking-[0.3em] whitespace-nowrap">Homepage Curation</h2>
+                            <h2 className="text-3xl font-serif uppercase tracking-[0.3em] whitespace-nowrap">Gallery Curation</h2>
                             <div className="h-px bg-white/10 flex-1" />
                         </div>
 

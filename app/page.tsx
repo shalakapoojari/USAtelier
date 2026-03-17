@@ -6,6 +6,7 @@ import Link from "next/link"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 import useEmblaCarousel from 'embla-carousel-react' // New import
+import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
@@ -106,7 +107,7 @@ export default function HomePage() {
       stopAutoplay()
       intervalId = setInterval(() => {
         emblaApi.scrollNext()
-      }, 6400) // Slightly increased for better readability
+      }, 2500)
     }
 
     const stopAutoplay = () => {
@@ -251,7 +252,7 @@ export default function HomePage() {
                   <div className="relative w-full overflow-hidden bg-[#030303]">
                     <div className="relative h-screen md:hidden">
                       <Image
-                        src={slide.image || "/placeholder.jpg"}
+                        src={resolveMediaUrl(slide.image || "/placeholder.jpg")}
                         alt={`Hero Slide ${idx}`}
                         fill
                         priority={idx === 0}
@@ -261,7 +262,7 @@ export default function HomePage() {
                     </div>
                     <div className="relative hidden md:block">
                       <img
-                        src={slide.image || "/placeholder.jpg"}
+                        src={resolveMediaUrl(slide.image || "/placeholder.jpg")}
                         alt={`Hero Slide ${idx}`}
                         className="w-full h-auto block opacity-60 -mt-56"
                       />
@@ -309,6 +310,24 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
+
+            <button
+              type="button"
+              aria-label="Previous hero slide"
+              onClick={() => emblaApi?.scrollPrev()}
+              className="absolute left-6 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center border border-white/20 bg-black/35 p-3 text-white/80 backdrop-blur-sm transition-all hover:border-white/60 hover:text-white md:flex"
+            >
+              <ChevronLeft size={20} />
+            </button>
+
+            <button
+              type="button"
+              aria-label="Next hero slide"
+              onClick={() => emblaApi?.scrollNext()}
+              className="absolute right-6 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center border border-white/20 bg-black/35 p-3 text-white/80 backdrop-blur-sm transition-all hover:border-white/60 hover:text-white md:flex"
+            >
+              <ChevronRight size={20} />
+            </button>
           </div>
 
         </section>
