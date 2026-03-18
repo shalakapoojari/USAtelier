@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useEffect, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 
 import { useAuth } from "@/lib/auth-context"
@@ -19,10 +19,9 @@ export default function LoginPage() {
 
   const { login, loginWithGoogle } = useAuth()
   const router = useRouter()
-  const searchParams = useSearchParams()
 
   useEffect(() => {
-    const oauthError = searchParams.get("error")
+    const oauthError = new URLSearchParams(window.location.search).get("error")
     if (!oauthError) return
 
     const errorMap: Record<string, string> = {
@@ -37,7 +36,7 @@ export default function LoginPage() {
     }
 
     setError(errorMap[oauthError] || "Google sign-in failed. Please try again.")
-  }, [searchParams])
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
