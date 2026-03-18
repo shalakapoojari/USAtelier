@@ -268,7 +268,7 @@ export function SiteHeader() {
   return (
     <header className={`fixed top-0 left-0 w-full z-100 ${isHomePage ? "bg-transparent md:bg-[#030303]" : "bg-[#030303]"}`}>
       {/* ── ROW 1: BRAND | SEARCH | ICONS ── */}
-      <div className={`w-full px-3 md:px-8 py-3 md:py-4 flex items-center gap-3 md:gap-12 ${isHomePage ? "border-b border-transparent md:border-white/5" : "border-b border-white/5"}`}>
+      <div className={`relative z-160 w-full px-3 md:px-8 py-3 md:py-4 flex items-center gap-3 md:gap-12 ${isHomePage ? "border-b border-transparent md:border-white/5" : "border-b border-white/5"}`}>
         <Link href="/" className="shrink-0 -ml-1">
           <div className="flex h-10 w-40 items-center justify-center overflow-hidden sm:w-48 md:h-12 md:w-72">
             <img
@@ -371,7 +371,7 @@ export function SiteHeader() {
                 Login
               </Link>
             ) : (
-              <div className="relative hidden md:block" ref={profileRef}>
+              <div className="relative hidden md:block z-170" ref={profileRef}>
                 <button
                   onClick={() => setProfileOpen((o) => !o)}
                   className="flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors"
@@ -388,7 +388,7 @@ export function SiteHeader() {
 
                 {/* Dropdown */}
                 {profileOpen && (
-                  <div className="absolute right-0 top-full mt-3 w-52 bg-[#0e0e0e] border border-white/10 shadow-2xl z-50">
+                  <div className="absolute right-0 top-full mt-3 w-52 bg-[#0e0e0e] border border-white/10 shadow-2xl z-220">
                     <div className="px-4 py-3 border-b border-white/10">
                       <p className="text-xs uppercase tracking-widest text-gray-400 truncate">
                         {user.email}
@@ -449,7 +449,7 @@ export function SiteHeader() {
       </div>
 
       {/* ── ROW 2: COMBINED NAV & CATEGORIES ── */}
-      <div className="hidden md:block w-full bg-[#030303]/80 backdrop-blur-md border-b border-white/5 py-2 md:py-2.5 px-3 md:px-8 relative z-140">
+      <div className="hidden md:block w-full bg-[#030303]/80 backdrop-blur-md border-b border-white/5 py-2 md:py-2.5 px-3 md:px-8 relative z-120">
         <div className="max-w-350 mx-auto flex items-center gap-4 md:gap-8 text-[8px] sm:text-[9px] md:text-[10px] uppercase tracking-[0.25em] font-medium font-sans">
           <Link
             href="/view-all"
@@ -515,7 +515,7 @@ export function SiteHeader() {
 
       {/* ── MOBILE DRAWER: ALL NAV CONTENT ── */}
       {mobileMenuOpen && (
-        <div ref={mobileMenuOverlayRef} className="md:hidden fixed inset-0 bg-black/45 backdrop-blur-[1px] z-120" onClick={() => closeMobileMenu()}>
+        <div ref={mobileMenuOverlayRef} className="md:hidden fixed inset-0 bg-black/45 backdrop-blur-[1px] z-300" onClick={() => closeMobileMenu()}>
           <div
             ref={mobileMenuRef}
             onClick={(e) => e.stopPropagation()}
