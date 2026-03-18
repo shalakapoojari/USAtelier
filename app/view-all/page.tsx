@@ -484,7 +484,7 @@ do
         <div className="flex gap-16 w-full">
           {/* Desktop Filters */}
           {!loading && (
-            <aside className="hidden lg:block w-70 shrink-0">
+              <aside className="hidden lg:block w-70 shrink-0">
               <div className="sticky top-52 pb-12">
                 {renderFilterContent()}
               </div>
