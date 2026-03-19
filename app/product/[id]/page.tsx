@@ -29,7 +29,7 @@ export default function ProductPage({
   const [allProducts, setAllProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const { addItem } = useCart()
+  const { addItem, items } = useCart()
   const { toggleItem, isWishlisted } = useWishlist()
   const { showToast } = useToast()
   const { isAuthenticated } = useAuth()
@@ -208,13 +208,16 @@ export default function ProductPage({
       return
     }
 
-    addItem({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      size: selectedSize,
-      image: resolveMediaUrl(images[0]),
-    })
+    const existing = items.find((i: any) => i.id === product.id && i.size === selectedSize)
+    if (!existing) {
+      addItem({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        size: selectedSize,
+        image: resolveMediaUrl(images[0]),
+      })
+    }
 
     showToast("Redirecting to checkout...", "cart", product.name)
     router.push("/checkout")
