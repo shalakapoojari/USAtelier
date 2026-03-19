@@ -33,8 +33,10 @@ interface Payment {
 }
 
 export default function AdminPaymentsPage() {
+  const { isAuthLoading } = useAuth()
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [refreshing, setRefreshing] = useState(false)
   const API_BASE = getApiBase()
@@ -42,15 +44,27 @@ export default function AdminPaymentsPage() {
   const fetchPayments = async () => {
     setRefreshing(true)
     try {
+      console.log(`[Payments] Fetching from: ${API_BASE}/api/admin/payments`)
       const res = await fetch(`${API_BASE}/api/admin/payments`, {
         credentials: "include"
       })
-      if (res.ok) {
+      console.log(`[Payments] Response status: ${res.status}`)
+      
+      if (!res.ok) {
+        const errorData = await res.json()
+        console.error(`[Payments] Error response:`, errorData)
+        setError(`Failed to load payments: ${res.status} ${res.statusText}`)
+        setPayments([])
+      } else {
         const data = await res.json()
-        setPayments(data)
+        console.log(`[Payments] Received ${data.length} payments`)
+        setPayments(data || [])
+        setError(null)
       }
     } catch (err) {
-      console.error("Failed to fetch payments:", err)
+      console.error("[Payments] Fetch error:", err)
+      setError(`Failed to fetch payments: ${err instanceof Error ? err.message : String(err)}`)
+      setPayments([])
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -58,8 +72,14 @@ export default function AdminPaymentsPage() {
   }
 
   useEffect(() => {
+    // Don't fetch until authentication is complete
+    if (isAuthLoading) {
+      console.log("[Payments] Waiting for authentication...")
+      return
+    }
+    
     fetchPayments()
-  }, [])
+  }, [isAuthLoading])
 
   const filteredPayments = payments.filter(p =>
     (p.razorpay_payment_id?.toLowerCase().includes(search.toLowerCase())) ||
@@ -91,6 +111,20 @@ export default function AdminPaymentsPage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <RefreshCcw className="animate-spin text-gray-500" size={24} />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 lg:p-12 max-w-7xl mx-auto min-h-[60vh] flex flex-col items-center justify-center">
+        <p className="text-red-400 text-center mb-4">{error}</p>
+        <button
+          onClick={fetchPayments}
+          className="px-6 py-2 border border-white/10 hover:bg-white/5 transition-colors text-xs uppercase tracking-widest"
+        >
+          Retry
+        </button>
       </div>
     )
   }

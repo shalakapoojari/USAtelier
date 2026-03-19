@@ -2,32 +2,53 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useAuth } from "@/lib/auth-context"
 import { getApiBase } from "@/lib/api-base"
 
 const API_BASE = getApiBase()
 
 export default function OrdersPage() {
+  const { isAuthLoading } = useAuth()
   const [orders, setOrders] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // Don't fetch until authentication is complete
+    if (isAuthLoading) {
+      console.log("[Orders] Waiting for authentication...")
+      return
+    }
+
     const fetchOrders = async () => {
       try {
+        console.log(`[Orders] Fetching from: ${API_BASE}/api/admin/orders`)
         const res = await fetch(`${API_BASE}/api/admin/orders`, {
           credentials: "include"
         })
-        if (res.ok) {
+        console.log(`[Orders] Response status: ${res.status}`)
+        
+        if (!res.ok) {
+          const errorData = await res.json()
+          console.error(`[Orders] Error response:`, errorData)
+          setError(`Failed to load orders: ${res.status} ${res.statusText}`)
+          setOrders([])
+        } else {
           const data = await res.json()
-          setOrders(data)
+          console.log(`[Orders] Received ${data.length} orders`)
+          setOrders(data || [])
+          setError(null)
         }
       } catch (err) {
-        console.error("Failed to fetch admin orders:", err)
+        console.error("[Orders] Fetch error:", err)
+        setError(`Failed to fetch orders: ${err instanceof Error ? err.message : String(err)}`)
+        setOrders([])
       } finally {
         setIsLoading(false)
       }
     }
     fetchOrders()
-  }, [])
+  }, [isAuthLoading])
 
   const [activeTab, setActiveTab] = useState<
     "all" | "pending" | "completed"
@@ -186,6 +207,15 @@ export default function OrdersPage() {
                   className="px-8 py-24 text-center text-sm tracking-widest text-gray-500 animate-pulse"
                 >
                   Loading orders...
+                </td>
+              </tr>
+            ) : error ? (
+              <tr>
+                <td
+                  colSpan={7}
+                  className="px-8 py-24 text-center text-sm tracking-widest text-red-400"
+                >
+                  Error: {error}
                 </td>
               </tr>
             ) : filteredOrders.length === 0 ? (
