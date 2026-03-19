@@ -3,7 +3,7 @@
 import type React from "react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
-import { User, Package, Heart, Settings, LogOut, ChevronRight, LayoutDashboard, ArrowLeft } from "lucide-react"
+import { User, Package, Settings, LogOut, ChevronRight, LayoutDashboard, ArrowLeft } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
 type SidebarProps = {
@@ -13,7 +13,6 @@ type SidebarProps = {
 const navItems = [
     { href: "/account", icon: User, label: "Profile", exact: true },
     { href: "/account/orders", icon: Package, label: "Order History", exact: false },
-    { href: "/favourites", icon: Heart, label: "Favourites", exact: false },
     { href: "/account/profile", icon: Settings, label: "Settings", exact: false },
 ]
 
@@ -34,7 +33,7 @@ export function AccountSidebar({ children }: SidebarProps) {
         <div className="flex min-h-[calc(100vh-80px)] bg-[#030303] text-[#e8e8e3]">
 
             {/* ── SIDEBAR ── */}
-            <aside className="w-64 shrink-0 border-r border-white/10 flex flex-col">
+            <aside className="hidden md:flex w-64 shrink-0 border-r border-white/10 flex-col">
                 {/* User card */}
                 <div className="p-8 border-b border-white/10">
                     <div className="w-14 h-14 rounded-full border border-white/20 bg-white/5 flex items-center justify-center mb-4">
@@ -99,7 +98,7 @@ export function AccountSidebar({ children }: SidebarProps) {
             </aside>
 
             {/* ── MAIN CONTENT ── */}
-            <main className="flex-1 overflow-auto">
+            <main className="flex-1 overflow-auto min-w-0">
                 {children}
             </main>
         </div>

@@ -158,9 +158,9 @@ export default function ProfilePage() {
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen">
       <SiteHeader />
 
-      <div className="pt-52">
+      <div className="pt-28 md:pt-52">
         <AccountSidebar>
-          <div className="p-10 max-w-xl">
+          <div className="p-5 md:p-10 max-w-2xl">
             {/* Header */}
             <div className="mb-10 pb-8 border-b border-white/10">
               <p className="uppercase tracking-[0.4em] text-xs text-gray-500 mb-2">Account</p>
@@ -209,7 +209,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">First Name</label>
                       <Input
@@ -300,7 +300,7 @@ export default function ProfilePage() {
                         </button>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">New Password</label>
                         <div className="relative">

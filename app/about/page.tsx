@@ -48,7 +48,7 @@ export default function AboutPage() {
 
       <main className="pt-52">
         {/* Hero Section */}
-        <section className="px-6 md:px-12 max-w-[1400px] mx-auto mb-40">
+        <section className="px-6 md:px-12 max-w-350 mx-auto mb-40">
           <div className="overflow-hidden">
             <h1 className="hero-title font-serif text-[12vw] md:text-[8vw] leading-none font-light uppercase tracking-tighter">
               The Art of <br />
@@ -67,10 +67,11 @@ export default function AboutPage() {
             </div>
             <div className="reveal-section aspect-4/5 relative overflow-hidden bg-white/5">
               <Image
-                src="https://images.unsplash.com/photo-1534030347209-c87ca36e65e5?q=80&w=1974&auto=format&fit=crop"
+                src="/artisan-hands-crafting-fabric-minimal-elegant.jpg"
                 alt="Craftsmanship"
                 fill
                 className="object-cover opacity-80"
+                sizes="(max-width: 768px) 100vw, 50vw"
               />
             </div>
           </div>
@@ -78,7 +79,7 @@ export default function AboutPage() {
 
         {/* Philosophy Section */}
         <section className="bg-white text-black py-40 px-6 md:px-12">
-          <div className="max-w-[1400px] mx-auto">
+          <div className="max-w-350 mx-auto">
             <div className="grid md:grid-cols-3 gap-24">
               <div className="reveal-section">
                 <p className="text-[10px] uppercase tracking-[0.5em] mb-10 font-bold border-b border-black/10 pb-4 text-black/50">Philosophy</p>
@@ -108,7 +109,7 @@ export default function AboutPage() {
         </section>
 
         {/* Studio Section */}
-        <section className="py-40 px-6 md:px-12 max-w-[1400px] mx-auto overflow-hidden">
+        <section className="py-40 px-6 md:px-12 max-w-350 mx-auto overflow-hidden">
           <div className="grid md:grid-cols-2 gap-20 items-center">
             <div className="reveal-section order-2 md:order-1">
               <div className="relative aspect-3/4 w-full bg-white/5 overflow-hidden">

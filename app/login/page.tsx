@@ -69,9 +69,6 @@ export default function LoginPage() {
               className="h-10 w-60 object-contain"
             />
           </Link>
-          <p className="mt-4 text-xs uppercase tracking-widest text-gray-500">
-            Welcome Back
-          </p>
         </div>
 
         {/* Login Form */}

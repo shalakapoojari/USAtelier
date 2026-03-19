@@ -29,9 +29,9 @@ export function SiteFooter() {
             <p className="text-[10px] uppercase tracking-[0.4em] text-white mb-3">Shop</p>
             <ul className="space-y-2.5 text-xs uppercase tracking-widest text-gray-500">
               <li><Link href="/view-all" className="hover:text-white transition-colors">All Products</Link></li>
-              <li><Link href="/new-arrivals" className="hover:text-white transition-colors">New Arrivals</Link></li>
-              <li><Link href="/collections/bestsellers" className="hover:text-white transition-colors">Bestsellers</Link></li>
-              <li><Link href="/collections" className="hover:text-white transition-colors">Collections</Link></li>
+              <li><Link href="/#new-arrivals" className="hover:text-white transition-colors">New Arrivals</Link></li>
+              <li><Link href="/#best-sellers" className="hover:text-white transition-colors">Bestsellers</Link></li>
+              <li><Link href="/#featured-products" className="hover:text-white transition-colors">Featured Products</Link></li>
             </ul>
           </div>
 

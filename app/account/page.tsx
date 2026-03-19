@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context"
 import { useCart } from "@/lib/cart-context"
 import { useWishlist } from "@/lib/wishlist-context"
 import { useState, useEffect } from "react"
-import { Package, Heart, ShoppingBag } from "lucide-react"
+import { Package, Heart, ShoppingBag, User } from "lucide-react"
 import Link from "next/link"
 import { getApiBase } from "@/lib/api-base"
 
@@ -59,9 +59,28 @@ export default function AccountPage() {
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen">
       <SiteHeader />
 
-      <div className="pt-52">
+      <div className="pt-28 md:pt-52">
         <AccountSidebar>
-          <div className="p-10 max-w-3xl">
+          <div className="p-5 md:p-10 max-w-4xl">
+
+            {/* Mobile user summary */}
+            <div className="mb-8 border border-white/10 p-5 md:hidden">
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-full border border-white/20 bg-white/5 overflow-hidden flex items-center justify-center">
+                  {user?.profilePic ? (
+                    <img src={user.profilePic} alt="Profile" className="h-full w-full object-cover" />
+                  ) : (
+                    <User size={24} className="text-gray-500" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-serif text-xl truncate">
+                    {user?.firstName ? `${user.firstName}${user?.lastName ? ` ${user.lastName}` : ""}` : "My Account"}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                </div>
+              </div>
+            </div>
 
             {/* Page Title */}
             <div className="mb-10 pb-8 border-b border-white/10">
@@ -73,7 +92,7 @@ export default function AccountPage() {
             </div>
 
             {/* Stats Row */}
-            <div className="grid grid-cols-3 gap-6 mb-12">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-12">
               <div className="border border-white/10 p-6 text-center">
                 <p className="font-serif text-3xl font-light mb-1">{userOrders.length}</p>
                 <p className="text-xs uppercase tracking-widest text-gray-500">Orders</p>
@@ -106,7 +125,7 @@ export default function AccountPage() {
                     <Link
                       key={order.id}
                       href={`/account/orders/${order.id}`}
-                      className="flex items-center justify-between border border-white/10 px-6 py-4 hover:border-white/30 transition-colors group"
+                      className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border border-white/10 px-4 sm:px-6 py-4 hover:border-white/30 transition-colors group"
                     >
                       <div>
                         <p className="text-xs uppercase tracking-widest mb-1">{order.id}</p>
@@ -114,7 +133,7 @@ export default function AccountPage() {
                           {new Date(order.date).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" })}
                         </p>
                       </div>
-                      <div className="flex items-center gap-6">
+                      <div className="flex items-center justify-between sm:justify-start gap-6">
                         <p className="text-xs uppercase tracking-widest text-gray-400">{order.status}</p>
                         <p className="text-sm">₹{order.total.toLocaleString("en-IN")}</p>
                       </div>
@@ -137,7 +156,7 @@ export default function AccountPage() {
                 <ShoppingBag size={13} />
                 Quick Actions
               </h2>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Link
                   href="/shop"
                   className="border border-white/10 px-6 py-4 text-xs uppercase tracking-widest text-gray-400 hover:text-white hover:border-white/30 transition-all"

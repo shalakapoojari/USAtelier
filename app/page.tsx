@@ -43,11 +43,11 @@ function SectionProductCard({ product }: { product: any }) {
 
 import { ProductSkeleton } from "@/components/product-skeleton"
 
-function CollectionSection({ title, subtitle, products }: { title: string, subtitle: string, products: any[] }) {
+function CollectionSection({ title, subtitle, products, sectionId }: { title: string, subtitle: string, products: any[], sectionId?: string }) {
   if (!products || products.length === 0) return null;
 
   return (
-    <div className="flex flex-col justify-center px-6 md:px-24">
+    <div id={sectionId} className="flex flex-col justify-center px-6 md:px-24 scroll-mt-52">
       <div className="max-w-400 w-full mx-auto">
         <div className="mb-12">
           <h2 className="text-3xl md:text-5xl font-serif font-light mb-6 uppercase tracking-[0.2em]">{title}</h2>
@@ -347,9 +347,9 @@ export default function HomePage() {
 
         {/* VERTICAL SECTIONS */}
         <section className="py-24 space-y-40 bg-[#030303]">
-          <CollectionSection title="Best Selling" subtitle="The Collection Essentials" products={bestsellers} />
-          <CollectionSection title="Featured Pieces" subtitle="Editorial Spotlight" products={featured} />
-          <CollectionSection title="New Arrivals" subtitle="Latest Drop" products={newArrivals} />
+          <CollectionSection sectionId="best-sellers" title="Best Selling" subtitle="The Collection Essentials" products={bestsellers} />
+          <CollectionSection sectionId="featured-products" title="Featured Pieces" subtitle="Editorial Spotlight" products={featured} />
+          <CollectionSection sectionId="new-arrivals" title="New Arrivals" subtitle="Latest Drop" products={newArrivals} />
         </section>
 
 

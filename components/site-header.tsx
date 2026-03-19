@@ -56,6 +56,7 @@ export function SiteHeader() {
   // (mounted at layout level) so they never reset on navigation
   const { unseenCount: cartUnseen, clearUnseen: clearCartUnseen } = useCart()
   const { unseenCount: wishlistUnseen, clearUnseen: clearWishlistUnseen } = useWishlist()
+  const hasMobileUnseen = cartUnseen > 0 || wishlistUnseen > 0
   const router = useRouter()
 
   const [profileOpen, setProfileOpen] = useState(false)
@@ -349,7 +350,7 @@ export function SiteHeader() {
             <ShoppingBag size={17} strokeWidth={1.5} />
             <span className="text-[10px] uppercase tracking-[0.2em] font-medium hidden xl:block">Cart</span>
             {cartUnseen > 0 && (
-              <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-white rounded-full border border-black animate-pulse" />
+              <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border border-black animate-pulse" />
             )}
           </button>
 
@@ -440,9 +441,12 @@ export function SiteHeader() {
           {/* Mobile hamburger */}
           <button
             onClick={() => (mobileMenuOpen ? closeMobileMenu() : setMobileMenuOpen(true))}
-            className="md:hidden w-10 h-10 rounded-full border border-white/20 flex items-center justify-center text-gray-300 hover:text-white hover:border-white/50 transition-colors"
+            className="relative md:hidden w-10 h-10 rounded-full border border-white/20 flex items-center justify-center text-gray-300 hover:text-white hover:border-white/50 transition-colors"
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
           >
+            {hasMobileUnseen && (
+              <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border border-black bg-red-500 animate-pulse" />
+            )}
             {mobileMenuOpen ? <X size={16} /> : <Menu size={16} />}
           </button>
         </div>
@@ -541,18 +545,25 @@ export function SiteHeader() {
                   View All
                 </Link>
                 <button onClick={handleMobileFavouritesClick} className="mobile-menu-item text-left font-serif text-[20px] sm:text-[22px] leading-none text-[#e8e8e3] hover:text-white transition-colors">
-                  Favourites
+                  <span className="inline-flex items-center gap-2">
+                    Favourites
+                    {wishlistUnseen > 0 && <span className="h-2 w-2 rounded-full bg-red-500" />}
+                  </span>
                 </button>
                 <button onClick={handleMobileCartClick} className="mobile-menu-item text-left font-serif text-[20px] sm:text-[22px] leading-none text-[#e8e8e3] hover:text-white transition-colors">
-                  Cart ({cartUnseen})
+                  <span className="inline-flex items-center gap-2">
+                    Cart
+                    {cartUnseen > 0 && <span className="h-2 w-2 rounded-full bg-red-500" />}
+                  </span>
                 </button>
               </div>
 
               <div className="mobile-menu-item mt-14 h-px bg-white/12" />
 
+              <p className="mobile-menu-item mt-8 text-[10px] uppercase tracking-[0.35em] text-gray-500">Categories</p>
               <div className="mt-8 flex flex-col gap-5">
                 {dynamicCategories.map((cat) => (
-                  <div key={cat.id || cat.name} className="mobile-menu-item space-y-2">
+                  <div key={cat.id || cat.name} className="mobile-menu-item">
                     <Link
                       href={`/view-all?category=${encodeURIComponent(cat.name)}`}
                       onClick={closeMobileMenuForNavigation}
@@ -560,20 +571,6 @@ export function SiteHeader() {
                     >
                       {cat.name}
                     </Link>
-                    {cat.subcategories && cat.subcategories.length > 0 && (
-                      <div className="pl-3 border-l border-white/10 flex flex-col gap-2 text-[10px] uppercase tracking-[0.18em]">
-                        {cat.subcategories.map((sub: string) => (
-                          <Link
-                            key={sub}
-                            href={`/view-all?category=${encodeURIComponent(cat.name)}&jumpTo=${encodeURIComponent(sub)}`}
-                            onClick={closeMobileMenuForNavigation}
-                            className="text-gray-500 hover:text-gray-300 transition-colors"
-                          >
-                            {sub}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -591,9 +588,9 @@ export function SiteHeader() {
                     <Link href="/account/orders" onClick={closeMobileMenuForNavigation} className="hover:text-white transition-colors">
                       Orders
                     </Link>
-                    <button onClick={handleMobileFavouritesClick} className="text-left hover:text-white transition-colors">
-                      Favourites
-                    </button>
+                    <Link href="/account/profile" onClick={closeMobileMenuForNavigation} className="hover:text-white transition-colors">
+                      Settings
+                    </Link>
                     {isAdmin && (
                       <Link href="/admin" onClick={closeMobileMenuForNavigation} className="text-amber-300 hover:text-amber-200 transition-colors">
                         Admin Panel
