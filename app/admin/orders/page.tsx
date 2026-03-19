@@ -174,15 +174,15 @@ export default function OrdersPage() {
                 </td>
 
                 <td className="px-4 md:px-8 py-4 md:py-6 text-xs tracking-widest text-gray-500">
-                  {new Date(order.date || order.createdAt).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" })}
+                  {new Date(order.date || order.createdAt || Date.now()).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" })}
                 </td>
 
                 <td className="px-4 md:px-8 py-4 md:py-6">
-                  {order.items.length}
+                  {(order.items || []).length}
                 </td>
 
                 <td className="px-4 md:px-8 py-4 md:py-6 font-medium">
-                  ₹{order.total.toLocaleString('en-IN')}
+                  ₹{(order.total ?? 0).toLocaleString('en-IN')}
                 </td>
 
                 <td className="px-4 md:px-8 py-4 md:py-6 uppercase tracking-widest text-xs text-gray-400">

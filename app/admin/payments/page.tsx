@@ -131,7 +131,7 @@ export default function AdminPaymentsPage() {
 
   const totalRevenue = payments
     .filter(p => p.status === 'captured')
-    .reduce((acc, curr) => acc + curr.amount, 0)
+    .reduce((acc, curr) => acc + (curr.amount ?? 0), 0)
 
   return (
     <div className="p-8 lg:p-12 space-y-12 max-w-7xl mx-auto">
@@ -250,7 +250,7 @@ export default function AdminPaymentsPage() {
                     )}
                   </td>
                   <td className="p-6 text-right">
-                    <p className="text-xs font-serif text-[#e8e8e3]">₹{p.amount.toLocaleString()}</p>
+                    <p className="text-xs font-serif text-[#e8e8e3]">₹{(p.amount ?? 0).toLocaleString()}</p>
                   </td>
                   <td className="p-6 text-right">
                     <p className="text-[9px] uppercase tracking-widest text-gray-500">
