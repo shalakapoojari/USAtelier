@@ -3,12 +3,49 @@
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { AccountSidebar } from "@/components/account-sidebar"
-import { orders } from "@/lib/data"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
+import { getApiBase } from "@/lib/api-base"
+import { useAuth } from "@/lib/auth-context"
+import { useRouter } from "next/navigation"
+
+const API_BASE = getApiBase()
 
 export default function OrdersPage() {
-  const userOrders = orders.slice(0, 2)
+  const [userOrders, setUserOrders] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const { user, isAdmin, isAuthLoading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!isAuthLoading && isAdmin) {
+      router.replace("/admin")
+      return
+    }
+  }, [isAdmin, isAuthLoading, router])
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/orders`, {
+          credentials: "include"
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setUserOrders(data)
+        }
+      } catch (err) {
+        console.error("Failed to fetch orders:", err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    if (!isAuthLoading && user && !isAdmin) {
+      fetchOrders()
+    }
+  }, [user, isAdmin, isAuthLoading])
 
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -17,6 +54,8 @@ export default function OrdersPage() {
       default: return "text-gray-500"
     }
   }
+
+  if (isAdmin) return null // Handled by redirect
 
   return (
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen">
@@ -31,7 +70,11 @@ export default function OrdersPage() {
               <h1 className="font-serif text-3xl md:text-4xl font-light">Order History</h1>
             </div>
 
-            {userOrders.length > 0 ? (
+            {isLoading ? (
+              <div className="py-24 text-center">
+                <p className="uppercase tracking-widest text-gray-500 mb-8 text-xs animate-pulse">Loading orders...</p>
+              </div>
+            ) : userOrders.length > 0 ? (
               <div className="space-y-6">
                 {userOrders.map((order) => (
                   <Link
@@ -41,9 +84,9 @@ export default function OrdersPage() {
                   >
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-5">
                       <div>
-                        <p className="uppercase tracking-widest text-xs mb-2">{order.id}</p>
+                        <p className="uppercase tracking-widest text-xs mb-2">{order.order_number || order.id}</p>
                         <p className="text-xs text-gray-500">
-                          {new Date(order.date).toLocaleDateString("en-IN", {
+                          {new Date(order.date || order.createdAt).toLocaleDateString("en-IN", {
                             year: "numeric",
                             month: "long",
                             day: "numeric",
@@ -59,9 +102,9 @@ export default function OrdersPage() {
                     </div>
 
                     <div className="border-t border-white/10 pt-5 space-y-2 text-sm text-gray-400">
-                      {order.items.map((item, index) => (
+                      {order.items && order.items.map((item: any, index: number) => (
                         <div key={index} className="flex items-start justify-between gap-4">
-                          <span className="pr-2">{item.productName} · Size {item.size} × {item.quantity}</span>
+                          <span className="pr-2">{item.productName || item.product_name} · Size {item.size} × {item.quantity}</span>
                           <span>₹{(item.price * item.quantity).toLocaleString("en-IN")}</span>
                         </div>
                       ))}

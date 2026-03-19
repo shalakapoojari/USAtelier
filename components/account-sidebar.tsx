@@ -60,7 +60,9 @@ export function AccountSidebar({ children }: SidebarProps) {
                             <ChevronRight size={12} className="ml-auto opacity-50" />
                         </Link>
                     )}
-                    {navItems.map((item) => {
+                    {navItems
+                        .filter((item) => !(isAdmin && item.label === "Order History"))
+                        .map((item) => {
                         const active = isActive(item.href, item.exact)
                         return (
                             <Link

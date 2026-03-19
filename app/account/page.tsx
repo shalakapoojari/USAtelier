@@ -14,7 +14,7 @@ import { getApiBase } from "@/lib/api-base"
 const API_BASE = getApiBase()
 
 export default function AccountPage() {
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
   const { items: cartItems } = useCart()
   const { count: wishlistCount } = useWishlist()
   const sanitizedDisplayName = `${user?.firstName || ""}${user?.lastName ? ` ${user.lastName}` : ""}`
@@ -96,6 +96,7 @@ export default function AccountPage() {
             </div>
 
             {/* Stats Row */}
+            {!isAdmin && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-12">
               <div className="border border-white/10 p-6 text-center">
                 <p className="font-serif text-3xl font-light mb-1">{userOrders.length}</p>
@@ -110,8 +111,10 @@ export default function AccountPage() {
                 <p className="text-xs uppercase tracking-widest text-gray-500">In Cart</p>
               </div>
             </div>
+            )}
 
             {/* Recent Orders */}
+            {!isAdmin && (
             <div className="mb-10">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="uppercase tracking-widest text-xs text-gray-400 flex items-center gap-2">
@@ -153,8 +156,10 @@ export default function AccountPage() {
                 </div>
               )}
             </div>
+            )}
 
             {/* Quick Actions */}
+            {!isAdmin ? (
             <div>
               <h2 className="uppercase tracking-widest text-xs text-gray-400 mb-6 flex items-center gap-2">
                 <ShoppingBag size={13} />
@@ -176,6 +181,15 @@ export default function AccountPage() {
                 </Link>
               </div>
             </div>
+            ) : (
+              <div className="border border-white/10 p-8 text-center mt-8">
+                 <p className="uppercase tracking-widest text-xs text-amber-400/80 mb-4">Admin Privileges Active</p>
+                 <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto">Admin accounts do not have shopping history or carts. Please use the Admin Panel to manage the store.</p>
+                 <Link href="/admin" className="inline-block border border-amber-400/30 px-8 py-3 text-[10px] uppercase tracking-[0.2em] text-amber-400 hover:bg-amber-400 hover:text-black transition-all">
+                   Go to Admin Dashboard
+                 </Link>
+              </div>
+            )}
           </div>
         </AccountSidebar>
       </div>
