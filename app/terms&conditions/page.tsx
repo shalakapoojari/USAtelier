@@ -5,6 +5,7 @@ import { SiteFooter } from "@/components/site-footer"
 
 const termsSections = [
   {
+    id: "privacy-policy",
     title: "1. Privacy Policy",
     content:
       "Your privacy is extremely important to us. We are committed to protecting the personal information you share and ensuring your experience on www.usatelier.com is secure, respectful, and transparent. This policy explains how we collect, use, disclose, and safeguard your personal data.",
@@ -25,11 +26,13 @@ const termsSections = [
       "We have done our best to display as accurately as possible the colors of the products shown on this website. However, because the colors you see depend on your monitor, we cannot guarantee that your monitor display of any color will be fully accurate.",
   },
   {
+    id: "cancellation-and-refund-policy",
     title: "5. Orders",
     content:
       "Once an order is placed and confirmed, it cannot be canceled after processing. We reserve the right to cancel any order in case of product unavailability or other issues.",
   },
   {
+    id: "shipping-and-delivery-policy",
     title: "6. Shipping",
     content:
       "We aim to dispatch your order within 2 working days after it is placed. Once your order is dispatched, you will receive a tracking link via email and SMS. Delivery typically takes 5 to 7 working days, depending on your PIN code. For certain locations, delivery may take slightly longer. Please call Customer Service and quote your tracking number to trace your package.",
@@ -73,7 +76,7 @@ export default function TermsAndConditionsPage() {
 
           <section className="space-y-8">
             {termsSections.map((section) => (
-              <div key={section.title} className="border border-white/10 bg-white/2 p-6 md:p-8">
+              <div id={section.id} key={section.title} className="border border-white/10 bg-white/2 p-6 md:p-8">
                 <h2 className="text-[11px] uppercase tracking-[0.25em] text-[#C8A45D] mb-4">{section.title}</h2>
                 <p className="text-sm text-gray-300 leading-relaxed">{section.content}</p>
               </div>

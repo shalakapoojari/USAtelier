@@ -65,9 +65,12 @@ export function SiteFooter() {
             <span>© 2025 U.S ATELIER Maison. All Rights Reserved.</span>
           </div>
           <span className="opacity-50">Crafted in India · Designed for the World</span>
-          <div className="flex gap-8">
-            
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+            <a href="mailto:usatelier08@gmail.com" className="hover:text-gray-400 transition-colors">Contact Us: usatelier08@gmail.com</a>
             <Link href="/terms&conditions" className="hover:text-gray-400 transition-colors">Terms & Conditions</Link>
+            <Link href="/terms&conditions#privacy-policy" className="hover:text-gray-400 transition-colors">Privacy Policy</Link>
+            <Link href="/terms&conditions#cancellation-and-refund-policy" className="hover:text-gray-400 transition-colors">Cancellation & Refund Policy</Link>
+            <Link href="/terms&conditions#shipping-and-delivery-policy" className="hover:text-gray-400 transition-colors">Shipping & Delivery Policy</Link>
           </div>
         </div>
       </div>
