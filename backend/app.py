@@ -44,7 +44,7 @@ from models_mysql import (
     Review, HomepageConfig, Payment,
     DispatchJob, Coupon, PasswordResetToken, AuditLog,
 )
-from borzo_utils import create_delivery_order, calculate_order_price, validate_address
+from delhivery_utils import create_shipment, calculate_shipping, validate_pincode
 
 try:
     from flask_limiter import Limiter
@@ -374,13 +374,22 @@ def _run_dispatch_job(job_id: int):
 
             user = User.query.get(order.user_id)
             shipping = order.shipping_address
-            pickup   = os.getenv("STORE_ADDRESS", "")
-            delivery = (
-                f"{shipping.get('street', '')}, "
-                f"{shipping.get('city', '')}, "
-                f"{shipping.get('state', '')} "
-                f"{shipping.get('zip', '')}"
-            ).strip(", ")
+
+            # Parse pickup location
+            pickup_location = {
+                "address": os.getenv("STORE_ADDRESS", ""),
+                "city": os.getenv("STORE_CITY", ""),
+                "state": os.getenv("STORE_STATE", ""),
+                "pincode": os.getenv("STORE_PINCODE", ""),
+            }
+
+            # Parse delivery location from order
+            delivery_location = {
+                "address": f"{shipping.get('street', '')}, {shipping.get('city', '')}".strip(", "),
+                "city": shipping.get('city', ''),
+                "state": shipping.get('state', ''),
+                "pincode": shipping.get('zip', ''),
+            }
 
             customer_phone = (user.phone if user else None) or "9999999999"
             customer_name  = (
@@ -388,17 +397,18 @@ def _run_dispatch_job(job_id: int):
                 or (f"{user.first_name or ''} {user.last_name or ''}".strip() if user else "Customer")
             )
 
-            res = create_delivery_order(
+            res = create_shipment(
                 order_id=order.order_number,
-                pickup_address=pickup,
-                delivery_address=delivery,
+                pickup_location=pickup_location,
+                delivery_location=delivery_location,
                 customer_phone=customer_phone,
                 customer_name=customer_name,
             )
 
             if res.get("success"):
-                order.borzo_order_id    = str(res["borzo_order_id"])
-                order.borzo_tracking_url = res["tracking_url"]
+                order.delhivery_shipment_id = str(res["delhivery_shipment_id"])
+                order.delhivery_tracking_url = res["tracking_url"]
+                order.delhivery_waybill_number = res.get("waybill_number", "")
                 order.status            = "Shipped"
                 job.status              = "done"
                 job.completed_at        = datetime.utcnow()
@@ -408,13 +418,13 @@ def _run_dispatch_job(job_id: int):
                     try:
                         send_order_status_update(
                             mail, user.email, order.order_number,
-                            "Shipped", order.borzo_tracking_url,
+                            "Shipped", order.delhivery_tracking_url,
                         )
                     except Exception as exc:
                         app.logger.warning("dispatch_email_failed order=%s err=%s",
                                            order.order_number, exc)
             else:
-                raise RuntimeError(res.get("error", "Unknown Borzo error"))
+                raise RuntimeError(res.get("error", "Unknown Delhivery error"))
 
         except Exception as exc:
             delay = min(60 * (2 ** job.attempts), 3600)  # cap at 1 h
@@ -527,12 +537,12 @@ with app.app_context():
 
 if HAS_SCHEDULER:
     _scheduler = BackgroundScheduler(daemon=True)
-    _scheduler.add_job(_poll_dispatch_jobs, "interval", seconds=60, id="borzo_poll")
+    _scheduler.add_job(_poll_dispatch_jobs, "interval", seconds=60, id="delhivery_poll")
     _scheduler.start()
-    app.logger.info("APScheduler started — Borzo job poller active")
+    app.logger.info("APScheduler started — Delhivery shipment poller active")
 else:
     app.logger.warning(
-        "apscheduler not installed — Borzo retries disabled. "
+        "apscheduler not installed — Delhivery retries disabled. "
         "Run: pip install apscheduler"
     )
 
@@ -563,7 +573,7 @@ def csrf_origin_guard():
     if not request.path.startswith("/api/"):
         return None
     # Webhooks are verified by their own signature — exclude from CSRF guard
-    if request.path in ("/api/payments/webhook", "/api/webhooks/razorpay", "/api/webhooks/borzo"):
+    if request.path in ("/api/payments/webhook", "/api/webhooks/razorpay", "/api/webhooks/delhivery"):
         return None
 
     origin  = request.headers.get("Origin", "")
@@ -2043,41 +2053,50 @@ def update_order_status(order_id):
 
 @app.route("/api/admin/dispatch/<order_id>", methods=["POST"])
 @admin_required
-def dispatch_borzo_order(order_id):
+def dispatch_delhivery_order(order_id):
     order = OrderSQL.query.filter_by(order_number=order_id).first()
     if not order:
         return jsonify({"error": "Order not found"}), 404
-    if order.borzo_order_id:
-        return jsonify({"error": "Order already dispatched via Borzo"}), 400
+    if order.delhivery_shipment_id:
+        return jsonify({"error": "Order already dispatched via Delhivery"}), 400
 
-    user             = User.query.get(order.user_id)
-    shipping         = order.shipping_address
-    pickup_from      = os.getenv("STORE_ADDRESS", "")
-    deliver_to       = (
-        f"{shipping.get('street', '')}, "
-        f"{shipping.get('city', '')}, "
-        f"{shipping.get('state', '')} "
-        f"{shipping.get('zip', '')}"
-    ).strip(", ")
-    customer_phone   = (user.phone if user else None) or "9999999999"
-    customer_name    = (
+    user = User.query.get(order.user_id)
+    shipping = order.shipping_address
+
+    pickup_location = {
+        "address": os.getenv("STORE_ADDRESS", ""),
+        "city": os.getenv("STORE_CITY", ""),
+        "state": os.getenv("STORE_STATE", ""),
+        "pincode": os.getenv("STORE_PINCODE", ""),
+    }
+
+    delivery_location = {
+        "address": f"{shipping.get('street', '')}, {shipping.get('city', '')}".strip(", "),
+        "city": shipping.get('city', ''),
+        "state": shipping.get('state', ''),
+        "pincode": shipping.get('zip', ''),
+    }
+
+    customer_phone = (user.phone if user else None) or "9999999999"
+    customer_name = (
         f"{shipping.get('firstName', '')} {shipping.get('lastName', '')}".strip()
         or (f"{user.first_name or ''} {user.last_name or ''}".strip() if user else "Customer")
     )
 
-    res = create_delivery_order(
+    res = create_shipment(
         order_id=order_id,
-        pickup_address=pickup_from,
-        delivery_address=deliver_to,
+        pickup_location=pickup_location,
+        delivery_location=delivery_location,
         customer_phone=customer_phone,
         customer_name=customer_name,
     )
 
     if res.get("success"):
-        order.borzo_order_id     = str(res["borzo_order_id"])
-        order.borzo_tracking_url = res["tracking_url"]
-        order.status             = "Shipped"
-        _audit("borzo_dispatch_manual", "order", order.id, {"borzo_id": res["borzo_order_id"]})
+        order.delhivery_shipment_id = str(res["delhivery_shipment_id"])
+        order.delhivery_tracking_url = res["tracking_url"]
+        order.delhivery_waybill_number = res.get("waybill_number", "")
+        order.status = "Shipped"
+        _audit("delhivery_dispatch_manual", "order", order.id, {"shipment_id": res["delhivery_shipment_id"]})
         db_mysql.session.commit()
 
         if user:
@@ -2087,12 +2106,13 @@ def dispatch_borzo_order(order_id):
                 pass
 
         return jsonify({
-            "success":      True,
-            "message":      "Dispatched via Borzo",
+            "success": True,
+            "message": "Dispatched via Delhivery",
             "tracking_url": res["tracking_url"],
+            "waybill": res.get("waybill_number", ""),
         }), 200
 
-    return jsonify({"error": f"Borzo error: {res.get('error')}"}), 500
+    return jsonify({"error": f"Delhivery error: {res.get('error')}"}), 500
 
 
 @app.route("/api/admin/dispatch-jobs", methods=["GET"])
@@ -2105,24 +2125,29 @@ def list_dispatch_jobs():
     return jsonify([j.to_dict() for j in q.order_by(DispatchJob.created_at.desc()).limit(100).all()])
 
 
-@app.route("/api/webhooks/borzo", methods=["POST"])
-def borzo_webhook():
+@app.route("/api/webhooks/delhivery", methods=["POST"])
+def delhivery_webhook():
     data = request.get_json(silent=True) or {}
-    borzo_order_id = str(data.get("order_id", ""))
-    status         = data.get("status", "")
+    shipment_id = str(data.get("shipment_id", ""))
+    status = data.get("status", "")
 
+    # Map Delhivery status to our order status
     STATUS_MAP = {
-        "completed":  "Delivered",
-        "canceled":   "Cancelled",
+        "delivered": "Delivered",
+        "delivered_order": "Delivered",
+        "cancelled": "Cancelled",
+        "rto": "Returned",
         "in_transit": "Shipped",
-        "pending":    "Processing",
-        "failed":     "Failed",
+        "in_shipment": "Shipped",
+        "out_for_delivery": "Out for Delivery",
+        "pending": "Processing",
+        "failed": "Failed",
     }
-    new_status = STATUS_MAP.get(status)
+    new_status = STATUS_MAP.get(status, status)
 
-    if new_status and borzo_order_id:
+    if shipment_id:
         try:
-            order = OrderSQL.query.filter_by(borzo_order_id=borzo_order_id).first()
+            order = OrderSQL.query.filter_by(delhivery_shipment_id=shipment_id).first()
             if order:
                 order.status = new_status
                 db_mysql.session.commit()
@@ -2131,13 +2156,13 @@ def borzo_webhook():
                     try:
                         send_order_status_update(
                             mail, user.email, order.order_number,
-                            new_status, order.borzo_tracking_url,
+                            new_status, order.delhivery_tracking_url,
                         )
                     except Exception:
                         pass
         except Exception as exc:
             db_mysql.session.rollback()
-            app.logger.error("borzo_webhook_error err=%s", exc)
+            app.logger.error("delhivery_webhook_error err=%s", exc)
 
     return jsonify({"success": True}), 200
 
@@ -2471,48 +2496,64 @@ def get_audit_log():
     return jsonify([l.to_dict() for l in logs])
 
 # ============================================================
-# ADMIN — BORZO TEST ENDPOINT
+# ADMIN — DELHIVERY TEST ENDPOINT
 # ============================================================
 
-@app.route("/api/admin/test/borzo", methods=["POST"])
+@app.route("/api/admin/test/delhivery", methods=["POST"])
 @admin_required
-def test_borzo_dispatch():
-    data      = request.get_json() or {}
+def test_delhivery_shipment():
+    data = request.get_json() or {}
     test_type = data.get("test_type", "all")
-    results   = {}
+    results = {}
 
-    if test_type in ("all", "address"):
-        addr = data.get("address", "Mumbai, Maharashtra, India")
-        results["address_validation"] = {
-            "address":  addr,
-            "is_valid": validate_address(addr),
+    if test_type in ("all", "pincode"):
+        pincode = data.get("pincode", "110001")
+        results["pincode_validation"] = {
+            "pincode": pincode,
+            "is_serviceable": validate_pincode(pincode),
         }
 
-    if test_type in ("all", "price"):
-        pickup   = data.get("pickup", os.getenv("STORE_ADDRESS", "Mumbai, India"))
-        delivery = data.get("delivery", "Pune, India")
-        results["price_calculation"] = {
-            "pickup":   pickup,
-            "delivery": delivery,
-            "price":    calculate_order_price(pickup, delivery),
+    if test_type in ("all", "shipping"):
+        origin = data.get("origin_pincode", os.getenv("STORE_PINCODE", "110001"))
+        dest = data.get("destination_pincode", "400001")
+        weight = float(data.get("weight", 1.0))
+        results["shipping_calculation"] = {
+            "origin_pincode": origin,
+            "destination_pincode": dest,
+            "weight_kg": weight,
+            "estimated_cost": calculate_shipping(origin, dest, weight),
         }
 
     if test_type == "create":
-        results["order_creation"] = create_delivery_order(
-            order_id         = f"TEST-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-            pickup_address   = data.get("pickup", os.getenv("STORE_ADDRESS", "")),
-            delivery_address = data.get("delivery", ""),
-            customer_phone   = data.get("phone", "9876543210"),
-            customer_name    = data.get("name", "Test Customer"),
+        pickup_loc = {
+            "address": data.get("pickup_address", os.getenv("STORE_ADDRESS", "")),
+            "city": data.get("pickup_city", os.getenv("STORE_CITY", "")),
+            "state": data.get("pickup_state", os.getenv("STORE_STATE", "")),
+            "pincode": data.get("pickup_pincode", os.getenv("STORE_PINCODE", "")),
+        }
+        delivery_loc = {
+            "address": data.get("delivery_address", ""),
+            "city": data.get("delivery_city", ""),
+            "state": data.get("delivery_state", ""),
+            "pincode": data.get("delivery_pincode", ""),
+        }
+        results["shipment_creation"] = create_shipment(
+            order_id=f"TEST-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            pickup_location=pickup_loc,
+            delivery_location=delivery_loc,
+            customer_phone=data.get("phone", "9876543210"),
+            customer_name=data.get("name", "Test Customer"),
+            weight_kg=float(data.get("weight", 1.0)),
         )
 
     return jsonify({
-        "success":     True,
-        "results":     results,
+        "success": True,
+        "results": results,
         "environment": {
-            "borzo_api_url":          os.getenv("BORZO_API_URL"),
-            "borzo_token_configured": bool(os.getenv("BORZO_API_TOKEN")),
-            "store_address":          os.getenv("STORE_ADDRESS"),
+            "delhivery_api_key_configured": bool(os.getenv("DELHIVERY_API_KEY")),
+            "delhivery_facility_code": os.getenv("DELHIVERY_FACILITY_CODE", ""),
+            "store_address": os.getenv("STORE_ADDRESS"),
+            "store_pincode": os.getenv("STORE_PINCODE"),
         },
     })
 

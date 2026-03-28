@@ -16,25 +16,50 @@ import { resolveMediaUrl } from "@/lib/media-url"
 
 gsap.registerPlugin(ScrollTrigger)
 
-function SectionProductCard({ product }: { product: any }) {
+function SectionProductCard({ product, index }: { product: any; index?: number }) {
   const images = typeof product.images === 'string' ? JSON.parse(product.images) : product.images
   const imageUrl = resolveMediaUrl(images && images[0] ? images[0] : "/placeholder.jpg")
+  const cardRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!cardRef.current) return
+    
+    gsap.fromTo(
+      cardRef.current,
+      { opacity: 0, y: 40 },
+      {
+        opacity: 1,
+        y: 0,
+        duration: 0.6,
+        ease: "power2.out",
+        scrollTrigger: {
+          trigger: cardRef.current,
+          start: "top 80%",
+          toggleActions: "play none none reverse",
+        },
+      }
+    )
+  }, [])
 
   return (
-    <div className="group relative w-50 md:w-70 aspect-3/4 overflow-hidden bg-white/5 border border-white/5 hover:border-white/20 transition-all duration-500 shrink-0">
+    <div 
+      ref={cardRef}
+      className="group relative w-50 md:w-70 aspect-3/4 overflow-hidden bg-white/5 border border-white/5 hover:border-white/20 transition-all duration-500 shrink-0 rounded-sm"
+    >
       <Link href={`/product/${product.id}`}>
         <Image
           src={imageUrl}
           alt={product.name}
           fill
-          className="object-cover transition-transform duration-700 group-hover:scale-110 opacity-70 group-hover:opacity-100"
+          className="object-cover transition-transform duration-700 group-hover:scale-105 opacity-70 group-hover:opacity-100"
         />
-        <div className="absolute inset-x-0 bottom-0 p-6 bg-linear-to-t from-black/80 to-transparent translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
-          <p className="text-xs uppercase tracking-[0.3em] text-gray-400 mb-2">{product.category}</p>
-          <h3 className="text-2xl font-serif italic text-white drop-shadow-md mb-2">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/95 to-transparent translate-y-2 group-hover:translate-y-0 transition-transform duration-500">
+          <p className="text-xs uppercase tracking-[0.3em] text-amber-700/80 mb-2">{product.category}</p>
+          <h3 className="text-2xl font-serif italic text-white drop-shadow-md mb-2 group-hover:text-amber-100 transition-colors">
             {product.name}
           </h3>
-          <p className="uppercase text-xs text-white/80 tracking-widest font-bold">₹{product.price.toLocaleString()}</p>
+          <p className="uppercase text-xs text-white/80 tracking-widest font-bold group-hover:text-amber-200 transition-colors">₹{product.price.toLocaleString()}</p>
         </div>
       </Link>
     </div>
@@ -45,23 +70,70 @@ import { ProductSkeleton } from "@/components/product-skeleton"
 
 function CollectionSection({ title, subtitle, products, sectionId }: { title: string, subtitle: string, products: any[], sectionId?: string }) {
   if (!products || products.length === 0) return null;
+  
+  const titleRef = useRef<HTMLDivElement | null>(null)
+  const contentRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!titleRef.current) return
+    
+    gsap.fromTo(
+      titleRef.current.querySelectorAll('h2, .divider-line'),
+      { opacity: 0, y: 20 },
+      {
+        opacity: 1,
+        y: 0,
+        duration: 0.7,
+        ease: "power2.out",
+        stagger: 0.2,
+        scrollTrigger: {
+          trigger: titleRef.current,
+          start: "top 80%",
+          toggleActions: "play none none reverse",
+        },
+      }
+    )
+  }, [])
+
+  useEffect(() => {
+    if (!contentRef.current) return
+    
+    gsap.fromTo(
+      contentRef.current.querySelectorAll('.product-card'),
+      { opacity: 0, y: 30 },
+      {
+        opacity: 1,
+        y: 0,
+        duration: 0.6,
+        ease: "power2.out",
+        stagger: 0.1,
+        scrollTrigger: {
+          trigger: contentRef.current,
+          start: "top 85%",
+          toggleActions: "play none none reverse",
+        },
+      }
+    )
+  }, [])
 
   return (
     <div id={sectionId} className="flex flex-col justify-center px-6 md:px-24 scroll-mt-52">
       <div className="max-w-400 w-full mx-auto">
-        <div className="mb-12">
-          <h2 className="text-3xl md:text-5xl font-serif font-light mb-6 uppercase tracking-[0.2em]">{title}</h2>
-          <div className="h-px w-32 bg-white/20" />
+        <div className="mb-12" ref={titleRef}>
+          <h2 className="text-3xl md:text-5xl font-serif font-light mb-6 uppercase tracking-[0.2em] text-balance">{title}</h2>
+          <div className="divider-line h-px w-32 bg-gradient-to-r from-amber-700/60 to-transparent" />
         </div>
 
-        <div className="flex gap-8 md:gap-12 pb-12 overflow-x-auto no-scrollbar scroll-smooth">
+        <div className="flex gap-8 md:gap-12 pb-12 overflow-x-auto no-scrollbar scroll-smooth" ref={contentRef}>
           {products.map((p, idx) => (
-            <SectionProductCard key={`${p.id}-${idx}`} product={p} />
+            <div key={`${p.id}-${idx}`} className="product-card">
+              <SectionProductCard product={p} index={idx} />
+            </div>
           ))}
         </div>
 
         <div className="mt-8">
-          <Link href="/view-all" className="text-xs uppercase tracking-widest border-b border-white/20 pb-1 hover:border-white transition-all text-gray-400 hover:text-white">
+          <Link href="/view-all" className="text-xs uppercase tracking-widest border-b border-amber-700/40 pb-1 hover:border-amber-700 transition-all text-amber-700/60 hover:text-amber-700">
             View Entire Collection →
           </Link>
         </div>
@@ -334,11 +406,15 @@ export default function HomePage() {
 
         </section>
 
-        <section className="px-6 md:px-16 pt-4 pb-16 md:pt-8 md:pb-20 bg-[#030303]">
-          <div className="max-w-5xl mx-auto text-center">
-            <p className="text-[8vw] sm:text-5xl md:text-6xl leading-[1.35] md:leading-[1.3] font-serif text-[#d8d8d6]">
+        <section className="px-6 md:px-16 pt-4 pb-16 md:pt-8 md:pb-20 bg-[#030303] relative overflow-hidden">
+          <div className="absolute inset-0 opacity-20 pointer-events-none">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-amber-600/10 to-transparent rounded-full blur-3xl"></div>
+            <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-amber-700/10 to-transparent rounded-full blur-3xl"></div>
+          </div>
+          <div className="max-w-5xl mx-auto text-center relative z-10">
+            <p className="text-[8vw] sm:text-5xl md:text-6xl leading-[1.35] md:leading-[1.3] font-serif text-[#d8d8d6] text-balance">
               U.S Atelier is premium menswear designed for the modern man who values style, comfort, and craftsmanship with innovative tailoring to deliver clothing that makes a statement—confident, stylish, and refined.
-            </p>s
+            </p>
             <p className="mt-8 text-sm md:text-base uppercase tracking-[0.3em] text-[#a99d73] font-light">
               &ldquo;Made with Pride, Worn with Confidence&rdquo;
             </p>
@@ -346,10 +422,20 @@ export default function HomePage() {
         </section>
 
         {/* VERTICAL SECTIONS */}
-        <section className="py-24 space-y-40 bg-[#030303]">
-          <CollectionSection sectionId="best-sellers" title="Best Selling" subtitle="The Collection Essentials" products={bestsellers} />
-          <CollectionSection sectionId="featured-products" title="Featured Pieces" subtitle="Editorial Spotlight" products={featured} />
-          <CollectionSection sectionId="new-arrivals" title="New Arrivals" subtitle="Latest Drop" products={newArrivals} />
+        <section className="py-32 space-y-56 bg-[#030303] relative">
+          <div className="absolute inset-0 opacity-10 pointer-events-none">
+            <div className="absolute top-1/4 left-0 w-full h-px bg-gradient-to-r from-transparent via-amber-700/30 to-transparent"></div>
+            <div className="absolute top-2/3 left-0 w-full h-px bg-gradient-to-r from-transparent via-amber-700/20 to-transparent"></div>
+          </div>
+          <div className="relative z-10">
+            <CollectionSection sectionId="best-sellers" title="Best Selling" subtitle="The Collection Essentials" products={bestsellers} />
+          </div>
+          <div className="relative z-10">
+            <CollectionSection sectionId="featured-products" title="Featured Pieces" subtitle="Editorial Spotlight" products={featured} />
+          </div>
+          <div className="relative z-10">
+            <CollectionSection sectionId="new-arrivals" title="New Arrivals" subtitle="Latest Drop" products={newArrivals} />
+          </div>
         </section>
 
 

@@ -109,15 +109,31 @@ export default function OrderDetailPage({
                   {order.status}
                 </span>
 
-                {/* Wefast/Borzo Tracking Button */}
-                {order.borzo_tracking_url ? (
+                {/* Delhivery Tracking Button */}
+                {order.delhivery_tracking_url ? (
+                  <>
+                    <a
+                      href={order.delhivery_tracking_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex justify-center items-center px-4 py-2 border border-amber-600/50 bg-amber-600/10 text-amber-600 hover:bg-amber-600 hover:text-white transition-all uppercase tracking-widest text-[10px] rounded"
+                    >
+                      Track Live Delivery
+                    </a>
+                    {order.delhivery_waybill && (
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest">
+                        Waybill: {order.delhivery_waybill}
+                      </p>
+                    )}
+                  </>
+                ) : order.borzo_tracking_url ? (
                   <a
                     href={order.borzo_tracking_url}
                     target="_blank"
                     rel="noreferrer"
                     className="flex justify-center items-center px-4 py-2 border border-blue-500 bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-all uppercase tracking-widest text-[10px]"
                   >
-                    Track Live Delivery
+                    Track Live Delivery (Legacy)
                   </a>
                 ) : order.status === "shipped" || order.status === "processing" ? (
                   <span className="text-[10px] text-gray-500 uppercase tracking-widest">
