@@ -217,7 +217,11 @@ class Order(db_mysql.Model):
     shipping_address_json = db_mysql.Column(db_mysql.Text)
     coupon_code           = db_mysql.Column(db_mysql.String(50), nullable=True)
     discount_amount       = db_mysql.Column(db_mysql.Float, default=0.0)
-    # Borzo
+    # Delhivery
+    delhivery_shipment_id = db_mysql.Column(db_mysql.String(100), nullable=True, index=True)
+    delhivery_tracking_url = db_mysql.Column(db_mysql.String(500), nullable=True)
+    delhivery_waybill_number = db_mysql.Column(db_mysql.String(100), nullable=True)
+    # Borzo (deprecated, kept for backward compatibility)
     borzo_order_id        = db_mysql.Column(db_mysql.String(100), nullable=True, index=True)
     borzo_tracking_url    = db_mysql.Column(db_mysql.String(500), nullable=True)
     # Razorpay
@@ -237,18 +241,20 @@ class Order(db_mysql.Model):
 
     def to_dict(self):
         return {
-            "id":                  self.id,
-            "order_number":        self.order_number,
-            "total":               self.total,
-            "status":              self.status,
-            "payment_status":      self.payment_status,
-            "razorpay_payment_id": self.razorpay_payment_id,
-            "shipping_address":    self.shipping_address,
-            "borzo_tracking_url":  self.borzo_tracking_url,
-            "coupon_code":         self.coupon_code,
-            "discount_amount":     self.discount_amount,
-            "createdAt":           self.created_at.isoformat() if self.created_at else None,
-            "items":               [item.to_dict() for item in self.items],
+            "id":                     self.id,
+            "order_number":           self.order_number,
+            "total":                  self.total,
+            "status":                 self.status,
+            "payment_status":         self.payment_status,
+            "razorpay_payment_id":    self.razorpay_payment_id,
+            "shipping_address":       self.shipping_address,
+            "delhivery_tracking_url": self.delhivery_tracking_url,
+            "delhivery_waybill":      self.delhivery_waybill_number,
+            "borzo_tracking_url":     self.borzo_tracking_url,  # deprecated
+            "coupon_code":            self.coupon_code,
+            "discount_amount":        self.discount_amount,
+            "createdAt":              self.created_at.isoformat() if self.created_at else None,
+            "items":                  [item.to_dict() for item in self.items],
         }
 
 

@@ -49,8 +49,11 @@ export type Order = {
     zip: string
     country: string
   }
-  borzo_order_id?: string
-  borzo_tracking_url?: string
+  delhivery_shipment_id?: string
+  delhivery_tracking_url?: string
+  delhivery_waybill?: string
+  borzo_order_id?: string  // deprecated
+  borzo_tracking_url?: string  // deprecated
 }
 
 // Mock Products Data
