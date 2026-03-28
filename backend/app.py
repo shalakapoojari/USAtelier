@@ -2,7 +2,7 @@
 app.py — U.S Atelier Flask Backend
 Enterprise edition: idempotency, RBAC decorators, DB-backed dispatch queue,
 account lockout, password reset, coupon codes, audit logging, structured
-logging with PII redaction, hardened headers, and full Borzo integration.
+logging with PII redaction, hardened headers, and full Delhivery integration.
 """
 
 # ============================================================
@@ -347,7 +347,7 @@ def _verify_reset_token(token: str, max_age: int = 3600):
         return None
 
 # ============================================================
-# DB-backed Borzo dispatch scheduler
+# DB-backed Delhivery dispatch scheduler
 # ============================================================
 
 def _run_dispatch_job(job_id: int):
@@ -532,7 +532,7 @@ with app.app_context():
         app.logger.error("Seeding failed: %s", exc)
 
 # ============================================================
-# APScheduler — Borzo retry queue
+# APScheduler — Delhivery retry queue
 # ============================================================
 
 if HAS_SCHEDULER:
@@ -664,7 +664,7 @@ def health():
         "status":              "healthy",
         "db":                  db_status,
         "payment_configured":  bool(RAZORPAY_KEY_ID),
-        "borzo_configured":    bool(os.getenv("BORZO_API_TOKEN")),
+        "delhivery_configured": bool(os.getenv("DELHIVERY_API_KEY")),
         "scheduler_running":   HAS_SCHEDULER,
     }), 200
 
@@ -1707,7 +1707,7 @@ def get_admin_payments():
 @admin_required
 def refund_payment():
     if not razorpay_client:
-        return jsonify({"error": "Payment gateway not configured"}), 500
+        return jsonify({"error": "Payment gateway not configured — check RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET"}), 500
     data           = request.get_json() or {}
     rzp_payment_id = data.get("razorpay_payment_id")
     amount         = data.get("amount")
@@ -1717,9 +1717,10 @@ def refund_payment():
         client      = get_razorpay_client()
         refund_data = {}
         if amount:
-            refund_data["amount"] = int(float(amount) * 100)
+            refund_data["amount"] = int(float(amount) * 100)   # Razorpay uses paise
         refund = client.payment.refund(rzp_payment_id, refund_data)
 
+        # Update Payment record if it exists
         payment = Payment.query.filter_by(razorpay_payment_id=rzp_payment_id).first()
         if payment:
             payment.status = "refunded"
@@ -1728,11 +1729,23 @@ def refund_payment():
                 if order:
                     order.payment_status = "Refunded"
                     order.status         = "Cancelled"
+
+        # Also look up order directly by payment ID (fallback)
+        if not payment:
+            order = OrderSQL.query.filter_by(razorpay_payment_id=rzp_payment_id).first()
+            if order:
+                order.payment_status = "Refunded"
+                order.status         = "Cancelled"
+
         _audit("payment_refunded", "payment", None, {"razorpay_payment_id": rzp_payment_id})
         db_mysql.session.commit()
         return jsonify({"success": True, "refund": refund}), 200
+    except razorpay.errors.BadRequestError as exc:
+        db_mysql.session.rollback()
+        return jsonify({"error": f"Razorpay rejected the refund: {str(exc)}"}), 400
     except Exception as exc:
         db_mysql.session.rollback()
+        app.logger.error("Refund failed: %s", traceback.format_exc())
         return jsonify({"error": str(exc)}), 500
 
 # ============================================================
@@ -1785,10 +1798,45 @@ def create_order():
     if errors:
         return jsonify({"error": errors[0], "details": errors}), 400
 
-    # Payment status (bypassing Razorpay for direct Delhivery dispatch)
-    payment_status = "COD"
-    rzp_order_id = None
-    rzp_payment_id = None
+    # ── Payment verification (Razorpay) ─────────────────────────────────
+    rzp_order_id   = data.get("razorpay_order_id")
+    rzp_payment_id = data.get("razorpay_payment_id")
+    rzp_signature  = data.get("razorpay_signature")
+
+    if not rzp_order_id or not rzp_payment_id or not rzp_signature:
+        return jsonify({"error": "Payment verification required. Please complete payment first."}), 400
+
+    if not razorpay_client:
+        return jsonify({"error": "Payment gateway not configured"}), 500
+
+    try:
+        razorpay_client.utility.verify_payment_signature({
+            "razorpay_order_id":   rzp_order_id,
+            "razorpay_payment_id": rzp_payment_id,
+            "razorpay_signature":  rzp_signature,
+        })
+    except Exception as exc:
+        app.logger.warning("order_payment_verification_failed err=%s", exc)
+        return jsonify({"error": "Payment verification failed. Please try again."}), 400
+
+    payment_status = "Paid"
+
+    # ── Address / pincode validation ─────────────────────────────────────
+    addr = data.get("shippingAddress") or {}
+    delivery_pincode = str(addr.get("zip", "")).strip()
+    if not delivery_pincode or not re.match(r"^\d{6}$", delivery_pincode):
+        return jsonify({"error": "Please enter a valid 6-digit delivery pincode"}), 400
+
+    # Validate pincode serviceability via Delhivery
+    try:
+        if not validate_pincode(delivery_pincode):
+            return jsonify({
+                "error": f"Delivery to pincode {delivery_pincode} is not currently available. Please use a different address."
+            }), 400
+    except Exception as exc:
+        app.logger.warning("pincode_validation_error pincode=%s err=%s", delivery_pincode, exc)
+        # Fail open — don't block order if Delhivery API is down
+        pass
 
     user = User.query.get(int(session["user_id"]))
     if not user:
@@ -1853,16 +1901,19 @@ def create_order():
             shipping_address_json = json.dumps(data.get("shippingAddress", {})),
             coupon_code           = coupon_code,
             discount_amount       = discount_amount,
+            razorpay_order_id     = rzp_order_id,
+            razorpay_payment_id   = rzp_payment_id,
         )
-        if rzp_order_id:
-            new_order.razorpay_order_id   = rzp_order_id
-        if rzp_payment_id:
-            new_order.razorpay_payment_id = rzp_payment_id
 
         db_mysql.session.add(new_order)
         db_mysql.session.flush()
 
-        # Payment skipped for direct checkout
+        # Update payment record
+        payment = Payment.query.filter_by(razorpay_order_id=rzp_order_id).first()
+        if payment:
+            payment.razorpay_payment_id = rzp_payment_id
+            payment.status = "captured"
+            payment.order_id = new_order.id
 
         # Order items + stock decrement
         for item in validated_items:
@@ -1892,10 +1943,10 @@ def create_order():
         # Clear cart
         CartItem.query.filter_by(user_id=user.id).delete()
 
-        # Enqueue Delhivery dispatch job automatically
+        # Enqueue Delhivery dispatch job (auto-dispatch after payment)
         _enqueue_dispatch(new_order.id)
 
-        _audit("order_created", "order", new_order.id, {"order_number": order_number})
+        _audit("order_created", "order", new_order.id, {"order_number": order_number, "payment_id": rzp_payment_id})
         db_mysql.session.commit()
 
         # Send confirmation email (non-blocking, best-effort)
@@ -1914,6 +1965,7 @@ def create_order():
         db_mysql.session.rollback()
         app.logger.error("create_order_error err=%s", exc)
         return jsonify({"error": "Order creation failed. Please try again."}), 500
+
 
 
 @app.route("/api/orders", methods=["GET"])
@@ -1935,7 +1987,7 @@ def cancel_order(order_number):
     ).first()
     if not order:
         return jsonify({"error": "Order not found"}), 404
-    if order.borzo_order_id:
+    if order.delhivery_shipment_id:
         return jsonify({"error": "Order already dispatched and cannot be self-cancelled. Contact support."}), 400
     if order.status in ("Cancelled", "Delivered"):
         return jsonify({"error": f"Order is already {order.status}"}), 400
@@ -2026,7 +2078,7 @@ def update_order_status(order_id):
         try:
             send_order_status_update(
                 mail, user.email, order.order_number,
-                new_status, data.get("tracking_link") or order.borzo_tracking_url,
+                new_status, data.get("tracking_link") or order.delhivery_tracking_url,
             )
         except Exception as exc:
             app.logger.error("status_email_failed err=%s", type(exc).__name__)
@@ -2095,7 +2147,10 @@ def dispatch_delhivery_order(order_id):
             "waybill": res.get("waybill_number", ""),
         }), 200
 
-    return jsonify({"error": f"Delhivery error: {res.get('error')}"}), 500
+    return jsonify({
+        "error": f"Delhivery: {res.get('error', 'Unknown dispatch error')}",
+        "error_code": res.get("error_code", "UNKNOWN"),
+    }), 500
 
 
 @app.route("/api/admin/dispatch-jobs", methods=["GET"])
@@ -2107,9 +2162,45 @@ def list_dispatch_jobs():
         q = q.filter_by(status=status)
     return jsonify([j.to_dict() for j in q.order_by(DispatchJob.created_at.desc()).limit(100).all()])
 
+# ── Public pincode serviceability check ──────────────────────────────────
+@app.route("/api/delivery/check-pincode", methods=["POST"])
+@login_required
+def check_pincode():
+    """Check if Delhivery can deliver to a given pincode."""
+    data = request.get_json() or {}
+    pincode = str(data.get("pincode", "")).strip()
+    if not pincode or not re.match(r"^\d{6}$", pincode):
+        return jsonify({"error": "Please enter a valid 6-digit pincode"}), 400
+
+    try:
+        serviceable = validate_pincode(pincode)
+        return jsonify({
+            "success": True,
+            "pincode": pincode,
+            "serviceable": serviceable,
+            "message": "Delivery available" if serviceable else "Delivery not available to this pincode",
+        }), 200
+    except Exception as exc:
+        app.logger.warning("pincode_check_error pincode=%s err=%s", pincode, exc)
+        return jsonify({
+            "success": True,
+            "pincode": pincode,
+            "serviceable": True,  # fail open
+            "message": "Unable to verify — delivery will be attempted",
+        }), 200
+
 
 @app.route("/api/webhooks/delhivery", methods=["POST"])
 def delhivery_webhook():
+    # ── Webhook authentication ──────────────────────────────────────────
+    webhook_token = os.getenv("DELHIVERY_WEBHOOK_TOKEN")
+    if webhook_token:
+        auth_header = request.headers.get("Authorization", "")
+        request_token = request.args.get("token", "")
+        if auth_header != f"Token {webhook_token}" and request_token != webhook_token:
+            app.logger.warning("delhivery_webhook_unauthorized")
+            return jsonify({"error": "Unauthorized"}), 401
+
     data = request.get_json(silent=True) or {}
     shipment_id = str(data.get("shipment_id", ""))
     status = data.get("status", "")

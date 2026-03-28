@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Users, MoreVertical, Edit2, Ban, Eye, UserCheck } from "lucide-react"
 import { getApiBase } from "@/lib/api-base"
+import { useToast } from "@/lib/toast-context"
 
 const API_BASE = getApiBase()
 
@@ -11,6 +12,7 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   useEffect(() => {
     fetchCustomers()
@@ -47,13 +49,14 @@ export default function CustomersPage() {
           c.id === customerId ? { ...c, is_blocked: !currentStatus } : c
         ))
         setOpenMenuId(null)
+        showToast(currentStatus ? "User unblocked" : "User blocked", currentStatus ? "success" : "warning")
       } else {
         const errData = await res.json()
-        alert(errData.error || "Failed to update status")
+        showToast("Failed to update status", "error", errData.error)
       }
     } catch (err) {
       console.error("Error toggling block status:", err)
-      alert("An error occurred. Please try again.")
+      showToast("An error occurred", "error", "Please try again")
     }
   }
 

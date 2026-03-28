@@ -1,7 +1,7 @@
 """
 models_mysql.py — SQLAlchemy models for U.S Atelier
 Enterprise additions:
-  - DispatchJob       (retry-safe Borzo queue)
+  - DispatchJob       (retry-safe Delhivery dispatch queue)
   - Coupon            (discount codes)
   - PasswordResetToken
   - AuditLog          (admin action trail)
@@ -221,9 +221,6 @@ class Order(db_mysql.Model):
     delhivery_shipment_id = db_mysql.Column(db_mysql.String(100), nullable=True, index=True)
     delhivery_tracking_url = db_mysql.Column(db_mysql.String(500), nullable=True)
     delhivery_waybill_number = db_mysql.Column(db_mysql.String(100), nullable=True)
-    # Borzo (deprecated, kept for backward compatibility)
-    borzo_order_id        = db_mysql.Column(db_mysql.String(100), nullable=True, index=True)
-    borzo_tracking_url    = db_mysql.Column(db_mysql.String(500), nullable=True)
     # Razorpay
     razorpay_order_id     = db_mysql.Column(db_mysql.String(255), unique=True, nullable=True, index=True)
     razorpay_payment_id   = db_mysql.Column(db_mysql.String(255), unique=True, nullable=True)
@@ -250,7 +247,7 @@ class Order(db_mysql.Model):
             "shipping_address":       self.shipping_address,
             "delhivery_tracking_url": self.delhivery_tracking_url,
             "delhivery_waybill":      self.delhivery_waybill_number,
-            "borzo_tracking_url":     self.borzo_tracking_url,  # deprecated
+            "delhivery_shipment_id":  self.delhivery_shipment_id,
             "coupon_code":            self.coupon_code,
             "discount_amount":        self.discount_amount,
             "createdAt":              self.created_at.isoformat() if self.created_at else None,
@@ -402,12 +399,12 @@ class HomepageConfig(db_mysql.Model):
 
 
 # ---------------------------------------------------------------------------
-# DispatchJob — retry-safe Borzo queue
+# DispatchJob — retry-safe Delhivery dispatch queue
 # ---------------------------------------------------------------------------
 
 class DispatchJob(db_mysql.Model):
     """
-    Persisted queue for Borzo dispatch tasks.
+    Persisted queue for Delhivery dispatch tasks.
     A background scheduler polls this table every 60 s and retries
     failed jobs with exponential back-off (max 5 attempts).
     """

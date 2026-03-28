@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
+import { Shield, Truck, CheckCircle, MapPin, CreditCard, Package, ChevronRight, AlertTriangle } from "lucide-react"
 
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
@@ -15,6 +16,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
 const API_BASE = getApiBase()
+
+declare global {
+  interface Window {
+    Razorpay: any
+  }
+}
 
 export default function CheckoutPage() {
   const { items, total, clearCart, isHydrated } = useCart()
@@ -27,10 +34,21 @@ export default function CheckoutPage() {
     }
   }, [items, isHydrated, router])
 
-  const shipping = 0
+  // Load Razorpay script
+  useEffect(() => {
+    const script = document.createElement("script")
+    script.src = "https://checkout.razorpay.com/v1/checkout.js"
+    script.async = true
+    document.body.appendChild(script)
+    return () => {
+      document.body.removeChild(script)
+    }
+  }, [])
+
+  const shipping: number = 0
   const grandTotal = total + shipping
 
-  const [step, setStep] = useState<"shipping" | "review">("shipping")
+  const [step, setStep] = useState<"shipping" | "review" | "payment">("shipping")
   const [formData, setFormData] = useState({
     email: "",
     firstName: "",
@@ -48,6 +66,8 @@ export default function CheckoutPage() {
   const [checkoutTermsAccepted, setCheckoutTermsAccepted] = useState(false)
   const [checkoutTermsError, setCheckoutTermsError] = useState("")
   const [globalError, setGlobalError] = useState("")
+  const [pincodeStatus, setPincodeStatus] = useState<"idle" | "checking" | "valid" | "invalid">("idle")
+  const [pincodeMessage, setPincodeMessage] = useState("")
 
   useEffect(() => {
     if (user) {
@@ -72,7 +92,6 @@ export default function CheckoutPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
-    // Clear error when user types
     if (errors[e.target.name]) {
       setErrors(prev => {
         const newErrors = { ...prev }
@@ -80,12 +99,40 @@ export default function CheckoutPage() {
         return newErrors
       })
     }
+    // Reset pincode status when zip changes
+    if (e.target.name === "zip") {
+      setPincodeStatus("idle")
+      setPincodeMessage("")
+    }
+  }
+
+  const checkPincode = async (pincode: string) => {
+    if (!pincode || pincode.length !== 6) return
+    setPincodeStatus("checking")
+    try {
+      const res = await fetch(`${API_BASE}/api/delivery/check-pincode`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ pincode }),
+      })
+      const data = await res.json()
+      if (data.serviceable) {
+        setPincodeStatus("valid")
+        setPincodeMessage(data.message || "Delivery available")
+      } else {
+        setPincodeStatus("invalid")
+        setPincodeMessage(data.message || "Delivery not available")
+      }
+    } catch {
+      setPincodeStatus("valid") // fail open
+      setPincodeMessage("Delivery will be attempted")
+    }
   }
 
   const validate = () => {
     const newErrors: Record<string, string> = {}
 
-    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!formData.email) {
       newErrors.email = "Email is required"
@@ -93,7 +140,6 @@ export default function CheckoutPage() {
       newErrors.email = "Please enter a valid email address"
     }
 
-    // Phone validation (10 digits)
     const phoneRegex = /^\d{10}$/
     if (!formData.phone) {
       newErrors.phone = "Phone number is required"
@@ -101,15 +147,13 @@ export default function CheckoutPage() {
       newErrors.phone = "Please enter a valid 10-digit phone number"
     }
 
-    // ZIP validation (assuming 6 digits for India)
     const zipRegex = /^\d{6}$/
     if (!formData.zip) {
-      newErrors.zip = "ZIP code is required"
+      newErrors.zip = "Pincode is required"
     } else if (!zipRegex.test(formData.zip)) {
-      newErrors.zip = "Please enter a valid 6-digit ZIP code"
+      newErrors.zip = "Please enter a valid 6-digit pincode"
     }
 
-    // Required fields
     if (!formData.firstName) newErrors.firstName = "First name is required"
     if (!formData.lastName) newErrors.lastName = "Last name is required"
     if (!formData.address) newErrors.address = "Address is required"
@@ -120,194 +164,329 @@ export default function CheckoutPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleContinue = (e: React.FormEvent) => {
+  const handleContinue = async (e: React.FormEvent) => {
     e.preventDefault()
     if (validate()) {
+      // Check pincode serviceability before continuing
+      if (pincodeStatus !== "valid") {
+        await checkPincode(formData.zip)
+      }
       setStep("review")
     }
   }
 
-  const handlePlaceOrder = async () => {
+  const handlePayAndPlaceOrder = async () => {
     if (!checkoutTermsAccepted) {
       setCheckoutTermsError("Please accept the Terms & Conditions before placing your order")
+      return
+    }
+
+    if (pincodeStatus === "invalid") {
+      setGlobalError("Delivery is not available to the entered pincode. Please update your address.")
       return
     }
 
     setCheckoutTermsError("")
     setGlobalError("")
     setIsProcessing(true)
+
     try {
-      const finalizeRes = await fetch(`${API_BASE}/api/orders`, {
+      // Step 1: Create Razorpay order
+      const orderRes = await fetch(`${API_BASE}/api/payments/create-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          total: total,
-          items: items.map((item) => ({
-            id: item.id,
-            name: item.name,
-            size: item.size,
-            quantity: item.quantity,
-            price: item.price,
-            image: item.image,
-          })),
-          shippingAddress: formData,
-          termsAccepted: checkoutTermsAccepted,
-        }),
+        body: JSON.stringify({ amount: grandTotal }),
       })
 
-      if (finalizeRes.ok) {
-        const finalData = await finalizeRes.json()
-        sessionStorage.setItem("lastOrder", JSON.stringify({
-          orderId: finalData.orderId,
-          items,
-          subtotal: total,
-          shipping,
-          total: grandTotal,
-          address: formData
-        }))
-        clearCart()
-        router.push("/checkout/confirmation")
-      } else {
-        const errorData = await finalizeRes.json();
-        setGlobalError(errorData.error || "Order creation failed. Please try again.")
+      if (!orderRes.ok) {
+        const err = await orderRes.json()
+        throw new Error(err.error || "Failed to create payment order")
       }
+
+      const rzpOrder = await orderRes.json()
+
+      // Step 2: Open Razorpay checkout modal
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_live_SSzOPc9pat6HkB",
+        amount: rzpOrder.amount,
+        currency: rzpOrder.currency || "INR",
+        name: "U.S ATELIER",
+        description: `Order for ${items.length} item(s)`,
+        order_id: rzpOrder.id,
+        handler: async (response: any) => {
+          // Step 3: Payment successful — create order with payment verification
+          try {
+            const finalizeRes = await fetch(`${API_BASE}/api/orders`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                total: grandTotal,
+                items: items.map((item) => ({
+                  id: item.id,
+                  name: item.name,
+                  size: item.size,
+                  quantity: item.quantity,
+                  price: item.price,
+                  image: item.image,
+                })),
+                shippingAddress: {
+                  ...formData,
+                  street: formData.address,
+                },
+                termsAccepted: checkoutTermsAccepted,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            })
+
+            if (finalizeRes.ok) {
+              const finalData = await finalizeRes.json()
+              sessionStorage.setItem("lastOrder", JSON.stringify({
+                orderId: finalData.orderId,
+                items,
+                subtotal: total,
+                shipping,
+                total: grandTotal,
+                address: formData,
+                paymentId: response.razorpay_payment_id,
+              }))
+              clearCart()
+              router.push("/checkout/confirmation")
+            } else {
+              const errorData = await finalizeRes.json()
+              setGlobalError(errorData.error || "Order creation failed after payment. Contact support.")
+            }
+          } catch (err: any) {
+            setGlobalError(`Order finalization failed: ${err.message}. Your payment was received — contact support.`)
+          }
+        },
+        prefill: {
+          name: `${formData.firstName} ${formData.lastName}`,
+          email: formData.email,
+          contact: formData.phone,
+        },
+        theme: {
+          color: "#1a1a1a",
+          backdrop_color: "rgba(0, 0, 0, 0.85)",
+        },
+        modal: {
+          ondismiss: () => {
+            setIsProcessing(false)
+          },
+        },
+      }
+
+      const razorpay = new window.Razorpay(options)
+      razorpay.on("payment.failed", (response: any) => {
+        setGlobalError(`Payment failed: ${response.error?.description || "Unknown error"}. Please try again.`)
+        setIsProcessing(false)
+      })
+      razorpay.open()
     } catch (err: any) {
       console.error(err)
-      setGlobalError(`Something went wrong: ${err.message || 'Unknown error'}`)
-    } finally {
+      setGlobalError(`Something went wrong: ${err.message || "Unknown error"}`)
       setIsProcessing(false)
     }
   }
+
+  const steps = [
+    { key: "shipping", label: "Shipping", icon: MapPin },
+    { key: "review", label: "Review & Pay", icon: CreditCard },
+  ]
 
   return (
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen">
       <SiteHeader />
 
-      <main className="pt-60 pb-32 px-6 md:px-12">
-        <h1 className="font-serif text-5xl font-light mb-16 text-center">
+      <main className="pt-36 md:pt-48 pb-20 md:pb-32 px-4 md:px-12">
+        {/* Progress Stepper */}
+        <div className="max-w-[600px] mx-auto mb-12 md:mb-16">
+          <div className="flex items-center justify-center gap-2 md:gap-4">
+            {steps.map((s, i) => {
+              const Icon = s.icon
+              const isActive = step === s.key
+              const isPast = steps.findIndex(x => x.key === step) > i
+              return (
+                <div key={s.key} className="flex items-center gap-2 md:gap-4">
+                  <div className={`flex items-center gap-2 md:gap-3 px-3 md:px-5 py-2 md:py-3 rounded-full border transition-all duration-500 ${
+                    isActive
+                      ? "border-white/30 bg-white/5 text-white"
+                      : isPast
+                        ? "border-green-500/30 bg-green-500/5 text-green-400"
+                        : "border-white/5 text-gray-600"
+                  }`}>
+                    {isPast ? (
+                      <CheckCircle size={14} className="text-green-400" />
+                    ) : (
+                      <Icon size={14} />
+                    )}
+                    <span className="text-[9px] md:text-[10px] uppercase tracking-[0.2em] font-medium hidden sm:inline">{s.label}</span>
+                    <span className="text-[9px] uppercase tracking-widest font-medium sm:hidden">{i + 1}</span>
+                  </div>
+                  {i < steps.length - 1 && (
+                    <ChevronRight size={14} className={`${isPast ? "text-green-500/50" : "text-white/10"}`} />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        <h1 className="font-serif text-3xl md:text-5xl font-light mb-10 md:mb-16 text-center">
           Checkout
         </h1>
 
-        <div className="grid lg:grid-cols-3 gap-20 max-w-[1400px] mx-auto">
+        <div className="grid lg:grid-cols-3 gap-10 md:gap-20 max-w-[1400px] mx-auto">
           {/* ================= FORM ================= */}
           <div className="lg:col-span-2">
             {step === "shipping" ? (
               <form
                 onSubmit={handleContinue}
-                className="space-y-12 border border-white/10 p-10"
+                className="space-y-8 md:space-y-12 border border-white/10 p-6 md:p-10 bg-white/[0.01] backdrop-blur-sm"
               >
-                <h2 className="uppercase tracking-widest text-xs text-gray-400">
+                <h2 className="uppercase tracking-widest text-xs text-gray-400 flex items-center gap-3">
+                  <MapPin size={14} />
                   Shipping Information
                 </h2>
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <Input
                     name="email"
                     placeholder="Email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className={`bg-transparent border-white/20 text-white placeholder:text-gray-600 ${errors.email ? 'border-red-500' : ''}`}
+                    className={`bg-transparent border-white/20 text-white placeholder:text-gray-600 h-12 ${errors.email ? 'border-red-500' : ''}`}
                   />
                   {errors.email && <p className="text-[10px] text-red-500 uppercase tracking-widest">{errors.email}</p>}
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <Input
                     name="phone"
-                    placeholder="Mobile Number"
+                    placeholder="Mobile Number (10 digits)"
                     value={formData.phone}
                     onChange={handleInputChange}
-                    className={`bg-transparent border-white/20 text-white placeholder:text-gray-600 ${errors.phone ? 'border-red-500' : ''}`}
+                    maxLength={10}
+                    className={`bg-transparent border-white/20 text-white placeholder:text-gray-600 h-12 ${errors.phone ? 'border-red-500' : ''}`}
                   />
                   {errors.phone && <p className="text-[10px] text-red-500 uppercase tracking-widest">{errors.phone}</p>}
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
+                <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+                  <div className="space-y-3">
                     <Input
                       name="firstName"
                       placeholder="First Name"
                       value={formData.firstName}
                       onChange={handleInputChange}
-                      className={`bg-transparent border-white/20 text-white ${errors.firstName ? 'border-red-500' : ''}`}
+                      className={`bg-transparent border-white/20 text-white h-12 ${errors.firstName ? 'border-red-500' : ''}`}
                     />
                     {errors.firstName && <p className="text-[10px] text-red-500 uppercase tracking-widest">{errors.firstName}</p>}
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <Input
                       name="lastName"
                       placeholder="Last Name"
                       value={formData.lastName}
                       onChange={handleInputChange}
-                      className={`bg-transparent border-white/20 text-white ${errors.lastName ? 'border-red-500' : ''}`}
+                      className={`bg-transparent border-white/20 text-white h-12 ${errors.lastName ? 'border-red-500' : ''}`}
                     />
                     {errors.lastName && <p className="text-[10px] text-red-500 uppercase tracking-widest">{errors.lastName}</p>}
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <Input
                     name="address"
-                    placeholder="Address"
+                    placeholder="Full Street Address"
                     value={formData.address}
                     onChange={handleInputChange}
-                    className={`bg-transparent border-white/20 text-white ${errors.address ? 'border-red-500' : ''}`}
+                    className={`bg-transparent border-white/20 text-white h-12 ${errors.address ? 'border-red-500' : ''}`}
                   />
                   {errors.address && <p className="text-[10px] text-red-500 uppercase tracking-widest">{errors.address}</p>}
                 </div>
 
-                <div className="grid md:grid-cols-3 gap-6">
-                  <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+                  <div className="space-y-3">
                     <Input
                       name="city"
                       placeholder="City"
                       value={formData.city}
                       onChange={handleInputChange}
-                      className={`bg-transparent border-white/20 text-white ${errors.city ? 'border-red-500' : ''}`}
+                      className={`bg-transparent border-white/20 text-white h-12 ${errors.city ? 'border-red-500' : ''}`}
                     />
                     {errors.city && <p className="text-[10px] text-red-500 uppercase tracking-widest">{errors.city}</p>}
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <Input
                       name="state"
                       placeholder="State"
                       value={formData.state}
                       onChange={handleInputChange}
-                      className={`bg-transparent border-white/20 text-white ${errors.state ? 'border-red-500' : ''}`}
+                      className={`bg-transparent border-white/20 text-white h-12 ${errors.state ? 'border-red-500' : ''}`}
                     />
                     {errors.state && <p className="text-[10px] text-red-500 uppercase tracking-widest">{errors.state}</p>}
                   </div>
-                  <div className="space-y-4">
-                    <Input
-                      name="zip"
-                      placeholder="ZIP"
-                      value={formData.zip}
-                      onChange={handleInputChange}
-                      className={`bg-transparent border-white/20 text-white ${errors.zip ? 'border-red-500' : ''}`}
-                    />
+                  <div className="space-y-3 col-span-2 md:col-span-1">
+                    <div className="relative">
+                      <Input
+                        name="zip"
+                        placeholder="Pincode"
+                        value={formData.zip}
+                        onChange={handleInputChange}
+                        maxLength={6}
+                        onBlur={() => formData.zip.length === 6 && checkPincode(formData.zip)}
+                        className={`bg-transparent border-white/20 text-white h-12 pr-10 ${
+                          errors.zip ? 'border-red-500' :
+                          pincodeStatus === "valid" ? 'border-green-500/50' :
+                          pincodeStatus === "invalid" ? 'border-red-500' : ''
+                        }`}
+                      />
+                      {pincodeStatus === "checking" && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        </div>
+                      )}
+                      {pincodeStatus === "valid" && (
+                        <CheckCircle size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400" />
+                      )}
+                      {pincodeStatus === "invalid" && (
+                        <AlertTriangle size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400" />
+                      )}
+                    </div>
                     {errors.zip && <p className="text-[10px] text-red-500 uppercase tracking-widest">{errors.zip}</p>}
+                    {pincodeMessage && (
+                      <p className={`text-[10px] uppercase tracking-widest ${
+                        pincodeStatus === "valid" ? "text-green-400" : pincodeStatus === "invalid" ? "text-red-400" : "text-gray-500"
+                      }`}>
+                        {pincodeMessage}
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 <Button
                   type="submit"
-                  className="w-full border border-white/40 bg-transparent uppercase tracking-widest text-xs hover:bg-white hover:text-black transition-all"
+                  className="w-full border border-white/40 bg-transparent uppercase tracking-widest text-xs hover:bg-white hover:text-black transition-all h-14"
                 >
                   Continue to Review
                 </Button>
               </form>
             ) : (
-              <div className="space-y-12">
+              <div className="space-y-8 md:space-y-12">
                 {/* SHIPPING REVIEW */}
-                <div className="border border-white/10 p-8">
+                <div className="border border-white/10 p-6 md:p-8 bg-white/[0.01]">
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="uppercase tracking-widest text-xs text-gray-400">
+                    <h2 className="uppercase tracking-widest text-xs text-gray-400 flex items-center gap-3">
+                      <MapPin size={14} />
                       Shipping Information
                     </h2>
                     <button
                       onClick={() => setStep("shipping")}
-                      className="text-xs uppercase tracking-widest text-gray-500 hover:text-white"
+                      className="text-xs uppercase tracking-widest text-gray-500 hover:text-white transition-colors"
                     >
                       Edit
                     </button>
@@ -324,21 +503,29 @@ export default function CheckoutPage() {
                     <br />
                     Phone: {formData.phone}
                   </p>
+
+                  {pincodeStatus === "valid" && (
+                    <div className="mt-4 flex items-center gap-2 text-green-400 text-[10px] uppercase tracking-widest">
+                      <Truck size={12} />
+                      Delivery available to {formData.zip}
+                    </div>
+                  )}
                 </div>
 
                 {/* ITEMS */}
-                <div className="border border-white/10 p-8">
-                  <h2 className="uppercase tracking-widest text-xs text-gray-400 mb-8">
-                    Order Items
+                <div className="border border-white/10 p-6 md:p-8 bg-white/[0.01]">
+                  <h2 className="uppercase tracking-widest text-xs text-gray-400 mb-6 md:mb-8 flex items-center gap-3">
+                    <Package size={14} />
+                    Order Items ({items.length})
                   </h2>
 
-                  <div className="space-y-6">
+                  <div className="space-y-4 md:space-y-6">
                     {items.map((item) => (
                       <div
                         key={`${item.id}-${item.size}`}
-                        className="flex gap-6"
+                        className="flex gap-4 md:gap-6 group"
                       >
-                        <div className="relative w-20 h-28">
+                        <div className="relative w-16 h-22 md:w-20 md:h-28 shrink-0 overflow-hidden rounded-sm">
                           <Image
                             src={item.image}
                             alt={item.name}
@@ -347,15 +534,15 @@ export default function CheckoutPage() {
                           />
                         </div>
 
-                        <div className="flex-1 text-sm text-gray-400">
-                          <p className="uppercase tracking-widest text-white">
+                        <div className="flex-1 text-sm text-gray-400 min-w-0">
+                          <p className="uppercase tracking-widest text-white text-xs md:text-sm truncate">
                             {item.name}
                           </p>
-                          <p>Size: {item.size}</p>
-                          <p>Qty: {item.quantity}</p>
+                          <p className="text-xs mt-1">Size: {item.size}</p>
+                          <p className="text-xs">Qty: {item.quantity}</p>
                         </div>
 
-                        <p className="text-sm">
+                        <p className="text-sm shrink-0">
                           ₹{(item.price * item.quantity).toLocaleString('en-IN')}
                         </p>
                       </div>
@@ -364,19 +551,22 @@ export default function CheckoutPage() {
                 </div>
 
                 {globalError && (
-                  <div className="mb-8 p-6 border border-red-500/30 bg-red-950/20 text-red-400 flex items-start justify-between">
-                    <div className="space-y-1">
-                      <h3 className="text-xs uppercase tracking-widest font-bold">Checkout Error</h3>
-                      <p className="text-[10px] uppercase tracking-widest">{globalError}</p>
+                  <div className="p-4 md:p-6 border border-red-500/30 bg-red-950/20 text-red-400 flex items-start justify-between gap-4 rounded-sm">
+                    <div className="space-y-1 min-w-0">
+                      <h3 className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+                        <AlertTriangle size={12} />
+                        Checkout Error
+                      </h3>
+                      <p className="text-[10px] uppercase tracking-widest break-words">{globalError}</p>
                     </div>
-                    <button onClick={() => setGlobalError("")} className="text-red-500/50 hover:text-red-400 transition-colors text-xl leading-none">
+                    <button onClick={() => setGlobalError("")} className="text-red-500/50 hover:text-red-400 transition-colors text-xl leading-none shrink-0">
                       &times;
                     </button>
                   </div>
                 )}
 
-                <div className="border border-white/10 p-4">
-                  <label className="flex items-start gap-3 text-xs text-gray-400 leading-relaxed">
+                <div className="border border-white/10 p-4 bg-white/[0.01]">
+                  <label className="flex items-start gap-3 text-xs text-gray-400 leading-relaxed cursor-pointer">
                     <input
                       type="checkbox"
                       checked={checkoutTermsAccepted}
@@ -384,7 +574,7 @@ export default function CheckoutPage() {
                         setCheckoutTermsAccepted(e.target.checked)
                         if (e.target.checked) setCheckoutTermsError("")
                       }}
-                      className="mt-0.5 h-4 w-4 rounded border-white/30 bg-transparent"
+                      className="mt-0.5 h-4 w-4 rounded border-white/30 bg-transparent accent-white"
                     />
                     <span>
                       I agree to the <Link href="/terms&conditions" target="_blank" className="text-[#C8A45D] hover:text-white underline underline-offset-4">Terms & Conditions</Link> and authorize order placement.
@@ -396,35 +586,72 @@ export default function CheckoutPage() {
                 </div>
 
                 <Button
-                  onClick={handlePlaceOrder}
+                  onClick={handlePayAndPlaceOrder}
                   disabled={isProcessing || !checkoutTermsAccepted}
-                  className="w-full border border-white/40 bg-transparent uppercase tracking-widest text-xs hover:bg-white hover:text-black transition-all py-8"
+                  className="w-full border border-white/40 bg-white/5 uppercase tracking-widest text-xs hover:bg-white hover:text-black transition-all py-6 md:py-8 disabled:opacity-40 group"
                 >
-                  {isProcessing ? "Processing Order..." : `Place Order (COD) · ₹${grandTotal.toLocaleString("en-IN")}`}
+                  <div className="flex items-center justify-center gap-3">
+                    {isProcessing ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin group-hover:border-black/30 group-hover:border-t-black" />
+                        Processing Payment...
+                      </>
+                    ) : (
+                      <>
+                        <Shield size={14} />
+                        Pay Securely · ₹{grandTotal.toLocaleString("en-IN")}
+                      </>
+                    )}
+                  </div>
                 </Button>
+
+                {/* Trust badges */}
+                <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8 pt-2">
+                  <div className="flex items-center gap-2 text-[9px] uppercase tracking-widest text-gray-600">
+                    <Shield size={12} /> Secure Payment
+                  </div>
+                  <div className="flex items-center gap-2 text-[9px] uppercase tracking-widest text-gray-600">
+                    <Truck size={12} /> Delhivery Shipping
+                  </div>
+                  <div className="flex items-center gap-2 text-[9px] uppercase tracking-widest text-gray-600">
+                    <CheckCircle size={12} /> Order Tracking
+                  </div>
+                </div>
               </div>
             )}
           </div>
 
           {/* ================= SUMMARY ================= */}
           <div className="lg:col-span-1">
-            <div className="sticky top-32 border border-white/10 p-8 space-y-6">
-              <h2 className="uppercase tracking-widest text-xs text-gray-400">
+            <div className="sticky top-32 border border-white/10 p-6 md:p-8 space-y-6 bg-white/[0.01] backdrop-blur-sm">
+              <h2 className="uppercase tracking-widest text-xs text-gray-400 flex items-center gap-3">
+                <Package size={14} />
                 Order Summary
               </h2>
 
               <div className="text-sm text-gray-400 space-y-3">
                 <div className="flex justify-between">
-                  <span>Subtotal</span>
+                  <span>Subtotal ({items.length} items)</span>
                   <span>₹{total.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Shipping</span>
-                  <span>₹{shipping.toLocaleString('en-IN')}</span>
+                  <span className="text-green-400 text-xs uppercase tracking-widest">{shipping === 0 ? "Free" : `₹${shipping.toLocaleString('en-IN')}`}</span>
                 </div>
-                <div className="border-t border-white/10 pt-4 flex justify-between text-white">
+                <div className="border-t border-white/10 pt-4 flex justify-between text-white font-medium">
                   <span>Total</span>
-                  <span>₹{grandTotal.toLocaleString('en-IN')}</span>
+                  <span className="text-lg">₹{grandTotal.toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-white/10 space-y-3">
+                <div className="flex items-center gap-3 text-[9px] uppercase tracking-widest text-gray-600">
+                  <Shield size={11} className="text-green-500/60" />
+                  <span>256-bit SSL Encrypted</span>
+                </div>
+                <div className="flex items-center gap-3 text-[9px] uppercase tracking-widest text-gray-600">
+                  <CreditCard size={11} className="text-green-500/60" />
+                  <span>Razorpay Secure Gateway</span>
                 </div>
               </div>
             </div>

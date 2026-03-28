@@ -92,8 +92,6 @@ Pending → Processing → Shipped → Out for Delivery → Delivered
 delhivery_shipment_id    -- Unique shipment ID from Delhivery
 delhivery_tracking_url   -- Live tracking link
 delhivery_waybill_number -- Waybill for customer reference
-borzo_order_id           -- DEPRECATED (for legacy orders)
-borzo_tracking_url       -- DEPRECATED (for legacy orders)
 ```
 
 ## Common Tasks
@@ -235,41 +233,79 @@ mysql -u user -p database -e "
 - `frontend/app/page.tsx` - Enhanced animations
 - `frontend/app/account/orders/[id]/page.tsx` - Tracking display
 
-## Key Improvements Over Borzo
+## Architecture
 
-| Feature | Borzo | Delhivery | Improvement |
-|---|---|---|---|
-| API Reliability | Standard | Robust | Better uptime |
-| Coverage | Urban | Pan-India | Wider reach |
-| COD Support | Limited | Full | Better for customers |
-| Tracking | Basic | Real-time | Live updates |
-| UI/UX | Minimal | Enhanced | Better experience |
-| Documentation | Basic | Comprehensive | Easier to maintain |
+- **Payment**: Razorpay → Signature verification → Order creation → Auto-dispatch
+- **Dispatch**: Orders queue via `DispatchJob` table → Background scheduler retries
+- **Tracking**: Delhivery webhooks update order status → Email notifications sent
+- **Pincode**: Validated via Delhivery API before order acceptance
+- **Refunds**: Admin triggers via Razorpay API → Order marked Cancelled + Refunded
 
-## Timeline
+## Testing the Delhivery Integration
 
-- **Setup**: 5 minutes (env vars)
-- **Migration**: 1 minute (DB)
-- **Testing**: 5 minutes (admin endpoint)
-- **Deployment**: 2 minutes
-- **Total**: ~15 minutes
+### 1. Verify Configuration
+```bash
+curl -X GET http://localhost:5000/api/health
+```
+Check `delhivery_configured: true` in the response.
 
-## Support
+### 2. Test Pincode Serviceability
+```bash
+# From the admin test endpoint (requires admin session)
+curl -X POST http://localhost:5000/api/admin/test/delhivery \
+  -H "Content-Type: application/json" \
+  -b "session=<your-session-cookie>" \
+  -d '{"test_type": "pincode", "pincode": "400097"}'
+```
 
-- **Setup Issues**: See `SETUP_DELHIVERY.md`
-- **API Issues**: See `DELHIVERY_MIGRATION.md`
-- **Troubleshooting**: See `DELHIVERY_MIGRATION.md#Troubleshooting`
-- **Code**: See inline comments in `delhivery_utils.py`
+Or use the checkout flow — enter a pincode in the shipping form, the system validates it on blur.
 
-## Rollback
+### 3. Test Full Order Flow
+1. **Add items to cart** and proceed to checkout
+2. **Enter shipping address** — pincode is validated against Delhivery
+3. **Pay via Razorpay** — use Razorpay test card: `4111 1111 1111 1111`
+4. **Order is created** and auto-dispatched to Delhivery
+5. Go to **Admin → Orders → [order]** to see tracking info
 
-In case of issues:
-1. Revert imports in `app.py` to `borzo_utils`
-2. Restart Flask
-3. No data loss (columns remain in DB)
+### 4. Test Webhook (Simulate Delhivery Status Update)
+```bash
+# Simulate a "delivered" webhook
+curl -X POST http://localhost:5000/api/webhooks/delhivery \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Token <your-webhook-token>" \
+  -d '{"shipment_id": "DL12345678", "status": "delivered"}'
+```
+
+### 5. Test Refund
+1. Go to **Admin → Orders → [paid order]**
+2. Click **Refund ₹ X,XXX** button
+3. Confirm in the modal dialog
+4. Verify refund in [Razorpay Dashboard](https://dashboard.razorpay.com)
+
+### 6. Test Manual Dispatch
+```bash
+curl -X POST http://localhost:5000/api/admin/dispatch/ORD-XXXXX \
+  -H "Content-Type: application/json" \
+  -b "session=<your-session-cookie>"
+```
+
+## Environment Variables
+
+```env
+# Required
+DELHIVERY_API_KEY=<your-delhivery-api-key>
+RAZORPAY_KEY_ID=<your-razorpay-key>
+RAZORPAY_KEY_SECRET=<your-razorpay-secret>
+
+# Optional
+DELHIVERY_FACILITY_CODE=<facility-code>
+DELHIVERY_WEBHOOK_TOKEN=<webhook-auth-token>
+RAZORPAY_WEBHOOK_SECRET=<webhook-secret>
+```
 
 ---
 
-**Last Updated**: March 28, 2026
-**Version**: 1.0
-**Status**: Ready for Production
+**Last Updated**: March 29, 2026
+**Version**: 2.0
+**Status**: Ready for Production — Automated Fulfillment
+
