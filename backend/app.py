@@ -763,7 +763,7 @@ def signup():
         db_mysql.session.add(new_user)
         db_mysql.session.commit()
 
-        session.permanent = False
+        session.permanent = True
         session["user_id"]  = str(new_user.id)
         session["is_admin"] = False
         session["is_new_signup"] = True
@@ -836,7 +836,7 @@ def login():
 
     db_mysql.session.commit()
 
-    session.permanent = False
+    session.permanent = True
     session["user_id"]  = str(user.id)
     session["is_admin"] = bool(user.is_admin)
 
@@ -1068,7 +1068,7 @@ def google_callback():
                 db_mysql.session.rollback()
 
     session.clear()
-    session.permanent  = False
+    session.permanent  = True
     session["user_id"] = str(user.id)
     session["is_admin"] = bool(user.is_admin)
     return redirect(f"{frontend_base}/auth/callback")

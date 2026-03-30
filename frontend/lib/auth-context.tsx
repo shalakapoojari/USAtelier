@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     if (typeof window === "undefined") return null
     try {
-      const raw = sessionStorage.getItem(SESSION_USER_KEY)
+      const raw = localStorage.getItem(SESSION_USER_KEY)
       return raw ? (JSON.parse(raw) as User) : null
     } catch {
       return null
@@ -65,15 +65,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             addresses: data.addresses || [],
           }
           setUser(restored)
-          sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(restored))
+          localStorage.setItem(SESSION_USER_KEY, JSON.stringify(restored))
           return restored
         }
       }
       setUser(null)
-      sessionStorage.removeItem(SESSION_USER_KEY)
+      localStorage.removeItem(SESSION_USER_KEY)
       return null
     } catch {
-      // Flask not reachable — keep sessionStorage snapshot for this tab
+      // Flask not reachable — keep localStorage snapshot for this tab
       return user
     }
   }
@@ -126,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           addresses: data.addresses || [],
         }
         setUser(loggedIn)
-        sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(loggedIn))
+        localStorage.setItem(SESSION_USER_KEY, JSON.stringify(loggedIn))
         return { success: true, user: loggedIn }
       }
 
@@ -171,7 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: "user",
         }
         setUser(newUser)
-        sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(newUser))
+        localStorage.setItem(SESSION_USER_KEY, JSON.stringify(newUser))
         // Keep cart data — guest cart survives signup
         return { success: true, user: newUser }
       }
@@ -196,7 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (user) {
           const updatedUser = { ...user, ...data }
           setUser(updatedUser)
-          sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(updatedUser))
+          localStorage.setItem(SESSION_USER_KEY, JSON.stringify(updatedUser))
         }
         return { success: true, message: json.message }
       }
@@ -216,7 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Ignore network errors on logout
     }
     setUser(null)
-    sessionStorage.removeItem(SESSION_USER_KEY)
+    localStorage.removeItem(SESSION_USER_KEY)
     // Keep cart in localStorage — cart is guest-friendly
     localStorage.removeItem("wishlist")
   }
