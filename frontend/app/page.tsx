@@ -59,18 +59,18 @@ function FeaturedPieceCard({
   const imageUrl = isPlaceholder
     ? product.image
     : (() => {
-        const imgs =
-          typeof product.images === "string"
-            ? (() => {
-                try {
-                  return JSON.parse(product.images);
-                } catch {
-                  return [product.images];
-                }
-              })()
-            : product.images;
-        return resolveMediaUrl(imgs?.[0] || "/placeholder.jpg");
-      })();
+      const imgs =
+        typeof product.images === "string"
+          ? (() => {
+            try {
+              return JSON.parse(product.images);
+            } catch {
+              return [product.images];
+            }
+          })()
+          : product.images;
+      return resolveMediaUrl(imgs?.[0] || "/placeholder.jpg");
+    })();
 
   const productLink = isPlaceholder ? "/view-all" : `/product/${product.id}`;
   const price = isPlaceholder ? product.price : Number(product.price);
@@ -103,9 +103,9 @@ function FeaturedPieceCard({
 
         <button
           onClick={(e) => {
-             e.preventDefault();
-             // Logic for add to cart handled by the button itself or context
-             // For now just prevent link navigation if this was a link
+            e.preventDefault();
+            // Logic for add to cart handled by the button itself or context
+            // For now just prevent link navigation if this was a link
           }}
           className="w-full flex items-center justify-center gap-2 px-4 py-4 text-[9px] uppercase tracking-[0.4em] text-white/50 border border-white/10 hover:border-white/40 hover:text-white hover:bg-white/5 transition-all duration-300"
         >
@@ -569,22 +569,22 @@ export default function HomePage() {
               const pImageUrl = isPlaceholder
                 ? product.image
                 : (() => {
-                    const imgs =
-                      typeof product.images === "string"
-                        ? (() => {
-                            try {
-                              return JSON.parse(product.images);
-                            } catch {
-                              return [product.images];
-                            }
-                          })()
-                        : product.images;
-                    return resolveMediaUrl(imgs?.[0] || "/placeholder.jpg");
-                  })();
+                  const imgs =
+                    typeof product.images === "string"
+                      ? (() => {
+                        try {
+                          return JSON.parse(product.images);
+                        } catch {
+                          return [product.images];
+                        }
+                      })()
+                      : product.images;
+                  return resolveMediaUrl(imgs?.[0] || "/placeholder.jpg");
+                })();
 
               return (
                 <div key={product.id || idx} className={`panel bg-[${bg}]`}>
-                  <Link 
+                  <Link
                     href={isPlaceholder ? "/view-all" : `/product/${product.id}`}
                     className="group relative h-[520px] w-[320px] overflow-hidden md:h-[600px] md:w-[400px] cursor-pointer"
                   >
