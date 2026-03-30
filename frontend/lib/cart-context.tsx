@@ -11,6 +11,7 @@ export type CartItem = {
   price: number
   size: string
   quantity: number
+  stock: number
   image: string
 }
 
@@ -57,19 +58,27 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // (no wipe on logout — guest cart is preserved)
 
   const addItem = (newItem: Omit<CartItem, "quantity">) => {
-    // Every addItem call is an addition — increment badge
-    setUnseenCount((c) => c + 1)
     setItems((prev) => {
       const existing = prev.find(
         (i) => i.id === newItem.id && i.size === newItem.size
       )
+      
       if (existing) {
+        if (existing.quantity >= newItem.stock) {
+          // Dispatch custom event to show toast since context isn't available here
+          window.dispatchEvent(new CustomEvent('toast-show', { 
+            detail: { message: `Only ${newItem.stock} units available in stock`, type: 'info' } 
+          }))
+          return prev
+        }
+        setUnseenCount((c) => c + 1)
         return prev.map((i) =>
           i.id === newItem.id && i.size === newItem.size
             ? { ...i, quantity: i.quantity + 1 }
             : i
         )
       }
+      setUnseenCount((c) => c + 1)
       return [...prev, { ...newItem, quantity: 1 }]
     })
   }
@@ -84,9 +93,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return
     }
     setItems((prev) =>
-      prev.map((i) =>
-        i.id === id && i.size === size ? { ...i, quantity } : i
-      )
+      prev.map((i) => {
+        if (i.id === id && i.size === size) {
+          if (quantity > i.stock) {
+            window.dispatchEvent(new CustomEvent('toast-show', { 
+                detail: { message: `Maximum stock limit reached (${i.stock} units)`, type: 'info' } 
+            }))
+            return { ...i, quantity: i.stock }
+          }
+          return { ...i, quantity }
+        }
+        return i
+      })
     )
   }
 

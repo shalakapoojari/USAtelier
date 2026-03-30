@@ -49,7 +49,7 @@ const PLACEHOLDER_BESTSELLERS = [
   },
 ];
 
-function BestSellerCard({
+function FeaturedPieceCard({
   product,
   isPlaceholder = false,
 }: {
@@ -76,36 +76,42 @@ function BestSellerCard({
   const price = isPlaceholder ? product.price : Number(product.price);
 
   return (
-    <div className="group flex-shrink-0 w-[240px] md:w-[280px] bg-[#0a0a0a] border border-white/5 hover:border-white/15 transition-all duration-300 overflow-hidden">
-      <div className="relative h-[320px] w-full overflow-hidden bg-[#111]">
+    <div className="group flex-shrink-0 w-[260px] md:w-[320px] bg-[#0a0a0a] border border-white/5 hover:border-white/10 transition-all duration-500 overflow-hidden">
+      <Link href={productLink} className="block relative h-[360px] w-full overflow-hidden bg-[#111]">
         <img
           src={imageUrl}
           alt={product.name}
-          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105 brightness-75 group-hover:brightness-90"
+          className="h-full w-full object-cover transition-transform duration-1000 group-hover:scale-110 brightness-[0.85] group-hover:brightness-100"
         />
         {product.badge && (
           <span className="absolute top-4 left-4 text-[8px] uppercase tracking-[0.3em] text-white/70 bg-black/60 backdrop-blur-sm px-3 py-1 border border-white/10">
             {product.badge}
           </span>
         )}
-      </div>
+        <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-500" />
+      </Link>
 
-      <div className="p-5">
-        <h3 className="serif text-lg text-white/90 leading-tight mb-1 group-hover:text-white transition-colors">
-          {product.name}
-        </h3>
-        <p className="sans text-[11px] uppercase tracking-[0.2em] text-white/40 mb-5">
+      <div className="p-6">
+        <Link href={productLink} className="block group/title">
+          <h3 className="serif text-xl text-white/90 leading-tight mb-2 group-hover/title:text-white transition-colors">
+            {product.name}
+          </h3>
+        </Link>
+        <p className="sans text-[11px] uppercase tracking-[0.2em] text-white/40 mb-6">
           ₹{price.toLocaleString("en-IN")}
         </p>
 
-        <Link
-          href={productLink}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 text-[9px] uppercase tracking-[0.35em] text-white/55 border border-white/15 hover:border-white/40 hover:text-white hover:bg-white/5 transition-all duration-200 active:scale-[0.98]"
-          aria-label={`Add ${product.name} to cart`}
+        <button
+          onClick={(e) => {
+             e.preventDefault();
+             // Logic for add to cart handled by the button itself or context
+             // For now just prevent link navigation if this was a link
+          }}
+          className="w-full flex items-center justify-center gap-2 px-4 py-4 text-[9px] uppercase tracking-[0.4em] text-white/50 border border-white/10 hover:border-white/40 hover:text-white hover:bg-white/5 transition-all duration-300"
         >
           <ShoppingCart size={12} strokeWidth={1.5} />
           {isPlaceholder ? "Shop Now" : "Add to Cart"}
-        </Link>
+        </button>
       </div>
     </div>
   );
@@ -117,6 +123,7 @@ export default function HomePage() {
 
   const [API_BASE, setApiBase] = useState("");
   const [config, setConfig] = useState<any>(null);
+  const [featuredItems, setFeaturedItems] = useState<any[] | null>(null);
   const [bestsellers, setBestsellers] = useState<any[] | null>(null);
 
   useEffect(() => {
@@ -141,13 +148,17 @@ export default function HomePage() {
             const results = await Promise.all(promises);
             return results.filter(Boolean);
           };
+          const f = await fetchCategory(data.featured_product_ids);
           const b = await fetchCategory(data.bestseller_product_ids);
+          setFeaturedItems(f);
           setBestsellers(b);
         } else {
+          setFeaturedItems([]);
           setBestsellers([]);
         }
       } catch (err) {
         console.error("Failed to fetch homepage config:", err);
+        setFeaturedItems([]);
         setBestsellers([]);
       }
     };
@@ -155,7 +166,7 @@ export default function HomePage() {
   }, [API_BASE]);
 
   useEffect(() => {
-    if (bestsellers === null) return; // wait for API
+    if (featuredItems === null) return; // wait for API
 
     const progress = { val: 0 };
     const loadTl = gsap.timeline();
@@ -308,7 +319,7 @@ export default function HomePage() {
       window.clearTimeout(preloaderSafety);
       cleanups.forEach((fn) => fn());
     };
-  }, [bestsellers]);
+  }, [featuredItems]);
 
   const heroSlide = config?.hero_slides?.[0] || null;
   const heroImage = heroSlide?.image
@@ -331,10 +342,10 @@ export default function HomePage() {
   const seasonText = config?.season_label || "Fall Winter 2025";
 
   const displayProducts =
-    bestsellers && bestsellers.length > 0
-      ? bestsellers
+    featuredItems && featuredItems.length > 0
+      ? featuredItems
       : PLACEHOLDER_BESTSELLERS;
-  const isPlaceholder = !bestsellers || bestsellers.length === 0;
+  const isPlaceholder = !featuredItems || featuredItems.length === 0;
 
   return (
     <>
@@ -573,7 +584,10 @@ export default function HomePage() {
 
               return (
                 <div key={product.id || idx} className={`panel bg-[${bg}]`}>
-                  <div className="group relative h-[520px] w-[320px] overflow-hidden md:h-[600px] md:w-[400px]">
+                  <Link 
+                    href={isPlaceholder ? "/view-all" : `/product/${product.id}`}
+                    className="group relative h-[520px] w-[320px] overflow-hidden md:h-[600px] md:w-[400px] cursor-pointer"
+                  >
                     <img
                       src={pImageUrl}
                       className="h-full w-full object-cover transition-transform duration-1000 group-hover:scale-110"
@@ -587,7 +601,7 @@ export default function HomePage() {
                       </p>
                     </div>
                     <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-all pointer-events-none" />
-                  </div>
+                  </Link>
                 </div>
               );
             })}
@@ -608,6 +622,51 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+
+        {/* Best Sellers Section - Managed by Admin */}
+        <section className="bg-[#030303] py-20 md:py-32 overflow-hidden border-t border-white/5">
+          <div className="px-8 md:px-20 mb-12">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="sans text-[10px] uppercase tracking-[0.4em] text-white/30 mb-3">
+                  Curated by the Studio
+                </p>
+                <h2 className="serif text-5xl md:text-7xl font-light text-white/90 leading-none">
+                  Best Sellers
+                </h2>
+              </div>
+              <Link
+                href="/view-all"
+                className="hidden md:inline-flex sans text-[10px] uppercase tracking-[0.3em] text-white/35 hover:text-white transition-colors border-b border-white/15 hover:border-white/50 pb-0.5 mb-2"
+              >
+                View All →
+              </Link>
+            </div>
+            <div className="mt-8 h-px w-full bg-white/5" />
+          </div>
+
+          <div
+            className="flex gap-4 md:gap-6 px-8 md:px-20 pb-4 overflow-x-auto no-scrollbar"
+            style={{ WebkitOverflowScrolling: "touch" }}
+          >
+            {(bestsellers && bestsellers.length > 0 ? bestsellers : PLACEHOLDER_BESTSELLERS).map((p: any, idx: number) => (
+              <FeaturedPieceCard
+                key={!bestsellers || bestsellers.length === 0 ? `ph-${idx}` : `${p.id}-${idx}`}
+                product={p}
+                isPlaceholder={!bestsellers || bestsellers.length === 0}
+              />
+            ))}
+          </div>
+
+          <div className="md:hidden px-8 mt-8">
+            <Link
+              href="/view-all"
+              className="sans text-[10px] uppercase tracking-[0.3em] text-white/35 hover:text-white transition-colors border-b border-white/15 hover:border-white/50 pb-0.5"
+            >
+              View All →
+            </Link>
+          </div>
+        </section>
 
         <section className="relative z-10 bg-[#030303] px-6 py-20 md:px-12 md:py-32">
           <div className="flex flex-col gap-8 md:flex-row">
@@ -661,51 +720,6 @@ export default function HomePage() {
                 />
               </div>
             </div>
-          </div>
-        </section>
-
-        {/* Brand New Admin-Controlled Best Sellers Section */}
-        <section className="bg-[#040404] py-20 md:py-32 overflow-hidden border-t border-white/5">
-          <div className="px-8 md:px-20 mb-12">
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="sans text-[10px] uppercase tracking-[0.4em] text-white/30 mb-3">
-                  Curated by the Studio
-                </p>
-                <h2 className="serif text-5xl md:text-7xl font-light text-white/90 leading-none">
-                  Best Sellers
-                </h2>
-              </div>
-              <Link
-                href="/view-all"
-                className="hidden md:inline-flex sans text-[10px] uppercase tracking-[0.3em] text-white/35 hover:text-white transition-colors border-b border-white/15 hover:border-white/50 pb-0.5 mb-2"
-              >
-                View All →
-              </Link>
-            </div>
-            <div className="mt-8 h-px w-full bg-white/5" />
-          </div>
-
-          <div
-            className="flex gap-4 md:gap-6 px-8 md:px-20 pb-4 overflow-x-auto no-scrollbar"
-            style={{ WebkitOverflowScrolling: "touch" }}
-          >
-            {displayProducts.map((p: any, idx: number) => (
-              <BestSellerCard
-                key={isPlaceholder ? `ph-${idx}` : `${p.id}-${idx}`}
-                product={p}
-                isPlaceholder={isPlaceholder}
-              />
-            ))}
-          </div>
-
-          <div className="md:hidden px-8 mt-8">
-            <Link
-              href="/view-all"
-              className="sans text-[10px] uppercase tracking-[0.3em] text-white/35 hover:text-white transition-colors border-b border-white/15 hover:border-white/50 pb-0.5"
-            >
-              View All →
-            </Link>
           </div>
         </section>
 

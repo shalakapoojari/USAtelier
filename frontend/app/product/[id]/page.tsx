@@ -205,6 +205,7 @@ export default function ProductPage({
       name: product.name,
       price: product.price,
       size: selectedSize,
+      stock: product.stock,
       image: resolveMediaUrl(images[0]),
     })
 
@@ -296,6 +297,7 @@ export default function ProductPage({
         name: product.name,
         price: product.price,
         size: selectedSize,
+        stock: product.stock,
         image: resolveMediaUrl(images[0]),
       })
     }

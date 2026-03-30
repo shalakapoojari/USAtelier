@@ -83,17 +83,17 @@ export function SiteFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/account/orders" className="footer-link hover:text-white transition-colors">
+                <Link href="/help#shipping" className="footer-link hover:text-white transition-colors">
                   Order Tracking
                 </Link>
               </li>
               <li>
-                <Link href="/cart" className="footer-link hover:text-white transition-colors">
+                <Link href="/help#shipping" className="footer-link hover:text-white transition-colors">
                   Shipping Info
                 </Link>
               </li>
               <li>
-                <Link href="/cart" className="footer-link hover:text-white transition-colors">
+                <Link href="/help#returns" className="footer-link hover:text-white transition-colors">
                   Returns
                 </Link>
               </li>

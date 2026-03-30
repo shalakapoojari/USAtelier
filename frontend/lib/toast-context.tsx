@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useCallback, useRef } from "react"
+import { createContext, useContext, useState, useCallback, useRef, useEffect } from "react"
 import { CheckCircle, Heart, X, AlertTriangle, XCircle, Info, Truck } from "lucide-react"
 
 type ToastType = "cart" | "wishlist" | "info" | "success" | "error" | "warning" | "dispatch"
@@ -63,6 +63,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             setToasts((prev) => prev.filter((t) => t.id !== id))
         }, 3800)
     }, [])
+
+    // Global listener for toasts (handy when context is unavailable)
+    useEffect(() => {
+        const handleToastEvent = (e: any) => {
+            if (e.detail) {
+                showToast(e.detail.message, e.detail.type || "info", e.detail.subtext)
+            }
+        }
+        window.addEventListener("toast-show", handleToastEvent)
+        return () => window.removeEventListener("toast-show", handleToastEvent)
+    }, [showToast])
 
     const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
         return new Promise((resolve) => {

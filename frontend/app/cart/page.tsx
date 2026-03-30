@@ -162,7 +162,12 @@ export default function CartPage() {
                             item.quantity + 1
                           )
                         }
-                        className="w-10 h-10 flex items-center justify-center hover:bg-white hover:text-black transition-all"
+                        disabled={item.quantity >= item.stock}
+                        className={`w-10 h-10 flex items-center justify-center transition-all ${
+                          item.quantity >= item.stock 
+                            ? "opacity-20 cursor-not-allowed" 
+                            : "hover:bg-white hover:text-black"
+                        }`}
                       >
                         <Plus size={14} />
                       </button>

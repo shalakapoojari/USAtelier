@@ -155,12 +155,19 @@ export default function HelpPage() {
 
                     {/* FAQs */}
                     <div id="faq" className="space-y-16">
-                        {faqs.map((group, idx) => (
-                            <div key={idx}>
-                                <h2 className="text-[10px] uppercase tracking-[0.4em] text-gray-500 mb-8 border-b border-white/5 pb-4">
-                                    {group.section}
-                                </h2>
-                                <Accordion type="single" collapsible className="w-full">
+                        {faqs.map((group, idx) => {
+                            const sectionId = group.section.toLowerCase().includes("shipping") ? "shipping" 
+                                            : group.section.toLowerCase().includes("return") ? "returns"
+                                            : group.section.toLowerCase().includes("cancellation") ? "cancellation"
+                                            : group.section.toLowerCase().includes("sizing") ? "sizing"
+                                            : group.section.toLowerCase().includes("payment") ? "payments"
+                                            : `section-${idx}`;
+                            return (
+                                <div key={idx} id={sectionId}>
+                                    <h2 className="text-[10px] uppercase tracking-[0.4em] text-gray-500 mb-8 border-b border-white/5 pb-4">
+                                        {group.section}
+                                    </h2>
+                                    <Accordion type="single" collapsible className="w-full">
                                     {group.items.map((item, itemIdx) => (
                                         <AccordionItem key={itemIdx} value={`item-${idx}-${itemIdx}`} className="border-white/10">
                                             <AccordionTrigger className="text-sm uppercase tracking-widest text-left hover:no-underline hover:text-white transition-colors py-6">
@@ -173,7 +180,7 @@ export default function HelpPage() {
                                     ))}
                                 </Accordion>
                             </div>
-                        ))}
+                        )})}
                     </div>
 
                     {/* Contact Section */}
