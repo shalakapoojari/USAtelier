@@ -104,7 +104,8 @@ if _delhivery_missing:
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 
 if os.getenv("TRUST_PROXY_HEADERS", "1") == "1":
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+    # PythonAnywhere/Vercel/Heroku common proxy headers
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_port=1, x_prefix=1)
 
 # ============================================================
 # Structured logging with PII redaction
@@ -140,9 +141,13 @@ def _normalize_url(raw: str, default: str) -> str:
     return urlunparse(parsed).rstrip("/")
 
 def get_backend_base_url() -> str:
-    cfg = os.getenv("BACKEND_URL", "")
+    cfg = os.getenv("BACKEND_URL", "").strip().rstrip("/")
     if cfg:
-        return _normalize_url(cfg, "http://localhost:5000")
+        # Hard-enforce HTTPS in production even if configured otherwise
+        if is_production and cfg.startswith("http://"):
+            cfg = "https://" + cfg[7:]
+        return cfg
+    
     root = request.url_root.rstrip("/") if request else ""
     return _normalize_url(root or "http://localhost:5000", "http://localhost:5000")
 
