@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/lib/auth-context"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { useCart } from "@/lib/cart-context"
@@ -12,9 +14,33 @@ const FREE_SHIPPING_MIN = 2000
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, total, clearUnseen } = useCart()
+  const { isAuthenticated, isAuthLoading } = useAuth()
+  const router = useRouter()
 
+  // Authentication guard
+  useEffect(() => {
+    if (!isAuthLoading && !isAuthenticated) {
+      router.push("/login?next=/cart")
+    }
+  }, [isAuthLoading, isAuthenticated, router])
+  
   // Clear the navbar badge as soon as the user lands here
-  useEffect(() => { clearUnseen() }, [])
+  useEffect(() => { 
+    if (isAuthenticated) {
+        clearUnseen() 
+    }
+  }, [isAuthenticated, clearUnseen])
+
+  if (isAuthLoading || !isAuthenticated) {
+    return (
+      <div className="bg-[#030303] text-[#e8e8e3] min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+           <div className="w-8 h-8 border-2 border-white/20 border-t-white animate-spin rounded-full" />
+           <p className="text-[10px] uppercase tracking-widest text-gray-500">Checking session...</p>
+        </div>
+      </div>
+    )
+  }
 
   const shipping = total >= FREE_SHIPPING_MIN ? 0 : 149
   const grandTotal = total + shipping

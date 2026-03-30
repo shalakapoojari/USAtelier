@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Heart, ShoppingBag, X } from "lucide-react"
 
 import { SiteHeader } from "@/components/site-header"
@@ -15,6 +16,7 @@ export default function FavouritesPage() {
     const { items, removeItem, clearUnseen } = useWishlist()
     const { addItem } = useCart()
     const { showToast } = useToast()
+    const router = useRouter()
 
     // Clear the navbar badge as soon as the user lands here
     useEffect(() => { clearUnseen() }, [])
@@ -22,10 +24,14 @@ export default function FavouritesPage() {
     const handleAddToCart = (item: typeof items[0]) => {
         // Add with default size — user can pick on product page
         addItem({
-            id: item.id, name: item.name, price: item.price, image: item.image, size: "M",
-            stock: 0
+            id: item.id,
+            name: item.name,
+            price: item.price,
+            image: item.image,
+            size: "M",
+            stock: item.stock ?? 50 // Use real stock or safe fallback
         })
-        showToast("Added to cart", "cart", item.name)
+        showToast("Added to cart", "cart", item.name, () => router.push("/cart"))
     }
 
     return (

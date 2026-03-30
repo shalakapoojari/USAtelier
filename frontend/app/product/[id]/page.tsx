@@ -210,7 +210,7 @@ export default function ProductPage({
     })
 
     setAddedToCart(true)
-    showToast("Added to cart", "cart", `${product.name} — Size ${selectedSize}`)
+    showToast("Added to cart", "cart", `${product.name} — Size ${selectedSize}`, () => router.push("/cart"))
     setTimeout(() => setAddedToCart(false), 2500)
   }
 

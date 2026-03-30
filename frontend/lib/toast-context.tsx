@@ -11,6 +11,7 @@ type Toast = {
     message: string
     subtext?: string
     type: ToastType
+    onAction?: () => void
 }
 
 type ConfirmOptions = {
@@ -22,7 +23,7 @@ type ConfirmOptions = {
 }
 
 type ToastContextType = {
-    showToast: (message: string, type?: ToastType, subtext?: string) => void
+    showToast: (message: string, type?: ToastType, subtext?: string, onAction?: () => void) => void
     confirm: (options: ConfirmOptions) => Promise<boolean>
 }
 
@@ -56,9 +57,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         resolve: ((value: boolean) => void) | null
     }>({ open: false, options: { title: "", message: "" }, resolve: null })
 
-    const showToast = useCallback((message: string, type: ToastType = "cart", subtext?: string) => {
+    const showToast = useCallback((message: string, type: ToastType = "cart", subtext?: string, onAction?: () => void) => {
         const id = Date.now().toString() + Math.random().toString(36).slice(2, 5)
-        setToasts((prev) => [...prev.slice(-4), { id, message, type, subtext }])
+        setToasts((prev) => [...prev.slice(-4), { id, message, type, subtext, onAction }])
         setTimeout(() => {
             setToasts((prev) => prev.filter((t) => t.id !== id))
         }, 3800)
@@ -68,7 +69,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         const handleToastEvent = (e: any) => {
             if (e.detail) {
-                showToast(e.detail.message, e.detail.type || "info", e.detail.subtext)
+                showToast(e.detail.message, e.detail.type || "info", e.detail.subtext, e.detail.onAction)
             }
         }
         window.addEventListener("toast-show", handleToastEvent)
@@ -97,7 +98,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 {toasts.map((toast, i) => (
                     <div
                         key={toast.id}
-                        className={`pointer-events-auto flex items-start gap-3 bg-[#0a0a0a]/95 border ${BORDER_MAP[toast.type]} px-5 py-4 shadow-[0_20px_50px_rgba(0,0,0,0.6)] backdrop-blur-xl min-w-[280px] max-w-[380px] rounded-sm`}
+                        onClick={() => {
+                            if (toast.onAction) {
+                                toast.onAction()
+                                dismiss(toast.id)
+                            }
+                        }}
+                        className={`pointer-events-auto flex items-start gap-3 bg-[#0a0a0a]/95 border ${BORDER_MAP[toast.type]} px-5 py-4 shadow-[0_20px_50px_rgba(0,0,0,0.6)] backdrop-blur-xl min-w-[280px] max-w-[380px] rounded-sm ${toast.onAction ? "cursor-pointer hover:border-white/20 transition-colors" : ""}`}
                         style={{
                             animation: "toastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
                             WebkitAnimation: "toastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
@@ -113,7 +120,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                             )}
                         </div>
                         <button
-                            onClick={() => dismiss(toast.id)}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                dismiss(toast.id)
+                            }}
                             className="text-gray-600 hover:text-white transition-colors shrink-0 mt-0.5"
                         >
                             <X size={12} />
