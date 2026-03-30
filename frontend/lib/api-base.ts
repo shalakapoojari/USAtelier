@@ -22,7 +22,7 @@ export function getApiBase(): string {
     }
 
     // Production fallback for this deployment when env vars are missing.
-    return "https://shalakapoojari.pythonanywhere.com"
+    return "https://api.usatelier.in"
   }
 
   return "http://localhost:5000"
