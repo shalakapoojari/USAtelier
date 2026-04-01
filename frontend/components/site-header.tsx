@@ -489,21 +489,7 @@ export function SiteHeader() {
 
 
         {/* ── Mobile category pills row — all pages ── */}
-        <div
-          className="hidden md:flex w-full overflow-x-auto no-scrollbar flex gap-2 px-4 py-2"
-          style={{ background: "rgba(4,2,10,0.92)", borderBottom: "1px solid rgba(155,48,255,0.1)" }}
-        >
-          <Link href="/view-all" className="pill-cat shrink-0">All</Link>
-          {dynamicCategories.map(cat => (
-            <Link
-              key={cat.id || cat.name}
-              href={`/view-all?category=${encodeURIComponent(cat.name)}`}
-              className="pill-cat shrink-0"
-            >
-              {cat.name}
-            </Link>
-          ))}
-        </div>
+
 
 
         {/* ── MOBILE DRAWER: ALL NAV CONTENT ── */}
