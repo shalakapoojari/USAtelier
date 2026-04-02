@@ -2151,10 +2151,6 @@ def create_order():
                 price          = item["unit_price"],
                 size           = item.get("size"),
             ))
-            product = ProductSQL.query.with_for_update().get(item["id"])
-            if not product or product.stock < item["quantity"]:
-                raise ValueError(f"Insufficient stock for {item['name']}")
-            product.stock -= item["quantity"]
 
             # Out-of-stock alert
             if product.stock == 0:

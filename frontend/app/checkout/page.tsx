@@ -84,7 +84,7 @@ export default function CheckoutPage() {
   const sgst = shippingEstimate?.sgst ?? (isMumbai ? total * 0.025 : 0)
   const igst = shippingEstimate?.igst ?? (isOut ? total * 0.05 : 0)
   const tax = shippingEstimate?.tax_total ?? (cgst + sgst + igst)
-  
+
   const shipping = shippingEstimate?.shipping_cost ?? (total >= 2000 ? 0 : 149)
   const grandTotal = total + shipping + tax
 
@@ -273,6 +273,8 @@ export default function CheckoutPage() {
               headers: { "Content-Type": "application/json" },
               credentials: "include",
               body: JSON.stringify({
+                email: formData.email,        // ✅ ADD THIS
+                phone: formData.phone,
                 total: grandTotal,
                 items: items.map((item) => ({
                   id: item.id,
@@ -366,13 +368,12 @@ export default function CheckoutPage() {
               const isPast = steps.findIndex(x => x.key === step) > i
               return (
                 <div key={s.key} className="flex items-center gap-2 md:gap-4">
-                  <div className={`flex items-center gap-2 md:gap-3 px-3 md:px-5 py-2 md:py-3 rounded-full border transition-all duration-500 ${
-                    isActive
+                  <div className={`flex items-center gap-2 md:gap-3 px-3 md:px-5 py-2 md:py-3 rounded-full border transition-all duration-500 ${isActive
                       ? "border-white/30 bg-white/5 text-white"
                       : isPast
                         ? "border-green-500/30 bg-green-500/5 text-green-400"
                         : "border-white/5 text-gray-600"
-                  }`}>
+                    }`}>
                     {isPast ? (
                       <CheckCircle size={14} className="text-green-400" />
                     ) : (
@@ -494,11 +495,10 @@ export default function CheckoutPage() {
                         onChange={handleInputChange}
                         maxLength={6}
                         onBlur={() => formData.zip.length === 6 && checkPincode(formData.zip)}
-                        className={`bg-transparent border-white/20 text-white h-12 pr-10 ${
-                          errors.zip ? 'border-red-500' :
-                          pincodeStatus === "valid" ? 'border-green-500/50' :
-                          pincodeStatus === "invalid" ? 'border-red-500' : ''
-                        }`}
+                        className={`bg-transparent border-white/20 text-white h-12 pr-10 ${errors.zip ? 'border-red-500' :
+                            pincodeStatus === "valid" ? 'border-green-500/50' :
+                              pincodeStatus === "invalid" ? 'border-red-500' : ''
+                          }`}
                       />
                       {pincodeStatus === "checking" && (
                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -514,9 +514,8 @@ export default function CheckoutPage() {
                     </div>
                     {errors.zip && <p className="text-[10px] text-red-500 uppercase tracking-widest">{errors.zip}</p>}
                     {pincodeMessage && (
-                      <p className={`text-[10px] uppercase tracking-widest ${
-                        pincodeStatus === "valid" ? "text-green-400" : pincodeStatus === "invalid" ? "text-red-400" : "text-gray-500"
-                      }`}>
+                      <p className={`text-[10px] uppercase tracking-widest ${pincodeStatus === "valid" ? "text-green-400" : pincodeStatus === "invalid" ? "text-red-400" : "text-gray-500"
+                        }`}>
                         {pincodeMessage}
                       </p>
                     )}
