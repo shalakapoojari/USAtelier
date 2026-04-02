@@ -4,7 +4,7 @@ import { useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
 export const dynamic = "force-dynamic"
-
+console.log("SIGNUP PAGE LOADED")
 export default function SignupPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
