@@ -99,6 +99,14 @@ export default function ProductsPage() {
     }
   }, [API_BASE])
 
+  async function getCSRFToken(API_BASE: string) {
+    const res = await fetch(`${API_BASE}/api/csrf-token`, {
+      credentials: "include",
+    })
+    const data = await res.json()
+    return data.csrf_token
+  }
+
   const fetchProducts = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/products`)
@@ -125,15 +133,6 @@ export default function ProductsPage() {
       console.error("Failed to fetch categories:", err)
     }
   }
-
-
-  useEffect(() => {
-    if (API_BASE) {
-      initCSRF(API_BASE)   // 🔥 ADD THIS
-      fetchProducts()
-      fetchCategories()
-    }
-  }, [API_BASE])
 
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -184,12 +183,19 @@ export default function ProductsPage() {
     data.append("file", file)
 
     try {
+      const csrfToken = await getCSRFToken(API_BASE)
+
       const res = await fetch(`${API_BASE}/api/upload`, {
         method: "POST",
         credentials: "include",
+        headers: {
+          "X-CSRF-Token": csrfToken,
+        },
         body: data,
       })
+
       const result = await res.json()
+
       if (res.ok && result.success) {
         handleImageChange(index, result.url)
         showToast("Image uploaded", "info")
@@ -200,6 +206,7 @@ export default function ProductsPage() {
       showToast("Upload error", "info")
     }
   }
+
   const handleDeleteProduct = async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return
 
@@ -310,15 +317,21 @@ export default function ProductsPage() {
     }
 
     try {
+      const csrfToken = await getCSRFToken(API_BASE)
+
       const url = editingProduct
         ? `${API_BASE}/api/products/${editingProduct.id}`
         : `${API_BASE}/api/products`
+
       const method = editingProduct ? "PUT" : "POST"
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
         credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken,
+        },
         body: JSON.stringify({
           ...formData,
           notify_users: formData.notifyUsers,
@@ -327,10 +340,15 @@ export default function ProductsPage() {
       })
 
       if (res.ok) {
-        showToast(editingProduct ? "Product updated successfully" : "Product added successfully", "info")
+        showToast(
+          editingProduct ? "Product updated successfully" : "Product added successfully",
+          "info"
+        )
+
         setDialogOpen(false)
         setEditingProduct(null)
         fetchProducts()
+
         setFormData({
           name: "",
           price: "",
@@ -353,7 +371,7 @@ export default function ProductsPage() {
         const data = await res.json()
         showToast(data.error || "Failed to save product", "info")
       }
-    } catch (err) {
+    } catch {
       showToast("Network error", "info")
     } finally {
       setIsAdding(false)
@@ -892,11 +910,3 @@ export default function ProductsPage() {
     </div>
   )
 }
-function fetchProducts() {
-  throw new Error("Function not implemented.")
-}
-
-function fetchCategories() {
-  throw new Error("Function not implemented.")
-}
-
