@@ -13,7 +13,44 @@ function normalizeApiBase(raw: string): string {
 }
 
 export function getApiBase(): string {
-  return process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000"
+  const envBase = process.env.NEXT_PUBLIC_API_BASE
+  if (envBase) return normalizeApiBase(envBase)
+
+  // Client-side
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname
+
+    const isLocalHost =
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host.startsWith("192.168.") ||
+      host.startsWith("10.")
+
+    if (isLocalHost) {
+      return "http://localhost:5000"   // ✅ FIXED
+    }
+
+    // Production fallback
+    return "https://api.usatelier.in"
+  }
+
+  // Server-side fallback (Next.js SSR)
+  return "http://localhost:5000"   // ✅ FIXED
+}
+
+export async function apiFetch(
+  API_BASE: string,
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  return fetch(`${API_BASE}${url}`, {
+    ...options,
+    credentials: "include",
+    headers: {
+      ...(options.headers || {}),
+      ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+    } as HeadersInit,
+  })
 }
 
 export async function initCSRF(API_BASE: string) {
