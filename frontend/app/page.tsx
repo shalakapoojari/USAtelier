@@ -9,8 +9,6 @@ import { getApiBase } from "@/lib/api-base";
 import { resolveMediaUrl } from "@/lib/media-url";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { getCSRFToken } from "./api"
-
 
 gsap.registerPlugin(ScrollTrigger);
 

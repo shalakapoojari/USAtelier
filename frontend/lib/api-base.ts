@@ -1,3 +1,6 @@
+let csrfToken: string | null = null
+
+
 function normalizeApiBase(raw: string): string {
   const value = raw.trim().replace(/\/+$/, "")
   if (!value) return value
@@ -27,4 +30,18 @@ export function getApiBase(): string {
 
   return "http://localhost:5000"
 }
+
+export async function initCSRF(API_BASE: string) {
+  try {
+    const res = await fetch(`${API_BASE}/api/csrf-token`, {
+      credentials: "include",
+    })
+
+    const data = await res.json()
+    csrfToken = data.csrf_token
+  } catch (err) {
+    console.error("CSRF init failed:", err)
+  }
+}
+
 

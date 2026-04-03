@@ -1,5 +1,4 @@
 "use client"
-
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { Plus, X, Loader2, Upload, Link as LinkIcon, Search } from "lucide-react"
@@ -28,6 +27,8 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/lib/toast-context"
 import { getApiBase } from "@/lib/api-base"
+import { initCSRF } from "@/lib/api-base"
+
 
 const getSizesForCategory = (categoryName: string) => {
   const cat = categoryName.toLowerCase();
@@ -56,6 +57,7 @@ type Category = {
   name: string
   subcategories: string[]
 }
+
 
 export default function ProductsPage() {
   const API_BASE = getApiBase()
@@ -111,6 +113,7 @@ export default function ProductsPage() {
     }
   }
 
+
   const fetchCategories = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/categories`)
@@ -122,6 +125,16 @@ export default function ProductsPage() {
       console.error("Failed to fetch categories:", err)
     }
   }
+
+
+  useEffect(() => {
+    if (API_BASE) {
+      initCSRF(API_BASE)   // 🔥 ADD THIS
+      fetchProducts()
+      fetchCategories()
+    }
+  }, [API_BASE])
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -879,3 +892,11 @@ export default function ProductsPage() {
     </div>
   )
 }
+function fetchProducts() {
+  throw new Error("Function not implemented.")
+}
+
+function fetchCategories() {
+  throw new Error("Function not implemented.")
+}
+
