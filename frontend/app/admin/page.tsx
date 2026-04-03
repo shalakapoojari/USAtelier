@@ -19,7 +19,7 @@ export default function AdminDashboard() {
         setOrders(Array.isArray(ordersData) ? ordersData : [])
         setProducts(Array.isArray(productsData) ? productsData : [])
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false))
   }, [])
 
