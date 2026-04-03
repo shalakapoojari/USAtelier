@@ -191,21 +191,21 @@ export default function ProductsPage() {
     if (!confirm("Are you sure you want to delete this product?")) return
 
     try {
-      // 🔥 STEP 1: get CSRF token
+      // 🔥 ALWAYS fetch fresh CSRF token
       const csrfRes = await fetch(`${API_BASE}/api/csrf-token`, {
-        credentials: "include"
+        credentials: "include",
       })
+
       const csrfData = await csrfRes.json()
       const csrfToken = csrfData.csrf_token
 
-      // 🔥 STEP 2: send DELETE with token
+      // 🔥 DELETE with fresh token
       const res = await fetch(`${API_BASE}/api/products/${id}`, {
         method: "DELETE",
         credentials: "include",
         headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": csrfToken   // 🔥 THIS WAS MISSING
-        }
+          "X-CSRF-Token": csrfToken,
+        },
       })
 
       if (res.ok) {
@@ -215,7 +215,8 @@ export default function ProductsPage() {
         const data = await res.json()
         showToast(data.error || "Failed to delete", "info")
       }
-    } catch {
+    } catch (err) {
+      console.error(err)
       showToast("Network error", "info")
     }
   }
