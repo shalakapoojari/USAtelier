@@ -312,6 +312,7 @@ if not is_production:
 # SECURITY: Exempt public auth endpoints from CSRF
 # They bootstrap the session; CSRF is only needed for subsequent requests.
 csrf.exempt("/api/auth/login")
+csrf.exempt("/api/auth/logout")
 csrf.exempt("/api/auth/signup")
 csrf.exempt("/api/auth/verify-otp")
 csrf.exempt("/api/auth/send-otp")
@@ -929,7 +930,6 @@ def signup():
         session.permanent    = True
         session["user_id"]   = str(new_user.id)
         session["is_admin"]  = False
-        session["_csrf_seed"] = secrets.token_hex(32)  # fresh CSRF seed
         session["is_new_signup"] = True
 
         try:
@@ -1016,7 +1016,6 @@ def login():
     session.permanent    = True
     session["user_id"]   = str(user.id)
     session["is_admin"]  = bool(user.is_admin)
-    session["_csrf_seed"] = secrets.token_hex(32)
     if old_cart:
         session["cart"] = old_cart  # preserve guest cart
 
@@ -1139,7 +1138,6 @@ def change_password():
         return jsonify({"error": "Failed to update password"}), 500
 
     # SECURITY: Invalidate all other sessions by regenerating CSRF seed
-    session["_csrf_seed"] = secrets.token_hex(32)
 
     try:
         send_password_change_confirmation(mail, user.email, user.first_name or "User")
@@ -1302,7 +1300,6 @@ def verify_otp():
         session.permanent     = True
         session["user_id"]    = str(user.id)
         session["is_admin"]   = bool(user.is_admin)
-        session["_csrf_seed"] = secrets.token_hex(32)
 
         return jsonify({
             "success":   True,
@@ -1527,7 +1524,7 @@ def add_product():
             size_guide_image = _sanitise_str(data.get("sizeGuideImage", ""), 500),
         )
         db_mysql.session.add(new_product)
-        db_mysql.session.commit()
+        db_mysql.session.flush()   # get new_product.id before audit
         _audit("product_created", "product", new_product.id, {"name": name})
         db_mysql.session.commit()
 
@@ -1596,7 +1593,6 @@ def update_product(product_id):
     try:
         db_mysql.session.commit()
         _audit("product_updated", "product", product_id)
-        db_mysql.session.commit()
         return jsonify({"success": True, "message": "Product updated"}), 200
     except Exception as exc:
         db_mysql.session.rollback()
@@ -2357,7 +2353,6 @@ def create_order():
         session.permanent     = True
         session["user_id"]    = str(user.id)
         session["is_admin"]   = bool(user.is_admin)
-        session["_csrf_seed"] = secrets.token_hex(32)
 
     incoming_items    = data.get("items", [])
     validated_items   = []

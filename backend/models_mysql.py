@@ -101,7 +101,6 @@ class Category(db_mysql.Model):
 # ---------------------------------------------------------------------------
 # Product
 # ---------------------------------------------------------------------------
-
 class Product(db_mysql.Model):
     __tablename__ = "products"
 
@@ -112,8 +111,11 @@ class Product(db_mysql.Model):
     subcategory      = db_mysql.Column(db_mysql.String(100))
     gender           = db_mysql.Column(db_mysql.String(50))
     description      = db_mysql.Column(db_mysql.Text)
-    images_json      = db_mysql.Column(db_mysql.Text)
-    sizes_json       = db_mysql.Column(db_mysql.Text) # Stores JSON like {"S": 10, "M": 5} or ["S", "M"]
+
+    # ✅ CLEAN JSON FIELDS
+    images           = db_mysql.Column(db_mysql.JSON, default=list)
+    sizes            = db_mysql.Column(db_mysql.JSON, default=dict)
+
     stock            = db_mysql.Column(db_mysql.Integer, default=0)
     is_featured      = db_mysql.Column(db_mysql.Boolean, default=False)
     is_new           = db_mysql.Column(db_mysql.Boolean, default=False)
@@ -123,73 +125,55 @@ class Product(db_mysql.Model):
     size_guide_image = db_mysql.Column(db_mysql.Text)
     created_at       = db_mysql.Column(db_mysql.DateTime, default=datetime.utcnow)
 
-    @property
-    def images(self):
-        return json.loads(self.images_json) if self.images_json else []
-
-    @images.setter
-    def images(self, value):
-        self.images_json = json.dumps(value)
-
-    @property
-    def sizes(self):
-        """Returns the dictionary or list of sizes."""
-        if not self.sizes_json:
-            return []
-        try:
-            return json.loads(self.sizes_json)
-        except:
-            return []
-
-    @sizes.setter
-    def sizes(self, value):
-        self.sizes_json = json.dumps(value)
-
     def get_stock_for_size(self, size: str) -> int:
-        """Returns the stock count for a specific size."""
-        data = self.sizes
+        data = self.sizes or {}
         if isinstance(data, dict):
             return int(data.get(size, 0))
-        # Legacy support: if sizes is a list, we use the global stock
-        if isinstance(data, list) and size in data:
-            return self.stock
         return 0
 
     def update_stock_for_size(self, size: str, delta: int):
-        """Increments/decrements stock for a specific size."""
-        data = self.sizes
+        data = self.sizes or {}
         if isinstance(data, dict):
             current = int(data.get(size, 0))
             data[size] = max(0, current + delta)
             self.sizes = data
-            # Also update the total stock for quick lookups
-            self.stock = sum(int(v) for v in data.values() if str(v).isdigit())
+            self.stock = sum(int(v) for v in data.values())
         else:
-            # Legacy fallback
             self.stock = max(0, self.stock + delta)
 
     def to_dict(self):
+        images = self.images or []
+        sizes  = self.sizes  or {}
         return {
             "id":            self.id,
             "name":          self.name,
-            "price":         self.price,
-            "category":      self.category,
-            "subcategory":   self.subcategory,
-            "gender":        self.gender,
-            "description":   self.description,
-            "images":        self.images,
-            "sizes":         self.sizes,
-            "stock":         self.stock,
-            "isFeatured":    self.is_featured,
-            "isNew":         self.is_new,
-            "isBestseller":  self.is_bestseller,
-            "fabric":        self.fabric,
-            "care":          self.care,
-            "sizeGuideImage": self.size_guide_image,
+            "price":         float(self.price or 0),
+            "category":      self.category or "",
+            "subcategory":   self.subcategory or "",
+            "gender":        self.gender or "",
+            "description":   self.description or "",
+            "images":        images,
+            "sizes":         sizes,
+            "stock":         int(self.stock or 0),
+            # Boolean flags — both camelCase (old) and snake_case (new)
+            "isFeatured":    bool(self.is_featured),
+            "is_featured":   bool(self.is_featured),
+            "isNew":         bool(self.is_new),
+            "is_new":        bool(self.is_new),
+            # Extra aliases used by frontend product-card
+            "newArrival":    bool(self.is_new),
+            "bestseller":    bool(self.is_bestseller),
+            "isBestseller":  bool(self.is_bestseller),
+            "is_bestseller": bool(self.is_bestseller),
+            "fabric":        self.fabric or "",
+            "care":          self.care or "",
+            # Size guide — both spellings
+            "sizeGuideImage":  self.size_guide_image or "",
+            "size_guide_image": self.size_guide_image or "",
+            # Dates — both spellings
             "createdAt":     self.created_at.isoformat() if self.created_at else None,
+            "created_at":    self.created_at.isoformat() if self.created_at else None,
         }
-
-
 # ---------------------------------------------------------------------------
 # Payment
 # ---------------------------------------------------------------------------

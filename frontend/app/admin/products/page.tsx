@@ -269,7 +269,7 @@ export default function ProductsPage() {
       fabric: product.fabric || "",
       care: product.care || "",
       gender: product.gender || "Unisex",
-      sizeGuideImage: product.sizeGuideImage || "",
+      sizeGuideImage: product.sizeGuideImage || product.size_guide_image || "",
       notifyUsers: false,
     })
     setEditingProduct(product)
