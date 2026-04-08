@@ -2,16 +2,13 @@ import { getApiBase } from "@/lib/api-base"
 
 const API_BASE = getApiBase()
 
-function withStaticUploadsPath(url: string): string {
-  return url.replace("/uploads/", "/static/uploads/")
-}
-
 export function resolveMediaUrl(url?: string | null): string {
   if (!url) return "/placeholder.jpg"
 
   const trimmed = url.trim()
   if (!trimmed) return "/placeholder.jpg"
 
+  // 1. Handle absolute URLs (http, https, data, blob)
   if (
     trimmed.startsWith("http://") ||
     trimmed.startsWith("https://") ||
@@ -20,32 +17,33 @@ export function resolveMediaUrl(url?: string | null): string {
   ) {
     try {
       const parsed = new URL(trimmed)
-      if (parsed.pathname.startsWith("/uploads/")) {
-        parsed.pathname = withStaticUploadsPath(parsed.pathname)
+      // Normalize if it accidentally contains /static/uploads/
+      if (parsed.pathname.includes("/static/uploads/")) {
+        parsed.pathname = parsed.pathname.replace("/static/uploads/", "/uploads/")
         return parsed.toString()
       }
+      return trimmed
     } catch {
       return trimmed
     }
-    return trimmed
   }
 
+  // 2. Handle paths starting with /uploads/ (most common)
   if (trimmed.startsWith("/uploads/")) {
-    return `${API_BASE}${withStaticUploadsPath(trimmed)}`
-  }
-
-  if (trimmed.startsWith("/static/uploads/")) {
     return `${API_BASE}${trimmed}`
   }
 
-  if (trimmed.startsWith("uploads/")) {
-    return `${API_BASE}/static/${trimmed}`
+  // 3. Handle legacy or incorrect paths starting with /static/uploads/
+  if (trimmed.startsWith("/static/uploads/")) {
+    return `${API_BASE}${trimmed.replace("/static/uploads/", "/uploads/")}`
   }
 
-  if (trimmed.startsWith("static/uploads/")) {
+  // 4. Handle relative uploads/
+  if (trimmed.startsWith("uploads/")) {
     return `${API_BASE}/${trimmed}`
   }
 
+  // 5. Normal relative paths
   if (trimmed.startsWith("/")) {
     return trimmed
   }

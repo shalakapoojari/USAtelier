@@ -142,8 +142,37 @@ class Product(db_mysql.Model):
             self.stock = max(0, self.stock + delta)
 
     def to_dict(self):
-        images = self.images or []
-        sizes  = self.sizes  or {}
+        import os, json
+        backend_url = os.getenv("BACKEND_URL", "").rstrip("/")
+        
+        def _fix_url(url):
+            if not url: return ""
+            # Fix legacy or incorrect /static/uploads paths
+            if "/static/uploads/" in url:
+                url = url.replace("/static/uploads/", "/uploads/")
+
+            # If it's already a full URL, check if it points to our uploads
+            if url.startswith("http"):
+                # If it's our own domain's old URL, normalize it
+                if "/uploads/" in url and "api.usatelier.in" in url:
+                    url = url.split("/uploads/", 1)[1]
+                    return f"{backend_url}/uploads/{url}"
+                return url
+            if url.startswith("/uploads"): 
+                return f"{backend_url}{url}"
+            return url
+
+        # Handle potential DB serialization issues (string vs list)
+        raw_imgs = self.images
+        if isinstance(raw_imgs, str):
+            try: raw_imgs = json.loads(raw_imgs)
+            except: raw_imgs = [raw_imgs]
+        
+        images = [(_fix_url(img) if isinstance(img, str) else img) for img in (raw_imgs or [])]
+        sizes  = self.sizes or {}
+        if isinstance(sizes, str):
+            try: sizes = json.loads(sizes)
+            except: pass
         return {
             "id":            self.id,
             "name":          self.name,
@@ -168,8 +197,8 @@ class Product(db_mysql.Model):
             "fabric":        self.fabric or "",
             "care":          self.care or "",
             # Size guide — both spellings
-            "sizeGuideImage":  self.size_guide_image or "",
-            "size_guide_image": self.size_guide_image or "",
+            "sizeGuideImage":  _fix_url(self.size_guide_image),
+            "size_guide_image": _fix_url(self.size_guide_image),
             # Dates — both spellings
             "createdAt":     self.created_at.isoformat() if self.created_at else None,
             "created_at":    self.created_at.isoformat() if self.created_at else None,
@@ -340,7 +369,7 @@ class Review(db_mysql.Model):
     id              = db_mysql.Column(db_mysql.Integer, primary_key=True)
     user_id         = db_mysql.Column(db_mysql.Integer, db_mysql.ForeignKey("users.id"))
     user_email      = db_mysql.Column(db_mysql.String(255))
-    product_id      = db_mysql.Column(db_mysql.Integer, db_mysql.ForeignKey("products.id"))
+    product_id      = db_mysql.Column("product_id_str", db_mysql.String(50))
     rating          = db_mysql.Column(db_mysql.Integer, nullable=False)
     comment         = db_mysql.Column(db_mysql.Text)
     created_at      = db_mysql.Column(db_mysql.DateTime, default=datetime.utcnow)
@@ -405,8 +434,38 @@ class HomepageConfig(db_mysql.Model):
         self.new_arrival_ids_json = json.dumps(value)
 
     def to_dict(self):
+        import os, json
+        backend_url = os.getenv("BACKEND_URL", "").rstrip("/")
+        
+        def _fix_url(url):
+            if not url: return ""
+            # Fix legacy or incorrect /static/uploads paths
+            if "/static/uploads/" in url:
+                url = url.replace("/static/uploads/", "/uploads/")
+
+            if url.startswith("http"):
+                if "/uploads/" in url and "api.usatelier.in" in url:
+                    url = url.split("/uploads/", 1)[1]
+                    return f"{backend_url}/uploads/{url}"
+                return url
+            if url.startswith("/uploads"): 
+                return f"{backend_url}{url}"
+            return url
+
+        # Handle hero_slides if stored as JSON string
+        raw_slides = self.hero_slides or []
+        if isinstance(raw_slides, str):
+            try: raw_slides = json.loads(raw_slides)
+            except: raw_slides = []
+
+        fixed_slides = []
+        for slide in raw_slides:
+            if isinstance(slide, dict) and "image" in slide:
+                slide["image"] = _fix_url(slide["image"])
+            fixed_slides.append(slide)
+
         return {
-            "hero_slides":            self.hero_slides,
+            "hero_slides":            fixed_slides,
             "manifesto_text":         self.manifesto_text,
             "bestseller_product_ids": self.bestseller_ids,
             "featured_product_ids":   self.featured_ids,

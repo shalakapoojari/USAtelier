@@ -28,7 +28,7 @@ import secrets
 import hmac
 from werkzeug.utils import safe_join
 from flask import Flask, render_template, jsonify, request, session, redirect, send_from_directory, make_response
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -56,6 +56,10 @@ from mail_utils import (
     send_new_arrival_notification,
     send_otp_email,
 )
+from dotenv import load_dotenv
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+
 from models_mysql import (
     db_mysql,
     User, Product as ProductSQL, Category as CategorySQL,
@@ -90,7 +94,7 @@ except ImportError:
 # Bootstrap
 # ============================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(BASE_DIR, ".env"))
+# Dotenv loaded early to ensure env vars available to all modules
 
 is_production = (
     os.getenv("NODE_ENV") == "production"
@@ -735,38 +739,25 @@ else:
 # Static file serving
 # ============================================================
 
-@app.route("/static/uploads/<path:filename>")
-def serve_uploads(filename):
-    # SECURITY: secure_filename prevents path traversal
-    safe = secure_filename(filename)
-    if not safe:
-        return jsonify({"error": "Invalid filename"}), 400
-    return send_from_directory(app.config["UPLOAD_FOLDER"], safe)
-
 @app.route("/uploads/<path:filename>")
 def serve_uploads_short(filename):
     """
     Serve user-uploaded files at /uploads/<path>.
-    SECURITY: secure_filename prevents path traversal.
-    Subdirectory (products/, profiles/) is preserved by splitting on the first /.
+    SECURITY: safe_join prevents path traversal across directories.
     """
-    import os as _os
     try:
-        # Allow one level of sub-directory (e.g. products/abc.jpg)
-        parts = filename.split("/", 1)
-        if len(parts) == 2:
-            subdir, fname = parts
-            safe_dir  = _os.path.join(app.config["UPLOAD_FOLDER"], secure_filename(subdir))
-            safe_fname = secure_filename(fname)
-        else:
-            safe_dir  = app.config["UPLOAD_FOLDER"]
-            safe_fname = secure_filename(parts[0])
-        if not safe_fname:
-            return jsonify({"error": "Invalid filename"}), 400
-        return send_from_directory(safe_dir, safe_fname)
-    except FileNotFoundError:
-        return jsonify({"error": "File not found"}), 404
-    except Exception:
+        # Resolve the safest absolute path
+        from werkzeug.utils import safe_join as _safe_join
+        target = _safe_join(app.config["UPLOAD_FOLDER"], filename)
+        if not target or not os.path.isfile(target):
+            return jsonify({"error": "File not found"}), 404
+            
+        # Add CORS header to allow images to be loaded cross-origin (e.g. from the main site)
+        resp = send_from_directory(os.path.dirname(target), os.path.basename(target))
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp
+    except Exception as exc:
+        app.logger.warning("serve_file_error path=%s err=%s", filename, exc)
         return jsonify({"error": "Could not serve file"}), 500
 
 @app.errorhandler(413)
@@ -816,10 +807,11 @@ def security_headers(response):
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com; "
-        "style-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "img-src 'self' data: https:; "
-        "connect-src 'self' https://api.razorpay.com; "
+        "connect-src 'self' https://api.usatelier.in https://api.razorpay.com; "
         "frame-src https://api.razorpay.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
         "object-src 'none'; "
         "base-uri 'self'; "
         "form-action 'self';"
@@ -1652,7 +1644,7 @@ def delete_product(product_id):
 
 @app.route("/api/products/<int:product_id>/reviews", methods=["GET"])
 def get_product_reviews(product_id):
-    reviews = Review.query.filter_by(product_id=product_id).order_by(Review.created_at.desc()).all()
+    reviews = Review.query.filter_by(product_id=str(product_id)).order_by(Review.created_at.desc()).all()
     return jsonify([r.to_dict() for r in reviews]), 200
 
 @app.route("/api/products/<int:product_id>/reviews", methods=["POST"])
@@ -2011,6 +2003,7 @@ def delete_coupon(coupon_id):
 # ============================================================
 
 @app.route("/api/payments/create-order", methods=["POST"])
+@csrf.exempt
 def create_razorpay_order():
     if not razorpay_client:
         return jsonify({"error": "Payment gateway not configured"}), 500
@@ -2051,6 +2044,7 @@ def create_razorpay_order():
 
 
 @app.route("/api/payments/verify", methods=["POST"])
+@csrf.exempt
 def verify_payment():
     if not razorpay_client:
         return jsonify({"error": "Payment gateway not configured"}), 500
@@ -2657,6 +2651,7 @@ def _cached_pincode_check(pincode: str) -> bool:
 
 
 @app.route("/api/delivery/check-pincode", methods=["POST"])
+@csrf.exempt
 def check_pincode():
     data    = request.get_json() or {}
     pincode = _sanitise_str(str(data.get("pincode", "")), 10)
@@ -2678,6 +2673,7 @@ def check_pincode():
 
 
 @app.route("/api/delivery/estimate", methods=["POST"])
+@csrf.exempt
 def shipping_estimate():
     data    = request.get_json() or {}
     pincode = _sanitise_str(str(data.get("pincode", "")), 10)
@@ -2725,6 +2721,7 @@ def shipping_estimate():
 
 
 @app.route("/api/delivery/pincode-lookup", methods=["POST"])
+@csrf.exempt
 def pincode_lookup():
     data    = request.get_json() or {}
     pincode = _sanitise_str(str(data.get("pincode", "")), 10)
@@ -3353,30 +3350,37 @@ def run_dispatch():
 # ============================================================
 
 @app.errorhandler(400)
+@cross_origin(supports_credentials=True, origins=origins)
 def handle_400(e):
     return jsonify({"error": "Bad request"}), 400
 
 @app.errorhandler(401)
+@cross_origin(supports_credentials=True, origins=origins)
 def handle_401(e):
     return jsonify({"error": "Authentication required"}), 401
 
 @app.errorhandler(403)
+@cross_origin(supports_credentials=True, origins=origins)
 def handle_403(e):
     return jsonify({"error": "Forbidden"}), 403
 
 @app.errorhandler(404)
+@cross_origin(supports_credentials=True, origins=origins)
 def handle_404(e):
     return jsonify({"error": "Not found"}), 404
 
 @app.errorhandler(405)
+@cross_origin(supports_credentials=True, origins=origins)
 def handle_405(e):
     return jsonify({"error": "Method not allowed"}), 405
 
 @app.errorhandler(429)
+@cross_origin(supports_credentials=True, origins=origins)
 def handle_429(e):
     return jsonify({"error": "Too many requests. Please slow down."}), 429
 
 @app.errorhandler(Exception)
+@cross_origin(supports_credentials=True, origins=origins)
 def handle_exception(e):
     app.logger.exception("unhandled_exception path=%s method=%s", request.path, request.method)
     # SECURITY: Never return stack traces in production
