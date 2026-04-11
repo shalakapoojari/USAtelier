@@ -1,0 +1,158 @@
+To ensure your developer and designer can build this website with 100% uniformity, you need a strict, documented Design System.
+
+The aesthetic you are building is "Elevated Brutalism"—a high-fashion, editorial look that relies on extreme contrast, zero clutter, and the tension between classic Serifs and harsh Helvetica Bold.
+
+Here is your exact, in-depth technical Style Guide.
+
+1. THE CORE PALETTE
+Do not use grays for text. Do not use drop shadows. The design relies entirely on stark, flat contrast.
+
+Primary Dark: #000000 (Pure Black)
+
+Primary Light: #FFFFFF (Pure White)
+
+Accent / Alert: #5C0A0A (Deep Oxblood/Burgundy - strictly used for "Sold Out" tags, notification dots, or error states. Never for text).
+
+Disabled / Borders: #111111 (Off-black, used ONLY for subtle hairline grid dividers when pure black is too strong).
+
+2. TYPOGRAPHY SYSTEM
+This is the most crucial part of your brand. Never deviate from these exact weights and styles.
+
+Primary Typeface: The Elegant Serif
+(Suggested: Playfair Display, GT Alpina, or Garamond)
+
+Role: Emotion, luxury, large numbers, and philosophical statements.
+
+Rule: Can be used in Regular or Italic. Often mixed in the same sentence (e.g., "The new Standard"). Never use bold.
+
+Secondary Typeface: The Utility Sans
+(Helvetica Bold, or Neue Haas Grotesk Display Bold)
+
+Role: Structure, navigation, product names, UI buttons, actions.
+
+Rule: Mostly used in ALL CAPS. Tightly spaced.
+
+Exact Web Typographic Scale:
+Display / Hero Header (H1):
+
+Font: Serif Regular & Italic
+
+Size: 80px (Desktop) / 48px (Mobile)
+
+Line Height: 1.0em (Very tight)
+
+Letter Spacing: -0.02em
+
+Section Header (H2):
+
+Font: Helvetica Bold (ALL CAPS)
+
+Size: 24px
+
+Line Height: 1.2em
+
+Letter Spacing: 0.05em (Slightly tracked out)
+
+Product Title (H3):
+
+Font: Helvetica Bold (ALL CAPS)
+
+Size: 14px
+
+Letter Spacing: 0.02em
+
+Pricing:
+
+Font: Serif Regular
+
+Size: 18px
+
+UI / Navigation / Button Text:
+
+Font: Helvetica Bold (ALL CAPS)
+
+Size: 12px
+
+Letter Spacing: 0.1em (Wide tracking)
+
+Body Copy (Keep minimal):
+
+Font: Helvetica Regular (Sentence case)
+
+Size: 14px
+
+Line Height: 1.4em
+
+3. UI COMPONENTS & GEOMETRY
+Everything is sharp. Absolutely NO rounded corners anywhere (border-radius: 0px).
+
+Buttons:
+
+Primary Action (Add to Cart / Checkout):
+
+Background: #000000 (If on white) or #FFFFFF (If on black).
+
+Text: Helvetica Bold, 12px, All Caps. Inverted color to background.
+
+Padding: 16px 24px.
+
+Hover State: Background turns transparent, gains a 1px solid border, text color flips.
+
+Secondary Action (Filters, Read More):
+
+Background: Transparent.
+
+Border: 1px solid #000000.
+
+Text: Helvetica Bold, 12px.
+
+Tags & Badges (e.g., "SOLD OUT"):
+
+Background: Pure Black #000000 OR Deep Burgundy #5C0A0A.
+
+Text: White #FFFFFF, Helvetica Bold, 10px, All Caps.
+
+Padding: 4px 8px.
+
+Placement: Overlapping the top-left corner of a product image.
+
+Forms & Inputs:
+
+No background color (transparent).
+
+Border: Bottom border ONLY (border-bottom: 2px solid #000000).
+
+Text inside: Helvetica Regular, 14px.
+
+4. GRID & LAYOUT RULES
+To achieve the "Editorial / Magazine" look, you must treat the web browser like a printed poster.
+
+Grid Lines: Use visible 1px solid hairlines (black on white backgrounds, white on black backgrounds) to divide sections, headers, and footer. (Inspired by the Uniform reference).
+
+Padding & Margins (The "Extremes" Rule):
+
+Rule of Extremes: Elements should either be touching/constrained by a 1px border, OR they should have massive negative space around them (120px to 160px padding). Do not use average/medium spacing.
+
+Overlapping: When displaying product galleries or campaign images, allow images to overlap each other with absolute positioning. Give overlapping images a thin 1px border to separate them from the background.
+
+5. PHOTOGRAPHY TREATMENT
+Because your UI is entirely black, white, and text-based, your photography is the only source of texture.
+
+Editorial/Campaign Shots: Should be "flash-heavy," raw, cinematic, or grainy (like the reference images showing the people at the table and the makeup swatches).
+
+Product Cutouts (e-comm grid): Must be placed on pure #FFFFFF backgrounds so they blend seamlessly into the white UI sections.
+
+Borders: Images placed on a black background MUST have a 1px solid #FFFFFF border to create a stark frame. Images placed on white do not need borders unless overlapping.
+
+6. INTERACTION & ANIMATION
+The site must feel mechanical, snappy, and deliberate.
+
+No "bouncy" or "smooth" easing.
+
+Hover effects: Instant color inversion (Black to White).
+
+Page transitions: Hard cuts, no fade-ins.
+
+Scroll: Native scroll. Do not hijack the user's scrolling. Let the massive typography reveal itself naturally as they scroll down the stark pages.
+
+Instructions for your Web Developer: "Please implement this exact style guide globally in the CSS/Root variables before building any individual components. Ensure border-radius is globally set to 0, and set up typography variables specifically separating Serif Display from Helvetica UI."

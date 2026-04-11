@@ -402,7 +402,7 @@ function ShopContent() {
             onValueCommit={(val) => setPriceRange(val as [number, number])}
             className="py-4"
           />
-do 
+          do
           <div className="flex items-center gap-4">
             <div className="flex-1 relative group">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-white transition-colors text-[10px]">₹</span>
@@ -487,11 +487,10 @@ do
             <div className="flex items-center gap-3 min-w-max">
               <a
                 href="/view-all"
-                className={`px-5 py-2 text-[10px] uppercase tracking-[0.3em] border transition-all duration-300 whitespace-nowrap ${
-                  !urlCategory
+                className={`px-5 py-2 text-[10px] uppercase tracking-[0.3em] border transition-all duration-300 whitespace-nowrap ${!urlCategory
                     ? "border-white/40 text-white bg-white/5"
                     : "border-white/10 text-white/35 hover:text-white hover:border-white/30"
-                }`}
+                  }`}
               >
                 All
               </a>
@@ -499,11 +498,10 @@ do
                 <a
                   key={cat.id || cat.name}
                   href={`/view-all?category=${encodeURIComponent(cat.name)}`}
-                  className={`px-5 py-2 text-[10px] uppercase tracking-[0.3em] border transition-all duration-300 whitespace-nowrap ${
-                    urlCategory?.toLowerCase() === cat.name.toLowerCase()
+                  className={`px-5 py-2 text-[10px] uppercase tracking-[0.3em] border transition-all duration-300 whitespace-nowrap ${urlCategory?.toLowerCase() === cat.name.toLowerCase()
                       ? "border-white/40 text-white bg-white/5"
                       : "border-white/10 text-white/35 hover:text-white hover:border-white/30"
-                  }`}
+                    }`}
                 >
                   {cat.name}
                 </a>
@@ -515,7 +513,7 @@ do
         <div className="flex gap-16 w-full">
           {/* Desktop Filters */}
           {!loading && (
-              <aside className="hidden lg:block w-70 shrink-0">
+            <aside className="hidden lg:block w-70 shrink-0">
               <div className="sticky top-52 pb-12">
                 {renderFilterContent()}
               </div>
