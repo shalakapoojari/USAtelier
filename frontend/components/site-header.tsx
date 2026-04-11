@@ -153,27 +153,37 @@ export function SiteHeader() {
     return () => ctx.revert()
   }, [])
 
-  const navLinkClass = "relative whitespace-nowrap text-[12px] font-light tracking-[0.1em] uppercase block text-gray-400 hover:text-white transition-colors py-1 px-2"
+  const navLinkClass = "relative whitespace-nowrap text-[11px] font-light tracking-[0.15em] uppercase block text-gray-400 hover:text-white transition-colors py-1 px-2"
 
   return (
     <>
       <header className={`absolute top-0 left-0 w-full z-[999] bg-transparent text-white`} style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
         <div ref={navRef} className="w-full flex justify-between items-center px-6 md:px-10 py-5">
 
-          {/* MOBILE LEFT: Hamburger */}
-          <button
-            onClick={() => (mobileMenuOpen ? closeMobileMenu() : setMobileMenuOpen(true))}
-            className="md:hidden flex items-center justify-center transition-colors"
-            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-          >
-            {hasMobileUnseen && (
-              <span className="absolute left-4 top-4 h-2 w-2 bg-[#5C0A0A]" />
-            )}
-            {mobileMenuOpen ? <X size={20} strokeWidth={1.5} /> : <Menu size={20} strokeWidth={1.5} />}
-          </button>
+          {/* MOBILE LEFT: Hamburger + Search */}
+          <div className="md:hidden flex items-center gap-5">
+            <button
+              onClick={() => (mobileMenuOpen ? closeMobileMenu() : setMobileMenuOpen(true))}
+              className="flex items-center justify-center transition-colors"
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            >
+              {hasMobileUnseen && (
+                <span className="absolute left-4 top-4 h-2 w-2 bg-[#5C0A0A]" />
+              )}
+              {mobileMenuOpen ? <X size={20} strokeWidth={1.5} /> : <Menu size={20} strokeWidth={1.5} />}
+            </button>
+            <button
+              onClick={() => setSearchOverlayOpen(true)}
+              className="flex items-center text-gray-400 hover:text-white transition-colors"
+              title="Search"
+              aria-label="Open search drawer"
+            >
+              <Search size={18} strokeWidth={1.5} />
+            </button>
+          </div>
 
           {/* DESKTOP LEFT: Navigation */}
-          <nav className="hidden md:flex items-center gap-8">
+          <nav className="hidden md:flex items-center gap-10">
             <Link href="/" className={navLinkClass}>HOME</Link>
 
             <div
@@ -183,13 +193,13 @@ export function SiteHeader() {
             >
               <Link href="/view-all" className={navLinkClass}>ALL CATEGORIES</Link>
               {categoriesDropdownOpen && (
-                <div className="absolute left-0 top-[100%] w-max min-w-[320px] bg-black text-white border border-white/20 p-6 flex gap-12 z-[1000] cursor-default">
+                <div className="absolute left-0 top-[100%] w-max min-w-[360px] bg-black text-white border border-white/10 p-10 flex gap-20 z-[1000] cursor-default shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
                   <div>
-                    <h3 className="text-[12px] font-light tracking-[0.1em] uppercase border-b border-white/10 pb-2 mb-4 text-white">BY CATEGORY</h3>
-                    <ul className="flex flex-col gap-3">
+                    <h3 className="text-[10px] font-light tracking-[0.2em] uppercase border-b border-white/10 pb-3 mb-6 text-white/50">BY CATEGORY</h3>
+                    <ul className="flex flex-col gap-4">
                       {dynamicCategories.map(cat => (
                         <li key={cat.id || cat.name}>
-                          <Link href={`/view-all?category=${encodeURIComponent(cat.name)}`} onClick={() => setCategoriesDropdownOpen(false)} className="text-[12px] font-light uppercase text-gray-400 hover:text-white transition-colors block">
+                          <Link href={`/view-all?category=${encodeURIComponent(cat.name)}`} onClick={() => setCategoriesDropdownOpen(false)} className="text-[11px] font-light uppercase text-gray-400 hover:text-white transition-colors block tracking-widest leading-none">
                             {cat.name}
                           </Link>
                         </li>
@@ -197,20 +207,20 @@ export function SiteHeader() {
                     </ul>
                   </div>
                   <div>
-                    <h3 className="text-[12px] font-light tracking-[0.1em] uppercase border-b border-white/10 pb-2 mb-4 text-white">BY GENDER</h3>
-                    <ul className="flex flex-col gap-3">
+                    <h3 className="text-[10px] font-light tracking-[0.2em] uppercase border-b border-white/10 pb-3 mb-6 text-white/50">BY GENDER</h3>
+                    <ul className="flex flex-col gap-4">
                       <li>
-                        <Link href="/view-all?gender=Men" onClick={() => setCategoriesDropdownOpen(false)} className="text-[12px] font-light uppercase text-gray-400 hover:text-white transition-colors block">
+                        <Link href="/view-all?gender=Men" onClick={() => setCategoriesDropdownOpen(false)} className="text-[11px] font-light uppercase text-gray-400 hover:text-white transition-colors block tracking-widest leading-none">
                           MEN
                         </Link>
                       </li>
                       <li>
-                        <Link href="/view-all?gender=Women" onClick={() => setCategoriesDropdownOpen(false)} className="text-[12px] font-light uppercase text-gray-400 hover:text-white transition-colors block">
+                        <Link href="/view-all?gender=Women" onClick={() => setCategoriesDropdownOpen(false)} className="text-[11px] font-light uppercase text-gray-400 hover:text-white transition-colors block tracking-widest leading-none">
                           WOMEN
                         </Link>
                       </li>
                       <li>
-                        <Link href="/view-all?gender=Unisex" onClick={() => setCategoriesDropdownOpen(false)} className="text-[12px] font-light uppercase text-gray-400 hover:text-white transition-colors block">
+                        <Link href="/view-all?gender=Unisex" onClick={() => setCategoriesDropdownOpen(false)} className="text-[11px] font-light uppercase text-gray-400 hover:text-white transition-colors block tracking-widest leading-none">
                           UNISEX
                         </Link>
                       </li>
@@ -224,11 +234,11 @@ export function SiteHeader() {
             <Link href="/about" className={navLinkClass}>ABOUT US</Link>
           </nav>
 
-          {/* RIGHT: Search + User + Cart */}
-          <div className="flex items-center gap-5 md:gap-8 ml-auto text-current">
+          {/* RIGHT: Search (desktop only) + User + Cart */}
+          <div className="flex items-center gap-6 md:gap-10 ml-auto text-current">
             <button
               onClick={() => setSearchOverlayOpen(true)}
-              className="flex items-center text-gray-400 hover:text-white transition-colors"
+              className="hidden md:flex items-center text-gray-400 hover:text-white transition-colors"
               title="Search"
               aria-label="Open search"
             >
@@ -261,18 +271,18 @@ export function SiteHeader() {
                 </button>
 
                 {profileOpen && (
-                  <div className="absolute right-0 top-[100%] mt-3 w-52 bg-black text-white border border-white/20">
-                    <div className="px-4 py-3 border-b border-white/10">
-                      <p className="text-[12px] font-light uppercase tracking-[0.1em] truncate text-white" style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
+                  <div className="absolute right-0 top-[100%] mt-4 w-52 bg-black text-white border border-white/10 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
+                    <div className="px-5 py-4 border-b border-white/5 bg-white/5">
+                      <p className="text-[10px] font-light uppercase tracking-[0.2em] truncate text-white/70" style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
                         {user.email}
                       </p>
                     </div>
-                    <div className="py-0">
+                    <div className="py-2">
                       {isAdmin && (
                         <Link
                           href="/admin"
                           onClick={() => setProfileOpen(false)}
-                          className="flex items-center gap-3 px-4 py-3 text-[12px] font-light uppercase tracking-[0.1em] text-gray-400 hover:text-white transition-colors border-b border-white/10"
+                          className="flex items-center gap-4 px-5 py-3 text-[11px] font-light uppercase tracking-[0.15em] text-gray-400 hover:text-white transition-colors border-b border-white/5"
                         >
                           <LayoutDashboard size={14} strokeWidth={1.5} />
                           ADMIN PANEL
@@ -281,7 +291,7 @@ export function SiteHeader() {
                       <Link
                         href="/account"
                         onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-3 text-[12px] font-light uppercase tracking-[0.1em] text-gray-400 hover:text-white transition-colors border-b border-white/10"
+                        className="flex items-center gap-4 px-5 py-3 text-[11px] font-light uppercase tracking-[0.15em] text-gray-400 hover:text-white transition-colors border-b border-white/5"
                       >
                         <User size={14} strokeWidth={1.5} />
                         MY ACCOUNT
@@ -289,16 +299,16 @@ export function SiteHeader() {
                       <Link
                         href="/account/orders"
                         onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-3 text-[12px] font-light uppercase tracking-[0.1em] text-gray-400 hover:text-white transition-colors"
+                        className="flex items-center gap-4 px-5 py-3 text-[11px] font-light uppercase tracking-[0.15em] text-gray-400 hover:text-white transition-colors"
                       >
                         <Package size={14} strokeWidth={1.5} />
                         ORDERS
                       </Link>
                     </div>
-                    <div className="border-t border-white/10 py-0">
+                    <div className="border-t border-white/5 py-2">
                       <button
                         onClick={handleLogout}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-[12px] font-light uppercase tracking-[0.1em] transition-colors text-red-500 hover:text-white"
+                        className="flex w-full items-center gap-4 px-5 py-3 text-[11px] font-light uppercase tracking-[0.15em] transition-colors text-red-400 hover:text-red-300"
                       >
                         <LogOut size={14} strokeWidth={1.5} />
                         SIGN OUT
@@ -341,56 +351,56 @@ export function SiteHeader() {
                 </div>
 
                 <div className="flex flex-col gap-6">
-                  <Link href="/" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[12px] font-light tracking-[0.1em] uppercase text-gray-400 hover:text-white transition-colors w-max">
+                  <Link href="/" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[11px] font-light tracking-[0.15em] uppercase text-gray-400 hover:text-black transition-colors w-max">
                     HOME
                   </Link>
-                  <Link href="/view-all" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[12px] font-light tracking-[0.1em] uppercase text-gray-400 hover:text-white transition-colors w-max">
+                  <Link href="/view-all" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[11px] font-light tracking-[0.15em] uppercase text-gray-400 hover:text-black transition-colors w-max">
                     ALL CATEGORIES
                   </Link>
 
                   <div className="pl-4 border-l border-black flex flex-col gap-4 mt-2 mb-2">
-                    <p className="text-[12px] font-light uppercase tracking-[0.1em] text-black border-b border-black/10 pb-1">Shop by Category</p>
+                    <p className="text-[10px] font-light uppercase tracking-[0.2em] text-black border-b border-black/10 pb-2 mb-2">Shop by Category</p>
                     {dynamicCategories.map(cat => (
-                      <Link key={cat.id || cat.name} href={`/view-all?category=${encodeURIComponent(cat.name)}`} onClick={closeMobileMenuForNavigation} className="text-[12px] font-light uppercase text-gray-400 hover:text-white transition-colors w-max">
+                      <Link key={cat.id || cat.name} href={`/view-all?category=${encodeURIComponent(cat.name)}`} onClick={closeMobileMenuForNavigation} className="text-[11px] font-light uppercase text-gray-400 hover:text-black transition-colors w-max tracking-widest">
                         {cat.name}
                       </Link>
                     ))}
 
-                    <p className="text-[12px] font-light uppercase tracking-[0.1em] text-black mt-2 border-b border-black/10 pb-1">Shop by Gender</p>
-                    <Link href="/view-all?gender=Men" onClick={closeMobileMenuForNavigation} className="text-[12px] font-light uppercase text-gray-400 hover:text-white transition-colors w-max">MEN</Link>
-                    <Link href="/view-all?gender=Women" onClick={closeMobileMenuForNavigation} className="text-[12px] font-light uppercase text-gray-400 hover:text-white transition-colors w-max">WOMEN</Link>
-                    <Link href="/view-all?gender=Unisex" onClick={closeMobileMenuForNavigation} className="text-[12px] font-light uppercase text-gray-400 hover:text-white transition-colors w-max">UNISEX</Link>
+                    <p className="text-[10px] font-light uppercase tracking-[0.2em] text-black mt-4 border-b border-black/10 pb-2 mb-2">Shop by Gender</p>
+                    <Link href="/view-all?gender=Men" onClick={closeMobileMenuForNavigation} className="text-[11px] font-light uppercase text-gray-400 hover:text-black transition-colors w-max tracking-widest">MEN</Link>
+                    <Link href="/view-all?gender=Women" onClick={closeMobileMenuForNavigation} className="text-[11px] font-light uppercase text-gray-400 hover:text-black transition-colors w-max tracking-widest">WOMEN</Link>
+                    <Link href="/view-all?gender=Unisex" onClick={closeMobileMenuForNavigation} className="text-[11px] font-light uppercase text-gray-400 hover:text-black transition-colors w-max tracking-widest">UNISEX</Link>
                   </div>
 
-                  <Link href="/help" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[12px] font-light tracking-[0.1em] uppercase text-gray-400 hover:text-white transition-colors w-max">
+                  <Link href="/help" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[11px] font-light tracking-[0.15em] uppercase text-gray-400 hover:text-black transition-colors w-max">
                     HELP
                   </Link>
-                  <Link href="/about" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[12px] font-light tracking-[0.1em] uppercase text-gray-400 hover:text-white transition-colors w-max">
+                  <Link href="/about" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[11px] font-light tracking-[0.15em] uppercase text-gray-400 hover:text-black transition-colors w-max">
                     ABOUT US
                   </Link>
                 </div>
 
-                <div className="mobile-menu-item mt-10 mb-10 h-px w-full bg-black" />
+                <div className="mobile-menu-item mt-10 mb-10 h-px w-full bg-black/5" />
 
                 <div className="flex flex-col gap-6">
                   {!isMounted ? null : !user ? (
-                    <Link href="/login" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[12px] font-light tracking-[0.1em] uppercase text-gray-400 hover:text-white transition-colors w-max">
+                    <Link href="/login" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[11px] font-light tracking-[0.15em] uppercase text-gray-400 hover:text-black transition-colors w-max">
                       LOGIN
                     </Link>
                   ) : (
                     <>
-                      <Link href="/account" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[12px] font-light tracking-[0.1em] uppercase text-gray-400 hover:text-white transition-colors w-max">
+                      <Link href="/account" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[11px] font-light tracking-[0.15em] uppercase text-gray-400 hover:text-black transition-colors w-max">
                         MY ACCOUNT
                       </Link>
-                      <Link href="/account/orders" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[12px] font-light tracking-[0.1em] uppercase text-gray-400 hover:text-white transition-colors w-max">
+                      <Link href="/account/orders" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[11px] font-light tracking-[0.15em] uppercase text-gray-400 hover:text-black transition-colors w-max">
                         ORDERS
                       </Link>
                       {isAdmin && (
-                        <Link href="/admin" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[12px] font-light tracking-[0.1em] uppercase text-gray-400 hover:text-white transition-colors w-max">
+                        <Link href="/admin" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[11px] font-light tracking-[0.15em] uppercase text-gray-400 hover:text-black transition-colors w-max">
                           ADMIN PANEL
                         </Link>
                       )}
-                      <button onClick={handleLogout} className="mobile-menu-item text-left text-[12px] font-light tracking-[0.1em] uppercase text-red-500 hover:text-white transition-colors w-max">
+                      <button onClick={handleLogout} className="mobile-menu-item text-left text-[11px] font-light tracking-[0.15em] uppercase text-red-500 hover:text-black transition-colors w-max">
                         SIGN OUT
                       </button>
                     </>
