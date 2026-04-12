@@ -142,7 +142,7 @@ export function SiteHeader() {
   }, [pathname])
 
 
-  const navLinkClass = "relative whitespace-nowrap text-[11px] font-light tracking-[0.15em] uppercase block text-gray-400 hover:text-white transition-colors py-1 px-2"
+  const navLinkClass = "relative whitespace-nowrap text-[11px] font-light tracking-[0.15rem] uppercase block text-gray-400 hover:text-white transition-colors py-1 px-2"
 
   return (
     <>
@@ -184,7 +184,7 @@ export function SiteHeader() {
               {categoriesDropdownOpen && (
                 <div className="absolute left-0 top-[100%] w-max min-w-[360px] bg-black text-white border border-white/10 p-10 flex gap-20 z-[1000] cursor-default shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
                   <div>
-                    <h3 className="text-[10px] font-light tracking-[0.2em] uppercase border-b border-white/10 pb-3 mb-6 text-white/50">BY CATEGORY</h3>
+                    <h3 className="text-[10px] font-light tracking-[0.2rem] uppercase border-b border-white/10 pb-3 mb-6 text-white/50">BY CATEGORY</h3>
                     <ul className="flex flex-col gap-4">
                       {dynamicCategories.map(cat => (
                         <li key={cat.id || cat.name}>
@@ -196,7 +196,7 @@ export function SiteHeader() {
                     </ul>
                   </div>
                   <div>
-                    <h3 className="text-[10px] font-light tracking-[0.2em] uppercase border-b border-white/10 pb-3 mb-6 text-white/50">BY GENDER</h3>
+                    <h3 className="text-[10px] font-light tracking-[0.2rem] uppercase border-b border-white/10 pb-3 mb-6 text-white/50">BY GENDER</h3>
                     <ul className="flex flex-col gap-4">
                       <li>
                         <Link href="/view-all?gender=Men" onClick={() => setCategoriesDropdownOpen(false)} className="text-[11px] font-light uppercase text-gray-400 hover:text-white transition-colors block tracking-widest leading-none">
@@ -262,7 +262,7 @@ export function SiteHeader() {
                 {profileOpen && (
                   <div className="absolute right-0 top-[100%] mt-4 w-52 bg-black text-white border border-white/10 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
                     <div className="px-5 py-4 border-b border-white/5 bg-white/5">
-                      <p className="text-[10px] font-light uppercase tracking-[0.2em] truncate text-white/70" style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
+                      <p className="text-[10px] font-light uppercase tracking-[0.2rem] truncate text-white/70" style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
                         {user.email}
                       </p>
                     </div>
@@ -348,7 +348,7 @@ export function SiteHeader() {
                   </Link>
 
                   <div className="flex flex-col gap-6 mt-4">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/40 border-b border-black/10 pb-2 mb-2">Categories</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2rem] text-black/40 border-b border-black/10 pb-2 mb-2">Categories</p>
                     <div className="flex flex-col gap-5">
                       {dynamicCategories.map(cat => (
                         <Link key={cat.id || cat.name} href={`/view-all?category=${encodeURIComponent(cat.name)}`} onClick={closeMobileMenuForNavigation} className="text-[18px] font-bold uppercase text-black hover:opacity-70 transition-opacity w-max tracking-wide">
@@ -357,7 +357,7 @@ export function SiteHeader() {
                       ))}
                     </div>
 
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/40 mt-6 border-b border-black/10 pb-2 mb-2">Gender</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2rem] text-black/40 mt-6 border-b border-black/10 pb-2 mb-2">Gender</p>
                     <div className="flex flex-col gap-5">
                       <Link href="/view-all?gender=Men" onClick={closeMobileMenuForNavigation} className="text-[18px] font-bold uppercase text-black hover:opacity-70 transition-opacity w-max tracking-wide">MEN</Link>
                       <Link href="/view-all?gender=Women" onClick={closeMobileMenuForNavigation} className="text-[18px] font-bold uppercase text-black hover:opacity-70 transition-opacity w-max tracking-wide">WOMEN</Link>
