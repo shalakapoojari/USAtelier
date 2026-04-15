@@ -18,11 +18,6 @@ export function SiteFooter() {
 
           {/* Brand Identity - Aligned Left */}
           <div className="md:col-span-9 space-y-6">
-            <Link href="/" className="inline-block transition-opacity hover:opacity-70">
-              <span className="text-3xl md:text-4xl font-serif tracking-[0.1em] uppercase text-black font-medium">
-                U.S ATELIER
-              </span>
-            </Link>
             <p className="text-[13px] leading-relaxed text-gray-500 max-w-xs">
               Worn with distinction. Blending a dark elegant aesthetic with timeless minimal design.
             </p>
