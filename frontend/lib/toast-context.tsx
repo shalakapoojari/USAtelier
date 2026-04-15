@@ -31,20 +31,20 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined)
 
 const ICON_MAP: Record<ToastType, React.ReactNode> = {
     cart: <CheckCircle size={15} className="text-white/70" />,
-    wishlist: <Heart size={15} className="text-red-400 fill-red-400" />,
+    wishlist: <Heart size={15} className="text-white/60" />,
     info: <Info size={15} className="text-blue-400" />,
     success: <CheckCircle size={15} className="text-green-400" />,
-    error: <XCircle size={15} className="text-red-400" />,
+    error: <XCircle size={15} className="text-amber-500" />,
     warning: <AlertTriangle size={15} className="text-amber-400" />,
     dispatch: <Truck size={15} className="text-green-400" />,
 }
 
 const BORDER_MAP: Record<ToastType, string> = {
     cart: "border-white/10",
-    wishlist: "border-red-400/20",
+    wishlist: "border-white/20",
     info: "border-blue-400/20",
     success: "border-green-400/20",
-    error: "border-red-400/20",
+    error: "border-amber-500/20",
     warning: "border-amber-400/20",
     dispatch: "border-green-400/20",
 }
@@ -155,11 +155,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                         <div className="flex items-start gap-4 mb-6">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
                                 confirmState.options.variant === "danger"
-                                    ? "bg-red-500/10 border border-red-500/20"
+                                    ? "bg-amber-500/10 border border-amber-500/20"
                                     : "bg-white/5 border border-white/10"
                             }`}>
                                 {confirmState.options.variant === "danger" ? (
-                                    <AlertTriangle size={18} className="text-red-400" />
+                                    <AlertTriangle size={18} className="text-amber-400" />
                                 ) : (
                                     <Info size={18} className="text-white/60" />
                                 )}
@@ -184,7 +184,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                                 onClick={() => handleConfirm(true)}
                                 className={`px-6 py-3 text-[10px] uppercase tracking-widest transition-all font-medium ${
                                     confirmState.options.variant === "danger"
-                                        ? "bg-red-500/80 text-white hover:bg-red-500 border border-red-500/50"
+                                        ? "bg-amber-500/80 text-black hover:bg-amber-500 border border-amber-500/50"
                                         : "bg-white text-black hover:bg-white/90 border border-white/50"
                                 }`}
                             >

@@ -408,7 +408,7 @@ export default function ProductPage({
                   </span>
                 )}
                 {!isInStock && (
-                  <span className="bg-red-600 text-white text-[10px] uppercase tracking-widest px-3 py-1 font-medium">
+                  <span className="bg-white/10 text-white/50 border border-white/20 text-[10px] uppercase tracking-widest px-3 py-1 font-medium">
                     Out of Stock
                   </span>
                 )}
@@ -491,7 +491,7 @@ export default function ProductPage({
               </div>
               <div className="bg-white/5 rounded px-4 py-3">
                 <p className="text-gray-500 uppercase tracking-widest mb-1">Availability</p>
-                <p className={isInStock ? (selectedSize ? (isSizeAvailable(selectedSize) ? "text-green-400" : "text-red-400") : (isLowStock ? "text-amber-400" : "text-green-400")) : "text-red-400"}>
+                <p className={isInStock ? (selectedSize ? (isSizeAvailable(selectedSize) ? "text-white/90" : "text-white/40 line-through") : (isLowStock ? "text-amber-400" : "text-white/90")) : "text-white/40"}>
                   {isInStock 
                     ? (selectedSize 
                         ? (isSizeAvailable(selectedSize) ? "In Stock" : "Size Sold Out") 
@@ -542,7 +542,7 @@ export default function ProductPage({
                     >
                       {size}
                       {!available && (
-                        <div className="absolute inset-x-0 top-1/2 h-[1px] bg-red-500/40 -rotate-45 scale-x-110 pointer-events-none" />
+                        <div className="absolute inset-x-0 top-1/2 h-[1px] bg-white/40 -rotate-45 scale-x-110 pointer-events-none" />
                       )}
                     </button>
                   )
@@ -579,12 +579,12 @@ export default function ProductPage({
                 <button
                   onClick={handleWishlistToggle}
                   className={`px-4 py-4 border transition-all duration-300 ${isWishlisted(product.id)
-                    ? "border-red-400 text-red-400"
+                    ? "border-white text-white bg-white/5"
                     : "border-white/60 text-white"
                     }`}
                   title="Add to Favourites"
                 >
-                  <Heart size={16} className={isWishlisted(product.id) ? "fill-red-400" : ""} />
+                  <Heart size={16} className={isWishlisted(product.id) ? "fill-white" : ""} />
                 </button>
 
                 <div className="relative">

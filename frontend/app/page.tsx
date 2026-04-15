@@ -115,6 +115,8 @@ export default function HomePage() {
   const [bestsellers, setBestsellers] = useState<any[] | null>(null);
   const [featured,    setFeatured]    = useState<any[] | null>(null);
   const [enlargedProduct, setEnlargedProduct] = useState<any | null>(null);
+  const [featuredScrollPos, setFeaturedScrollPos] = useState(0);
+  const featuredRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   useEffect(() => { setApiBase(getApiBase()); }, []);
@@ -278,8 +280,8 @@ export default function HomePage() {
         /* Product card */
         .product-card { border-bottom:1px solid rgba(255,255,255,0.05); }
 
-        @keyframes fadein { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:none} }
-        .animate-fadein { animation:fadein 0.7s ease both; }
+        @keyframes fadein { from{opacity:0;transform:translateY(24px) scale(0.98)} to{opacity:1;transform:none} }
+        .animate-fadein { animation:fadein 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
       `}</style>
 
       <div className="grain-overlay" />
@@ -401,7 +403,7 @@ export default function HomePage() {
       <section id="featured" className="py-24 md:py-32 px-6 md:px-16 bg-[#030303]">
         <div className="max-w-screen-xl mx-auto">
           {/* Header */}
-          <div className="flex items-end justify-between mb-14 reveal-heading">
+          <div className="flex items-end justify-between mb-8 reveal-heading">
             <div>
               <p className="text-[9px] sans uppercase tracking-[0.5em] text-gray-600 mb-3">Editorial Spotlight</p>
               <h2 className="font-serif text-4xl md:text-6xl font-light text-white">Featured Pieces</h2>
@@ -411,28 +413,47 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {/* Grid — featured gets a 2-col asymmetric layout on desktop */}
-          {featured === null ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-white/5">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="aspect-[3/4] bg-white/3 animate-pulse" />
-              ))}
-            </div>
-          ) : (
-            <div className="products-grid grid grid-cols-2 md:grid-cols-3 gap-px bg-white/5">
-              {featured.map((p, i) => (
-                <div key={p.id || i} className={`bg-[#030303] ${i === 0 ? "md:col-span-1 md:row-span-2" : ""}`}>
-                  <ProductCard
-                    product={p}
-                    isPlaceholder={!config?.featured_product_ids?.length}
-                    onEnlarge={setEnlargedProduct}
+          {/* Carousel */}
+          <div className="relative group/carousel">
+            {featured === null ? (
+              <div className="flex overflow-hidden gap-6">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="min-w-[70vw] md:min-w-[380px] aspect-[3/4] bg-white/3 animate-pulse" />
+                ))}
+              </div>
+            ) : (
+              <>
+                <div 
+                  ref={featuredRef}
+                  className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-6 no-scrollbar touch-pan-x"
+                  onScroll={(e) => {
+                    const el = e.currentTarget;
+                    if(el) setFeaturedScrollPos(el.scrollLeft / (el.scrollWidth - el.clientWidth));
+                  }}
+                >
+                  {featured.map((p, i) => (
+                    <div key={p.id || i} className="w-[75vw] md:w-[400px] flex-none snap-start bg-[#030303]">
+                      <ProductCard
+                        product={p}
+                        isPlaceholder={!config?.featured_product_ids?.length}
+                        onEnlarge={setEnlargedProduct}
+                      />
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Scroll Progress Indicator */}
+                <div className="w-full max-w-[200px] h-[1px] bg-white/10 mx-auto mt-4 relative overflow-hidden">
+                  <div 
+                    className="absolute top-0 left-0 h-full bg-white transition-transform duration-100 ease-out" 
+                    style={{ width: '30%', transform: `translateX(${featuredScrollPos * 233}%)` }} 
                   />
                 </div>
-              ))}
-            </div>
-          )}
+              </>
+            )}
+          </div>
 
-          <div className="mt-10 flex justify-center md:hidden">
+          <div className="mt-12 flex justify-center md:hidden">
             <Link href="/view-all" className="text-[9px] sans uppercase tracking-[0.4em] text-gray-500 hover:text-white transition-colors border-b border-white/20 pb-0.5">
               Shop Now →
             </Link>

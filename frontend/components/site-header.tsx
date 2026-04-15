@@ -105,8 +105,8 @@ export function SiteHeader() {
 
       gsap.fromTo(
         mobileMenuRef.current,
-        { x: -48, opacity: 0 },
-        { x: 0, opacity: 1, duration: 0.42, ease: "power3.out" },
+        { opacity: 0 },
+        { opacity: 1, duration: 0.6, ease: "power2.out" },
       )
 
       gsap.fromTo(
@@ -157,7 +157,7 @@ export function SiteHeader() {
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
             >
               {hasMobileUnseen && (
-                <span className="absolute left-4 top-4 h-2 w-2 bg-[#5C0A0A]" />
+                <span className="absolute left-4 top-4 h-2 w-2 bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
               )}
               {mobileMenuOpen ? <X size={20} strokeWidth={1.5} /> : <Menu size={20} strokeWidth={1.5} />}
             </button>
@@ -317,7 +317,7 @@ export function SiteHeader() {
             >
               <ShoppingBag size={18} strokeWidth={1.5} />
               {cartUnseen > 0 && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#5C0A0A]" />
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
               )}
             </button>
           </div>
@@ -325,76 +325,63 @@ export function SiteHeader() {
 
         {/* MOBILE DRAWER */}
         {mobileMenuOpen && (
-          <div ref={mobileMenuOverlayRef} className="md:hidden fixed inset-0 bg-black/50 z-[1000]" onClick={() => closeMobileMenu()}>
+          <div ref={mobileMenuOverlayRef} className="md:hidden fixed inset-0 z-[1000] bg-black/95 backdrop-blur-2xl" onClick={() => closeMobileMenu()}>
             <div
               ref={mobileMenuRef}
               onClick={(e) => e.stopPropagation()}
-              className="fixed left-0 top-0 h-dvh w-[85vw] bg-white flex flex-col overflow-hidden"
-              style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+              className="absolute inset-0 flex flex-col items-center justify-center p-6 text-[#F0F0F0]"
             >
+              <button 
+                onClick={() => closeMobileMenu()} 
+                aria-label="Close menu" 
+                className="absolute top-8 right-6 p-2 text-white/70 hover:text-white transition-colors mobile-menu-item"
+              >
+                <X size={28} strokeWidth={1} />
+              </button>
 
-              <div className="flex flex-col min-h-full text-black">
-                <div className="mobile-menu-item px-8 pt-8 pb-6 shrink-0">
-                  <button onClick={() => closeMobileMenu()} aria-label="Close menu">
-                    <X size={24} strokeWidth={1.5} className="text-black" />
-                  </button>
+              <div className="flex flex-col items-center gap-6 w-full max-w-sm mt-10">
+                <Link href="/" onClick={closeMobileMenuForNavigation} className="mobile-menu-item font-serif text-[clamp(2rem,8vw,3rem)] tracking-widest uppercase hover:text-white/70 transition-colors leading-none text-center">
+                  HOME
+                </Link>
+                <Link href="/view-all" onClick={closeMobileMenuForNavigation} className="mobile-menu-item font-serif text-[clamp(2rem,8vw,3rem)] tracking-widest uppercase hover:text-white/70 transition-colors leading-none text-center">
+                  SHOP ALL
+                </Link>
+                <Link href="/about" onClick={closeMobileMenuForNavigation} className="mobile-menu-item font-serif text-[clamp(2rem,8vw,3rem)] tracking-widest uppercase hover:text-white/70 transition-colors leading-none text-center">
+                  ABOUT
+                </Link>
+                <Link href="/help" onClick={closeMobileMenuForNavigation} className="mobile-menu-item font-serif text-[clamp(2rem,8vw,3rem)] tracking-widest uppercase hover:text-white/70 transition-colors leading-none text-center">
+                  HELP
+                </Link>
+
+                <div className="mobile-menu-item w-12 h-px bg-white/20 my-6" />
+
+                <div className="mobile-menu-item flex gap-6 text-[11px] uppercase tracking-[0.2em] text-white/50">
+                  <Link href="/view-all?gender=Men" onClick={closeMobileMenuForNavigation} className="hover:text-white transition-colors">MEN</Link>
+                  <Link href="/view-all?gender=Women" onClick={closeMobileMenuForNavigation} className="hover:text-white transition-colors">WOMEN</Link>
+                  <Link href="/view-all?gender=Unisex" onClick={closeMobileMenuForNavigation} className="hover:text-white transition-colors">UNISEX</Link>
                 </div>
 
-                <div className="flex flex-col gap-4">
-                  <Link href="/" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[32px] font-bold tracking-tight uppercase text-black hover:opacity-70 transition-opacity w-max leading-none">
-                    HOME
-                  </Link>
-                  <Link href="/view-all" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[32px] font-bold tracking-tight uppercase text-black hover:opacity-70 transition-opacity w-max leading-none">
-                    SHOP ALL
-                  </Link>
+                <div className="mobile-menu-item w-12 h-px bg-white/20 my-6" />
 
-                  <div className="flex flex-col gap-6 mt-4">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2rem] text-black/40 border-b border-black/10 pb-2 mb-2">Categories</p>
-                    <div className="flex flex-col gap-5">
-                      {dynamicCategories.map(cat => (
-                        <Link key={cat.id || cat.name} href={`/view-all?category=${encodeURIComponent(cat.name)}`} onClick={closeMobileMenuForNavigation} className="text-[18px] font-bold uppercase text-black hover:opacity-70 transition-opacity w-max tracking-wide">
-                          {cat.name}
-                        </Link>
-                      ))}
-                    </div>
-
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2rem] text-black/40 mt-6 border-b border-black/10 pb-2 mb-2">Gender</p>
-                    <div className="flex flex-col gap-5">
-                      <Link href="/view-all?gender=Men" onClick={closeMobileMenuForNavigation} className="text-[18px] font-bold uppercase text-black hover:opacity-70 transition-opacity w-max tracking-wide">MEN</Link>
-                      <Link href="/view-all?gender=Women" onClick={closeMobileMenuForNavigation} className="text-[18px] font-bold uppercase text-black hover:opacity-70 transition-opacity w-max tracking-wide">WOMEN</Link>
-                      <Link href="/view-all?gender=Unisex" onClick={closeMobileMenuForNavigation} className="text-[18px] font-bold uppercase text-black hover:opacity-70 transition-opacity w-max tracking-wide">UNISEX</Link>
-                    </div>
-                  </div>
-
-                  <Link href="/help" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[32px] font-bold tracking-tight uppercase text-black hover:opacity-70 transition-opacity w-max leading-none">
-                    HELP
-                  </Link>
-                  <Link href="/about" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[32px] font-bold tracking-tight uppercase text-black hover:opacity-70 transition-opacity w-max leading-none">
-                    ABOUT
-                  </Link>
-                </div>
-
-                <div className="mobile-menu-item mt-10 mb-10 h-px w-full bg-black/5" />
-
-                <div className="flex flex-col gap-8">
+                <div className="flex flex-col items-center gap-5 w-full">
                   {!isMounted ? null : !user ? (
-                    <Link href="/login" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[24px] font-bold uppercase text-black hover:opacity-70 transition-opacity w-max">
+                    <Link href="/login" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[12px] uppercase tracking-[0.3em] font-light hover:text-white/70 transition-colors">
                       LOGIN
                     </Link>
                   ) : (
                     <>
-                      <Link href="/account" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[24px] font-bold uppercase text-black hover:opacity-70 transition-opacity w-max">
-                        ACCOUNT
+                      <Link href="/account" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[12px] uppercase tracking-[0.3em] font-light hover:text-white/70 transition-colors">
+                        MY ACCOUNT
                       </Link>
-                      <Link href="/account/orders" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[24px] font-bold uppercase text-black hover:opacity-70 transition-opacity w-max">
+                      <Link href="/account/orders" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[12px] uppercase tracking-[0.3em] font-light hover:text-white/70 transition-colors">
                         ORDERS
                       </Link>
                       {isAdmin && (
-                        <Link href="/admin" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[24px] font-bold uppercase text-black hover:opacity-70 transition-opacity w-max">
-                          ADMIN
+                        <Link href="/admin" onClick={closeMobileMenuForNavigation} className="mobile-menu-item text-[12px] uppercase tracking-[0.3em] font-light text-amber-500/80 hover:text-amber-500 transition-colors">
+                          ADMIN PANEL
                         </Link>
                       )}
-                      <button onClick={handleLogout} className="mobile-menu-item text-left text-[24px] font-bold uppercase text-red-600 hover:opacity-70 transition-opacity w-max">
+                      <button onClick={handleLogout} className="mobile-menu-item text-[12px] uppercase tracking-[0.3em] font-light text-white/40 hover:text-white/80 transition-colors mt-2">
                         SIGN OUT
                       </button>
                     </>

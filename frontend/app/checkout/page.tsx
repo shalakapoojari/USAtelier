@@ -410,9 +410,9 @@ export default function CheckoutPage() {
                     placeholder="Email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className={`bg-transparent border-white/20 text-white placeholder:text-gray-600 h-12 ${errors.email ? 'border-red-500' : ''}`}
+                    className={`bg-transparent border-white/20 text-white placeholder:text-gray-600 h-12 ${errors.email ? 'border-amber-500' : ''}`}
                   />
-                  {errors.email && <p className="text-[10px] text-red-500 uppercase tracking-widest">{errors.email}</p>}
+                  {errors.email && <p className="text-[10px] text-amber-500 uppercase tracking-widest">{errors.email}</p>}
                 </div>
 
                 <div className="space-y-3">
@@ -422,9 +422,9 @@ export default function CheckoutPage() {
                     value={formData.phone}
                     onChange={handleInputChange}
                     maxLength={10}
-                    className={`bg-transparent border-white/20 text-white placeholder:text-gray-600 h-12 ${errors.phone ? 'border-red-500' : ''}`}
+                    className={`bg-transparent border-white/20 text-white placeholder:text-gray-600 h-12 ${errors.phone ? 'border-amber-500' : ''}`}
                   />
-                  {errors.phone && <p className="text-[10px] text-red-500 uppercase tracking-widest">{errors.phone}</p>}
+                  {errors.phone && <p className="text-[10px] text-amber-500 uppercase tracking-widest">{errors.phone}</p>}
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-4 md:gap-6">
@@ -434,9 +434,9 @@ export default function CheckoutPage() {
                       placeholder="First Name"
                       value={formData.firstName}
                       onChange={handleInputChange}
-                      className={`bg-transparent border-white/20 text-white h-12 ${errors.firstName ? 'border-red-500' : ''}`}
+                      className={`bg-transparent border-white/20 text-white h-12 ${errors.firstName ? 'border-amber-500' : ''}`}
                     />
-                    {errors.firstName && <p className="text-[10px] text-red-500 uppercase tracking-widest">{errors.firstName}</p>}
+                    {errors.firstName && <p className="text-[10px] text-amber-500 uppercase tracking-widest">{errors.firstName}</p>}
                   </div>
                   <div className="space-y-3">
                     <Input
@@ -444,9 +444,9 @@ export default function CheckoutPage() {
                       placeholder="Last Name"
                       value={formData.lastName}
                       onChange={handleInputChange}
-                      className={`bg-transparent border-white/20 text-white h-12 ${errors.lastName ? 'border-red-500' : ''}`}
+                      className={`bg-transparent border-white/20 text-white h-12 ${errors.lastName ? 'border-amber-500' : ''}`}
                     />
-                    {errors.lastName && <p className="text-[10px] text-red-500 uppercase tracking-widest">{errors.lastName}</p>}
+                    {errors.lastName && <p className="text-[10px] text-amber-500 uppercase tracking-widest">{errors.lastName}</p>}
                   </div>
                 </div>
 
@@ -456,9 +456,9 @@ export default function CheckoutPage() {
                     placeholder="Full Street Address"
                     value={formData.address}
                     onChange={handleInputChange}
-                    className={`bg-transparent border-white/20 text-white h-12 ${errors.address ? 'border-red-500' : ''}`}
+                    className={`bg-transparent border-white/20 text-white h-12 ${errors.address ? 'border-amber-500' : ''}`}
                   />
-                  {errors.address && <p className="text-[10px] text-red-500 uppercase tracking-widest">{errors.address}</p>}
+                  {errors.address && <p className="text-[10px] text-amber-500 uppercase tracking-widest">{errors.address}</p>}
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
@@ -468,9 +468,9 @@ export default function CheckoutPage() {
                       placeholder="City"
                       value={formData.city}
                       onChange={handleInputChange}
-                      className={`bg-transparent border-white/20 text-white h-12 ${errors.city ? 'border-red-500' : ''}`}
+                      className={`bg-transparent border-white/20 text-white h-12 ${errors.city ? 'border-amber-500' : ''}`}
                     />
-                    {errors.city && <p className="text-[10px] text-red-500 uppercase tracking-widest">{errors.city}</p>}
+                    {errors.city && <p className="text-[10px] text-amber-500 uppercase tracking-widest">{errors.city}</p>}
                   </div>
                   <div className="space-y-3">
                     <Input
@@ -478,9 +478,9 @@ export default function CheckoutPage() {
                       placeholder="State"
                       value={formData.state}
                       onChange={handleInputChange}
-                      className={`bg-transparent border-white/20 text-white h-12 ${errors.state ? 'border-red-500' : ''}`}
+                      className={`bg-transparent border-white/20 text-white h-12 ${errors.state ? 'border-amber-500' : ''}`}
                     />
-                    {errors.state && <p className="text-[10px] text-red-500 uppercase tracking-widest">{errors.state}</p>}
+                    {errors.state && <p className="text-[10px] text-amber-500 uppercase tracking-widest">{errors.state}</p>}
                   </div>
                   <div className="space-y-3 col-span-2 md:col-span-1">
                     <div className="relative">
@@ -491,9 +491,9 @@ export default function CheckoutPage() {
                         onChange={handleInputChange}
                         maxLength={6}
                         onBlur={() => formData.zip.length === 6 && checkPincode(formData.zip)}
-                        className={`bg-transparent border-white/20 text-white h-12 pr-10 ${errors.zip ? 'border-red-500' :
+                        className={`bg-transparent border-white/20 text-white h-12 pr-10 ${errors.zip ? 'border-amber-500' :
                             pincodeStatus === "valid" ? 'border-green-500/50' :
-                              pincodeStatus === "invalid" ? 'border-red-500' : ''
+                              pincodeStatus === "invalid" ? 'border-amber-500' : ''
                           }`}
                       />
                       {pincodeStatus === "checking" && (
@@ -505,12 +505,12 @@ export default function CheckoutPage() {
                         <CheckCircle size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400" />
                       )}
                       {pincodeStatus === "invalid" && (
-                        <AlertTriangle size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400" />
+                        <AlertTriangle size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-amber-400" />
                       )}
                     </div>
-                    {errors.zip && <p className="text-[10px] text-red-500 uppercase tracking-widest">{errors.zip}</p>}
+                    {errors.zip && <p className="text-[10px] text-amber-500 uppercase tracking-widest">{errors.zip}</p>}
                     {pincodeMessage && (
-                      <p className={`text-[10px] uppercase tracking-widest ${pincodeStatus === "valid" ? "text-green-400" : pincodeStatus === "invalid" ? "text-red-400" : "text-gray-500"
+                      <p className={`text-[10px] uppercase tracking-widest ${pincodeStatus === "valid" ? "text-green-400" : pincodeStatus === "invalid" ? "text-amber-400" : "text-gray-500"
                         }`}>
                         {pincodeMessage}
                       </p>
@@ -601,7 +601,7 @@ export default function CheckoutPage() {
                 </div>
 
                 {globalError && (
-                  <div className="p-4 md:p-6 border border-red-500/30 bg-red-950/20 text-red-400 flex items-start justify-between gap-4 rounded-sm">
+                  <div className="p-4 md:p-6 border border-amber-500/30 bg-amber-950/20 text-amber-400 flex items-start justify-between gap-4 rounded-sm">
                     <div className="space-y-1 min-w-0">
                       <h3 className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
                         <AlertTriangle size={12} />
@@ -609,7 +609,7 @@ export default function CheckoutPage() {
                       </h3>
                       <p className="text-[10px] uppercase tracking-widest break-words">{globalError}</p>
                     </div>
-                    <button onClick={() => setGlobalError("")} className="text-red-500/50 hover:text-red-400 transition-colors text-xl leading-none shrink-0">
+                    <button onClick={() => setGlobalError("")} className="text-amber-500/50 hover:text-amber-400 transition-colors text-xl leading-none shrink-0">
                       &times;
                     </button>
                   </div>
@@ -631,7 +631,7 @@ export default function CheckoutPage() {
                     </span>
                   </label>
                   {checkoutTermsError && (
-                    <p className="mt-3 text-[10px] uppercase tracking-widest text-red-500">{checkoutTermsError}</p>
+                    <p className="mt-3 text-[10px] uppercase tracking-widest text-amber-500">{checkoutTermsError}</p>
                   )}
                 </div>
 
