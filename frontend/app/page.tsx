@@ -359,46 +359,35 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section className="py-28 md:py-40 px-6 md:px-32 bg-[#f5f5f5]">
-
-        <div className="flex justify-end items-start">
-
-          <div className="w-full md:w-[55%] text-right">
-
-            <p className="text-[8px] sans uppercase tracking-[0.6em] text-gray-500 mb-8">
-              Our Philosophy
-            </p>
-
-            <p className="highlight-text text-xl md:text-3xl lg:text-4xl serif leading-[1.4] text-gray-900">
-              {manifesto}
-            </p>
-
-            <div className="mt-12 flex items-center justify-end gap-6">
-              <div className="h-px w-16 bg-black/10" />
-              <span className="text-[9px] sans uppercase tracking-[0.5em] text-gray-500">
-                U.S Atelier
-              </span>
-              <div className="h-px w-16 bg-black/10" />
-            </div>
-
+      {/* ── MANIFESTO ────────────────────────────────────────────────────── */}
+      <section className="py-28 md:py-40 px-6 md:px-32 bg-[#030303]">
+        <div className="max-w-4xl mx-auto text-center">
+          <p className="text-[8px] sans uppercase tracking-[0.6em] text-gray-600 mb-12">Our Philosophy</p>
+          <p className="highlight-text text-2xl md:text-4xl lg:text-5xl serif leading-[1.45] text-gray-300">
+            {manifesto}
+          </p>
+          <div className="mt-16 flex items-center justify-center gap-8">
+            <div className="h-px w-20 bg-white/10" />
+            <span className="text-[9px] sans uppercase tracking-[0.5em] text-gray-600">U.S Atelier</span>
+            <div className="h-px w-20 bg-white/10" />
           </div>
-
         </div>
       </section>
 
       <div className="section-rule mx-auto max-w-screen-xl px-6 md:px-16" />
 
       {/* ── FEATURED PIECES ──────────────────────────────────────────────── */}
-      <section id="featured" className="pt-28 pb-24 md:pt-32 md:pb-32 bg-[#f5f5f5] overflow-hidden w-full">
+      <section id="featured" className="py-24 md:py-32 bg-[#050505] overflow-hidden w-full">
         <div className="max-w-screen-2xl mx-auto px-6 md:px-12 mb-10 md:mb-14">
-
-          <div className="flex flex-col items-center text-center reveal-heading">
-            <h2 className="font-serif text-3xl md:text-4xl text-gray-600 tracking-wide uppercase">
-              (Featured Pieces)
-            </h2>
-
+          <div className="flex items-end justify-between reveal-heading">
+            <div>
+              <p className="text-[10px] sans uppercase tracking-[0.3em] text-white/40 mb-3">Editorial Spotlight</p>
+              <h2 className="font-serif text-4xl md:text-5xl text-white tracking-wide uppercase">Featured Pieces</h2>
+            </div>
+            <Link href="/view-all" className="hidden md:block text-[10px] sans uppercase tracking-[0.2em] text-white/60 hover:text-white transition-colors border-b border-white/20 hover:border-white/60 pb-0.5">
+              Explore Collection →
+            </Link>
           </div>
-
         </div>
 
         <div className="w-full flex">
