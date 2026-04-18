@@ -71,37 +71,66 @@ function HeroMedia({ slide, fallbackImage }: { slide: HeroSlide | null; fallback
 }
 
 // ─── Product Card ─────────────────────────────────────────────────────────────
+// ─── Product Card ─────────────────────────────────────────────────────────────
 function ProductCard({ product, isPlaceholder, onEnlarge }: {
   product: any; isPlaceholder: boolean; onEnlarge: (p: any) => void
 }) {
+  // Parse the image array safely
   const imgs = (() => {
     if (isPlaceholder) return product.images;
     if (Array.isArray(product.images)) return product.images;
     try { return JSON.parse(product.images); } catch { return [product.images]; }
   })();
-  const imgUrl = isPlaceholder ? imgs[0] : resolveMediaUrl(imgs?.[0] || "/placeholder.jpg");
+
+  // Assign Image 1 and Image 2 (fallback to Image 1 if a second doesn't exist)
+  const imgUrl1 = isPlaceholder ? imgs[0] : resolveMediaUrl(imgs?.[0] || "/placeholder.jpg");
+  const imgUrl2 = isPlaceholder ? (imgs[1] || imgs[0]) : resolveMediaUrl(imgs?.[1] || imgs?.[0] || "/placeholder.jpg");
 
   return (
-    <div className="product-card group relative overflow-hidden bg-[#0a0a0a]">
-      <div className="relative aspect-[3/4] overflow-hidden">
+    <div className="product-card group relative w-full h-full cursor-pointer flex flex-col bg-transparent">
+      {/* IMAGE CONTAINER */}
+      <div className="relative w-full aspect-[3/4] overflow-hidden bg-[#050505]">
+
+        {/* Base Image */}
         <img
-          src={imgUrl} key={imgUrl} alt={product.name}
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 cursor-zoom-in"
-          onClick={() => onEnlarge({ id: product.id, name: product.name, price: product.price, image: imgUrl })}
+          src={imgUrl1} key={imgUrl1} alt={product.name}
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-[1200ms] ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105"
         />
-        {/* hover overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-        {/* Quick link — goes directly to product page */}
-        <Link
-          href={isPlaceholder ? "/view-all" : `/product/${product.id}`}
-          className="absolute inset-0 z-10 flex items-end pb-6 pl-5 opacity-0 group-hover:opacity-100 transition-all duration-500"
-        >
-          <span className="text-[9px] uppercase tracking-[0.4em] text-white/90 border-b border-white/40 pb-0.5">View Details →</span>
-        </Link>
+
+        {/* Hover Image (Curtain Reveal from Top) */}
+        {/* Using clip-path inset to create a flawless top-to-bottom unrolling effect */}
+        <img
+          src={imgUrl2} key={`hover-${imgUrl2}`} alt={`${product.name} alternate`}
+          className="absolute inset-0 w-full h-full object-cover transition-all duration-[800ms] ease-[cubic-bezier(0.76,0,0.24,1)] [clip-path:inset(0_0_100%_0)] group-hover:[clip-path:inset(0)] z-10"
+        />
+
+        {/* Quick Actions (Enlarge / View) */}
+        <div className="absolute inset-0 z-20 flex flex-col justify-end p-5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+          <div className="flex gap-4 pointer-events-auto">
+            <button
+              onClick={(e) => { e.preventDefault(); onEnlarge({ id: product.id, name: product.name, price: product.price, image: imgUrl1 }); }}
+              className="text-[9px] sans uppercase tracking-widest text-white hover:text-white/50 transition-colors border-b border-white/30 hover:border-white pb-0.5"
+            >
+              Enlarge
+            </button>
+            <Link
+              href={isPlaceholder ? "/view-all" : `/product/${product.id}`}
+              className="text-[9px] sans uppercase tracking-widest text-white hover:text-white/50 transition-colors border-b border-white/30 hover:border-white pb-0.5"
+            >
+              View
+            </Link>
+          </div>
+        </div>
       </div>
-      <div className="p-4">
-        <h3 className="font-serif text-sm text-white mb-1 truncate">{product.name}</h3>
-        <p className="text-[10px] uppercase tracking-widest text-gray-500">₹{Number(product.price).toLocaleString("en-IN")}</p>
+
+      {/* PRODUCT INFO (Odd Ritual Style - Bottom Alignment) */}
+      <div className="flex justify-between items-start w-full mt-4 md:mt-5">
+        <h3 className="font-serif text-lg md:text-xl text-white tracking-wide uppercase transition-colors duration-500 group-hover:text-white/70 max-w-[70%]">
+          {product.name}
+        </h3>
+        <p className="text-[10px] md:text-[11px] sans uppercase tracking-[0.2em] text-white/60 pt-1">
+          ₹{Number(product.price).toLocaleString("en-IN")}
+        </p>
       </div>
     </div>
   );
@@ -242,7 +271,7 @@ export default function HomePage() {
   const seasonText = config?.season_label || "Fall Winter 2025";
   const isLoading = bestsellers === null || featured === null;
 
-  let title1 = "ETHEREAL", title2 = "SHADOWS";
+  let title1 = "BE YOU", title2 = "BE BOLD";
   if (heroSlide?.content) {
     const words = heroSlide.content.split(" ");
     if (words.length > 1) {
