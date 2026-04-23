@@ -263,7 +263,7 @@ export default function OrderDetailPage({
                               </p>
                               {order.status === "Delivered" && (
                                 <Link
-                                  href={`/product/${item.product_id_str || item.productId || item.product_id || item.id}#write-review`}
+                                  href={`/product/${encodeURIComponent(item.product_name || item.productName)}#write-review`}
                                   className="text-[10px] uppercase tracking-[0.2em] text-gray-500 hover:text-white transition-colors border border-gray-500/30 hover:border-white/50 px-3 py-1.5 mt-2"
                                 >
                                   Write Review

@@ -75,9 +75,20 @@ function FilterDropdown({
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-[#0a0a0a] border border-white/10 shadow-2xl min-w-[180px] animate-in fade-in slide-in-from-top-1 duration-150">
-          {children}
-        </div>
+        <>
+          {/* Mobile Overlay */}
+          <div 
+            className="fixed inset-0 z-40 md:hidden" 
+            onClick={(e) => { e.stopPropagation(); setOpen(false); }} 
+          />
+          {/* Dropdown / Mobile Sheet */}
+          <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0a] border-t border-white/10 p-6 pb-12 rounded-t-3xl md:p-0 md:pb-0 md:rounded-none md:border-t-0 md:absolute md:top-full md:bottom-auto md:left-0 md:mt-1 md:min-w-[180px] md:border animate-in slide-in-from-bottom-8 md:slide-in-from-top-1 duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] md:shadow-2xl flex flex-col max-h-[80vh]">
+            <div className="w-12 h-1 bg-white/20 rounded-full mx-auto mb-6 md:hidden" />
+            <div className="overflow-y-auto no-scrollbar">
+              {children}
+            </div>
+          </div>
+        </>
       )}
     </div>
   )
@@ -293,7 +304,7 @@ function ShopContent() {
 
         {/* ─── HORIZONTAL FILTER BAR ───────────────────────────────────────── */}
         {!loading && (
-          <div className="mb-8 flex flex-wrap items-center gap-3">
+          <div className="mb-8 flex flex-nowrap items-center gap-3 overflow-x-auto no-scrollbar pb-2 md:flex-wrap md:overflow-visible md:pb-0 w-full relative">
             {/* Gender filter */}
             <FilterDropdown label="Gender" activeCount={selectedGenders.length}>
               <div className="p-4 space-y-2">

@@ -55,7 +55,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
   return (
     <Link
-      href={`/product/${product.id}`}
+      href={`/product/${encodeURIComponent(product.name)}`}
       ref={rootRef}
       className="product-card group block rounded-sm focus:outline-none focus:ring-1 focus:ring-[rgba(123,47,190,0.4)]"
       style={{

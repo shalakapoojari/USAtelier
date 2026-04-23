@@ -81,7 +81,7 @@ function ProductCard({ product, isPlaceholder }: {
     try { return JSON.parse(product.images); } catch { return [product.images]; }
   })();
   const imgUrl = isPlaceholder ? imgs[0] : resolveMediaUrl(imgs?.[0] || "/placeholder.jpg");
-  const targetUrl = isPlaceholder ? "/view-all" : `/product/${product.id}`;
+  const targetUrl = isPlaceholder ? "/view-all" : `/product/${encodeURIComponent(product.name)}`;
 
   return (
     <Link href={targetUrl} className="product-card group relative overflow-hidden bg-[#050505] w-full h-full block cursor-pointer">
@@ -227,6 +227,18 @@ export default function HomePage() {
   const [enlargedProduct, setEnlargedProduct] = useState<any | null>(null);
   const [featuredScrollPos, setFeaturedScrollPos] = useState(0);
   const featuredRef = useRef<HTMLDivElement>(null);
+  const [showPreloader, setShowPreloader] = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (sessionStorage.getItem("hasSeenPreloader")) {
+        setShowPreloader(false);
+      } else {
+        sessionStorage.setItem("hasSeenPreloader", "true");
+      }
+    }
+  }, []);
+
   const router = useRouter();
 
   useEffect(() => { setApiBase(getApiBase()); }, []);
@@ -268,23 +280,23 @@ export default function HomePage() {
 
     const progress = { val: 0 };
     const loadTl = gsap.timeline();
+    
+    if (showPreloader) {
+      loadTl
+        .to(progress, { val: 100, duration: 1.8, ease: "power1.inOut", onUpdate: () => setLoadingPercent(Math.round(progress.val)) })
+        .to(".js-preloader", {
+          yPercent: -100,
+          duration: 1.1,
+          ease: "expo.inOut",
+        }, ">0.25")
+        .from(".hero-main-text", { y: 120, duration: 1.4, stagger: 0.16, ease: "expo.out" }, "-=0.5");
+    } else {
+      loadTl.from(".hero-main-text", { y: 120, duration: 1.4, stagger: 0.16, ease: "expo.out" }, "+=0.2");
+    }
+    
     loadTl
-      .to(progress, { val: 100, duration: 1.8, ease: "power1.inOut", onUpdate: () => setLoadingPercent(Math.round(progress.val)) })
-      // Curtain wipe: slide the whole preloader upward off-screen
-      .to(".js-preloader", {
-        yPercent: -100,
-        duration: 1.1,
-        ease: "expo.inOut",
-      }, ">0.25")
-      // Hero text: curtain-wipe reveal from below the clip mask
-      .from(".hero-main-text", {
-        y: 120,
-        duration: 1.4,
-        stagger: 0.16,
-        ease: "expo.out",
-      }, "-=0.5")
-      .from(".hero-sub-text", { y: 28, opacity: 0, duration: 0.9, ease: "power3.out" }, "-=1.1")
-      .to(".hero-cta", { opacity: 1, duration: 0.9 }, "-=0.7");
+      .from(".hero-sub-text", { y: 28, opacity: 0, duration: 0.9, ease: "power3.out" }, showPreloader ? "-=1.1" : "-=0.8")
+      .to(".hero-cta", { opacity: 1, duration: 0.9 }, showPreloader ? "-=0.7" : "-=0.5");
 
     // Hero bg parallax
     gsap.fromTo(".hero-bg", { y: 0, scale: 1.12 }, {
@@ -407,15 +419,17 @@ export default function HomePage() {
       <div className="grain-overlay" />
 
       {/* Preloader — curtain wipe panel */}
-      <div className="js-preloader">
-        <div className="text-center flex flex-col items-center gap-6">
-          <p className="font-serif text-2xl tracking-[0.5em] text-white/80 uppercase select-none">U.S Atelier</p>
-          <div className="w-48 h-px bg-gray-800 relative overflow-hidden">
-            <div className="absolute top-0 left-0 h-full bg-white" style={{ width: `${loadingPercent}%`, transition: "width 50ms linear" }} />
+      {showPreloader && (
+        <div className="js-preloader">
+          <div className="text-center flex flex-col items-center gap-6">
+            <p className="font-serif text-2xl tracking-[0.5em] text-white/80 uppercase select-none">U.S Atelier</p>
+            <div className="w-48 h-px bg-gray-800 relative overflow-hidden">
+              <div className="absolute top-0 left-0 h-full bg-white" style={{ width: `${loadingPercent}%`, transition: "width 50ms linear" }} />
+            </div>
+            <p className="text-[10px] font-sans uppercase tracking-[0.4em] text-gray-600">{loadingPercent}%</p>
           </div>
-          <p className="text-[10px] font-sans uppercase tracking-[0.4em] text-gray-600">{loadingPercent}%</p>
         </div>
-      </div>
+      )}
 
 
       <SiteHeader />
@@ -518,7 +532,7 @@ export default function HomePage() {
               <div className="flex items-center justify-between">
                 <p className="text-sm font-sans uppercase tracking-widest text-[#d4af37]">₹{Number(enlargedProduct.price).toLocaleString("en-IN")}</p>
                 <Link
-                  href={`/product/${enlargedProduct.id}`}
+                  href={`/product/${encodeURIComponent(enlargedProduct.name)}`}
                   className="px-6 py-2 border border-white/20 text-[9px] font-sans uppercase tracking-widest hover:bg-white hover:text-black transition-all"
                 >
                   View Details

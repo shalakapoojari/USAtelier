@@ -82,7 +82,7 @@ export function SearchOverlay({ isOpen, onClose, categories = [] }: SearchOverla
   }
 
   const handleProductClick = (product: any) => {
-    router.push(`/product/${product.id}`)
+    router.push(`/product/${encodeURIComponent(product.name)}`)
     onClose()
   }
 

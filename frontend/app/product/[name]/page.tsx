@@ -22,9 +22,10 @@ const API_BASE = getApiBase()
 export default function ProductPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ name: string }>
 }) {
-  const { id } = use(params)
+  const { name: urlName } = use(params)
+  const decodedName = decodeURIComponent(urlName)
   const [product, setProduct] = useState<any>(null)
   const [allProducts, setAllProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -57,22 +58,30 @@ export default function ProductPage({
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [productRes, allProductsRes, reviewsRes] = await Promise.all([
-          apiFetch(API_BASE, `/api/products/${id}`),
-          apiFetch(API_BASE, "/api/products"),
-          apiFetch(API_BASE, `/api/products/${id}/reviews`),
+        const allProductsRes = await apiFetch(API_BASE, "/api/products")
+        if (!allProductsRes.ok) throw new Error("Failed to fetch products")
+        const allData = await allProductsRes.json()
+        setAllProducts(allData)
+
+        const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+        const targetSlug = slugify(decodedName)
+        const targetProduct = allData.find((p: any) => slugify(p.name) === targetSlug)
+
+        if (!targetProduct) {
+          setProduct(null)
+          return
+        }
+
+        const [productRes, reviewsRes] = await Promise.all([
+          apiFetch(API_BASE, `/api/products/${targetProduct.id}`),
+          apiFetch(API_BASE, `/api/products/${targetProduct.id}/reviews`),
         ])
 
         if (productRes.ok) {
           const data = await productRes.json()
           setProduct(data)
         } else {
-          notFound()
-        }
-
-        if (allProductsRes.ok) {
-          const allData = await allProductsRes.json()
-          setAllProducts(allData)
+          setProduct(null)
         }
 
         if (reviewsRes.ok) {
@@ -86,7 +95,7 @@ export default function ProductPage({
       }
     }
     fetchData()
-  }, [id])
+  }, [decodedName])
 
   // Track recently viewed products (Hook must be before any early returns)
   useEffect(() => {
@@ -142,7 +151,7 @@ export default function ProductPage({
 
     setSubmittingReview(true)
     try {
-      const res = await apiFetch(API_BASE, `/api/products/${id}/reviews`, {
+      const res = await apiFetch(API_BASE, `/api/products/${product.id}/reviews`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rating: newReviewRating, comment: newReviewComment }),

@@ -83,7 +83,7 @@ export default function FavouritesPage() {
                                 </button>
 
                                 {/* Image */}
-                                <Link href={`/product/${item.id}`} className="block">
+                                <Link href={`/product/${encodeURIComponent(item.name)}`} className="block">
                                     <div className="relative aspect-[3/4] overflow-hidden bg-[#111] mb-4">
                                         <Image
                                             src={item.image}
@@ -101,7 +101,7 @@ export default function FavouritesPage() {
                                     <p className="text-[10px] uppercase tracking-widest text-gray-500">
                                         {item.category}
                                     </p>
-                                    <Link href={`/product/${item.id}`}>
+                                    <Link href={`/product/${encodeURIComponent(item.name)}`}>
                                         <h3 className="text-sm font-medium leading-snug hover:text-gray-300 transition-colors">
                                             {item.name}
                                         </h3>
