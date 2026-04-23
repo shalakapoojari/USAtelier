@@ -416,14 +416,14 @@ export default function ProductPage({
       <main className="pt-10 px-6 md:px-12 pb-32">
         <div className="grid md:grid-cols-2 gap-16 lg:gap-24 items-start max-w-350 mx-auto">
 
-          {/* ── IMAGES COLUMN ── */}
-          <div className="space-y-4">
+          {/* ── IMAGES CAROUSEL ── */}
+          <div className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar space-x-4 md:space-x-0 w-full relative">
             {images.map((img: string, idx: number) => (
-              <div key={idx} className="relative w-full overflow-hidden select-none bg-[#111]">
+              <div key={idx} className="relative w-full flex-none snap-center overflow-hidden select-none bg-[#111] aspect-[3/4] md:aspect-[4/5]">
                 <img
                   src={resolveMediaUrl(img)}
                   alt={`${product.name} - View ${idx + 1}`}
-                  className="w-full h-auto object-cover block"
+                  className="w-full h-full object-cover block"
                 />
                 
                 {/* Badges top-left (only on first image) */}
