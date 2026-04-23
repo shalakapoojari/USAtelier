@@ -238,12 +238,12 @@ export default function ProductPage({
     .slice(0, 8)
 
   // Swipe handlers for mobile image navigation
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+  const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX
     touchStartY.current = e.touches[0].clientY
-  }, [])
+  }
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+  const handleTouchEnd = (e: React.TouchEvent) => {
     if (touchStartX.current === null || touchStartY.current === null) return
     const dx = e.changedTouches[0].clientX - touchStartX.current
     const dy = e.changedTouches[0].clientY - touchStartY.current
@@ -256,7 +256,7 @@ export default function ProductPage({
     }
     touchStartX.current = null
     touchStartY.current = null
-  }, [images.length])
+  }
 
   const handleAddToCart = () => {
 
@@ -386,14 +386,7 @@ export default function ProductPage({
     router.push("/checkout")
   }
 
-  if (loading || !product) {
-    return (
-      <div className="bg-[#030303] text-[#e8e8e3] min-h-screen flex items-center justify-center">
-        <SiteHeader />
-        <Loader2 className="w-8 h-8 animate-spin text-white/40" />
-      </div>
-    )
-  }
+
 
   return (
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen">
