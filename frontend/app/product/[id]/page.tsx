@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { use } from "react"
 import Image from "next/image"
 import Link from "next/link"
@@ -42,6 +42,10 @@ export default function ProductPage({
   const [addedToCart, setAddedToCart] = useState(false)
   const [showShareMenu, setShowShareMenu] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
+
+  // Mobile swipe
+  const touchStartX = useRef<number | null>(null)
+  const touchStartY = useRef<number | null>(null)
 
   // Reviews
   const [reviews, setReviews] = useState<any[]>([])
@@ -233,6 +237,27 @@ export default function ProductPage({
     .filter((p) => p.category === product.category && p.id !== product.id)
     .slice(0, 8)
 
+  // Swipe handlers for mobile image navigation
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
+  }, [])
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    const dy = e.changedTouches[0].clientY - touchStartY.current
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+      if (dx < 0) {
+        setSelectedImage((prev) => (prev + 1) % images.length)
+      } else {
+        setSelectedImage((prev) => (prev - 1 + images.length) % images.length)
+      }
+    }
+    touchStartX.current = null
+    touchStartY.current = null
+  }, [images.length])
+
   const handleAddToCart = () => {
 
     if (!selectedSize) {
@@ -382,16 +407,20 @@ export default function ProductPage({
 
           {/* ── IMAGES COLUMN ── */}
           <div className="space-y-4">
-            {/* Main image */}
-            <div className="relative aspect-3/4 overflow-hidden bg-[#111]">
+            {/* Main image with swipe support */}
+            <div
+              className="relative aspect-3/4 overflow-hidden bg-[#111] select-none"
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+            >
               <Image
                 src={resolveMediaUrl(images[selectedImage])}
                 alt={product.name}
                 fill
                 priority
-                className="object-cover transition-opacity duration-500"
+                className="object-contain transition-opacity duration-500"
               />
-              <div className="absolute inset-0 bg-linear-to-b from-transparent to-black/10" />
+              <div className="absolute inset-0 bg-linear-to-b from-transparent to-black/10 pointer-events-none" />
 
               {/* Badges top-left */}
               <div className="absolute top-4 left-4 flex flex-col gap-2">
@@ -413,6 +442,41 @@ export default function ProductPage({
                   </span>
                 )}
               </div>
+
+              {/* Mobile swipe dots */}
+              {images.length > 1 && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 md:hidden">
+                  {images.map((_: any, idx: number) => (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedImage(idx)}
+                      className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                        selectedImage === idx ? "bg-white w-4" : "bg-white/30"
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Mobile prev/next arrows */}
+              {images.length > 1 && (
+                <>
+                  <button
+                    onClick={() => setSelectedImage((prev) => (prev - 1 + images.length) % images.length)}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 md:hidden flex items-center justify-center bg-black/40 backdrop-blur-sm text-white/80"
+                    aria-label="Previous image"
+                  >
+                    <ArrowLeft size={14} />
+                  </button>
+                  <button
+                    onClick={() => setSelectedImage((prev) => (prev + 1) % images.length)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 md:hidden flex items-center justify-center bg-black/40 backdrop-blur-sm text-white/80"
+                    aria-label="Next image"
+                  >
+                    <ArrowLeft size={14} className="rotate-180" />
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Thumbnails */}

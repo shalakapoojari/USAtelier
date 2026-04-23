@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import gsap from "gsap";
@@ -99,16 +99,118 @@ function ProductCard({ product, isPlaceholder }: {
           <h3 className="font-serif text-2xl md:text-3xl text-white mb-2 tracking-wide uppercase group-hover:italic transition-all duration-500">{product.name}</h3>
 
           <div className="flex items-center justify-between w-full mt-2">
-            <p className="text-[10px] sans uppercase tracking-[0.3em] text-white/60">
+            <p className="text-[10px] font-sans uppercase tracking-[0.3em] text-white/60">
               ₹{Number(product.price).toLocaleString("en-IN")}
             </p>
-            <span className="text-[9px] sans uppercase tracking-widest text-white border-b border-white/30 pb-0.5">
+            <span className="text-[9px] font-sans uppercase tracking-widest text-white border-b border-white/30 pb-0.5">
               View Details
             </span>
           </div>
         </div>
       </div>
     </Link>
+  );
+}
+
+// ─── Touch Carousel ───────────────────────────────────────────────────────────
+function TouchCarousel({ items, isPlaceholder }: { items: any[] | null; isPlaceholder: boolean }) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const posRef = useRef(0);          // current x offset (px)
+  const velRef = useRef(0);          // velocity px/frame
+  const rafRef = useRef<number>(0);
+  const touchRef = useRef<{ startX: number; startPos: number; lastX: number; lastT: number } | null>(null);
+  const pausedRef = useRef(false);
+  const SPEED = 0.6; // px per frame auto-scroll
+
+  const setTrackX = useCallback((x: number) => {
+    if (!trackRef.current) return;
+    trackRef.current.style.transform = `translateX(${x}px)`;
+  }, []);
+
+  const getTrackWidth = useCallback(() => {
+    if (!trackRef.current) return 0;
+    return trackRef.current.scrollWidth / 3; // we triple the items
+  }, []);
+
+  // Auto-scroll loop
+  useEffect(() => {
+    if (!items) return;
+    const loop = () => {
+      if (!pausedRef.current) {
+        posRef.current -= SPEED;
+        const w = getTrackWidth();
+        if (w > 0 && posRef.current < -w) posRef.current += w;
+        setTrackX(posRef.current);
+      }
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [items, getTrackWidth, setTrackX]);
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    pausedRef.current = true;
+    velRef.current = 0;
+    const t = e.touches[0];
+    touchRef.current = { startX: t.clientX, startPos: posRef.current, lastX: t.clientX, lastT: Date.now() };
+  }, []);
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchRef.current) return;
+    const t = e.touches[0];
+    const dx = t.clientX - touchRef.current.startX;
+    const now = Date.now();
+    const dt = now - touchRef.current.lastT;
+    if (dt > 0) velRef.current = (t.clientX - touchRef.current.lastX) / dt * 16;
+    touchRef.current.lastX = t.clientX;
+    touchRef.current.lastT = now;
+    let next = touchRef.current.startPos + dx;
+    const w = getTrackWidth();
+    if (w > 0) {
+      while (next < -w) next += w;
+      while (next > 0) next -= w;
+    }
+    posRef.current = next;
+    setTrackX(next);
+  }, [getTrackWidth, setTrackX]);
+
+  const onTouchEnd = useCallback(() => {
+    touchRef.current = null;
+    // Resume auto-scroll smoothly (keep velocity momentum then hand off to loop)
+    pausedRef.current = false;
+  }, []);
+
+  if (!items) {
+    return (
+      <div className="flex gap-6 opacity-20 px-6">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="min-w-[75vw] md:min-w-[400px] aspect-[3/4] bg-white/5 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  const tripled = [...items, ...items, ...items];
+
+  return (
+    <div
+      className="w-full overflow-hidden cursor-grab active:cursor-grabbing"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+      <div
+        ref={trackRef}
+        className="flex gap-4 md:gap-6 will-change-transform"
+        style={{ transform: "translateX(0px)" }}
+      >
+        {tripled.map((p, i) => (
+          <div key={`ft-${p.id}-${i}`} className="w-[75vw] md:w-[400px] flex-none bg-[#050505]">
+            <ProductCard product={p} isPlaceholder={isPlaceholder} />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -166,11 +268,22 @@ export default function HomePage() {
     const progress = { val: 0 };
     const loadTl = gsap.timeline();
     loadTl
-      .to(progress, { val: 100, duration: 1.8, onUpdate: () => setLoadingPercent(Math.round(progress.val)) })
-      .to(".preloader", { yPercent: -100, duration: 1.2, ease: "power3.inOut" }, ">")
-      .from(".hero-main-text", { y: 150, duration: 1.5, stagger: 0.18, ease: "power4.out" }, "-=0.8")
-      .from(".hero-sub-text", { y: 30, opacity: 0, duration: 1, ease: "power3.out" }, "-=1.2")
-      .to(".hero-cta", { opacity: 1, duration: 1 }, "-=0.8");
+      .to(progress, { val: 100, duration: 1.8, ease: "power1.inOut", onUpdate: () => setLoadingPercent(Math.round(progress.val)) })
+      // Curtain wipe: slide the whole preloader upward off-screen
+      .to(".js-preloader", {
+        yPercent: -100,
+        duration: 1.1,
+        ease: "expo.inOut",
+      }, ">0.25")
+      // Hero text: curtain-wipe reveal from below the clip mask
+      .from(".hero-main-text", {
+        y: 120,
+        duration: 1.4,
+        stagger: 0.16,
+        ease: "expo.out",
+      }, "-=0.5")
+      .from(".hero-sub-text", { y: 28, opacity: 0, duration: 0.9, ease: "power3.out" }, "-=1.1")
+      .to(".hero-cta", { opacity: 1, duration: 0.9 }, "-=0.7");
 
     // Hero bg parallax
     gsap.fromTo(".hero-bg", { y: 0, scale: 1.12 }, {
@@ -229,8 +342,8 @@ export default function HomePage() {
     });
 
     const preloaderSafety = window.setTimeout(() => {
-      gsap.to(".preloader", { yPercent: -100, duration: 0.6, ease: "power2.out", overwrite: true });
-    }, 4500);
+      gsap.to(".js-preloader", { yPercent: -100, duration: 0.8, ease: "expo.inOut", overwrite: true });
+    }, 5000);
 
     return () => {
       ScrollTrigger.getAll().forEach(t => t.kill());
@@ -259,65 +372,50 @@ export default function HomePage() {
   return (
     <div className="antialiased text-[#e8e8e3] bg-[#030303]">
       <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:italic&family=Inter:wght@300;400;500&display=swap');
         :root { --gold: #d4af37; }
-        .serif { font-family: 'Instrument Serif', serif; }
-        .sans  { font-family: 'Inter', sans-serif; }
 
         .grain-overlay {
           position: fixed; top:0; left:0; width:100%; height:100%;
           pointer-events:none; z-index:9000; opacity:0.04;
           background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
         }
-        
-        .preloader {
-          position:absolute; inset:0; background:#050505; z-index:9999;
-          display:flex; pointer-events:none; justify-content:center; align-items:center;
+
+        /* Preloader — full viewport curtain */
+        .js-preloader {
+          position: fixed;
+          top: 0; left: 0;
+          width: 100vw; height: 100vh;
+          background: #050505;
+          z-index: 99998;
+          display: flex;
+          pointer-events: all;
+          justify-content: center;
+          align-items: center;
+          will-change: transform;
         }
 
-        /* Infinite Auto-Scroll Animations */
-        @keyframes marquee {
-          0% { transform: translateX(0%); }
-          100% { transform: translateX(-50%); }
-        }
-        @keyframes marquee-reverse {
-          0% { transform: translateX(-50%); }
-          100% { transform: translateX(0%); }
-        }
-        .animate-marquee {
-          display: flex;
-          width: max-content;
-          animation: marquee 40s linear infinite;
-        }
-        .animate-marquee-reverse {
-          display: flex;
-          width: max-content;
-          animation: marquee-reverse 40s linear infinite;
-        }
-        .animate-marquee:hover, .animate-marquee-reverse:hover {
-          animation-play-state: paused;
-        }
+        /* Line-mask: hides text until GSAP slides it into view */
+        .line-mask { overflow: hidden; }
+        .line-mask span { display: block; transform: translateY(100%); }
+        .highlight-text span { opacity: 0.15; }
 
-        .line-mask { overflow:hidden; }
-        .line-mask span { display:block; transform:translateY(100%); }
-        .highlight-text span { opacity:0.15; }
-        
         @keyframes fadein { from{opacity:0;transform:translateY(24px) scale(0.98)} to{opacity:1;transform:none} }
-        .animate-fadein { animation:fadein 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .animate-fadein { animation: fadein 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
       `}</style>
 
       <div className="grain-overlay" />
 
-      {/* Preloader */}
-      <div className="preloader">
+      {/* Preloader — curtain wipe panel */}
+      <div className="js-preloader">
         <div className="text-center flex flex-col items-center gap-6">
           <p className="font-serif text-2xl tracking-[0.5em] text-white/80 uppercase select-none">U.S Atelier</p>
           <div className="w-48 h-px bg-gray-800 relative overflow-hidden">
             <div className="absolute top-0 left-0 h-full bg-white" style={{ width: `${loadingPercent}%`, transition: "width 50ms linear" }} />
           </div>
-          <p className="text-[10px] sans uppercase tracking-[0.4em] text-gray-600">{loadingPercent}%</p>
+          <p className="text-[10px] font-sans uppercase tracking-[0.4em] text-gray-600">{loadingPercent}%</p>
         </div>
       </div>
+
 
       <SiteHeader />
 
@@ -328,17 +426,17 @@ export default function HomePage() {
 
         <div className="z-10 text-center relative mix-blend-difference px-4">
           <div className="line-mask mb-2">
-            <h2 className="hero-sub-text text-[10px] sans uppercase tracking-[0.6em] text-gray-300">{seasonText}</h2>
+            <h2 className="hero-sub-text text-[10px] font-sans uppercase tracking-[0.6em] text-gray-300">{seasonText}</h2>
           </div>
           <div className="line-mask">
-            <h1 className="text-[13vw] md:text-[11vw] leading-[0.85] serif text-white hero-main-text">{title1}</h1>
+            <h1 className="text-[13vw] md:text-[11vw] leading-[0.85] font-serif text-white hero-main-text">{title1}</h1>
           </div>
           <div className="line-mask">
-            <h1 className="text-[13vw] md:text-[11vw] leading-[0.85] serif italic text-gray-400 hero-main-text">{title2}</h1>
+            <h1 className="text-[13vw] md:text-[11vw] leading-[0.85] font-serif italic text-gray-400 hero-main-text">{title2}</h1>
           </div>
           <div className="mt-12 opacity-0 hero-cta">
             <div className="magnetic-wrap">
-              <Link href="/view-all" className="inline-block px-8 py-4 border border-white/50 rounded-full text-[10px] sans uppercase tracking-widest hover:bg-white hover:text-black transition-all duration-500 magnetic-target">
+              <Link href="/view-all" className="inline-block px-8 py-4 border border-white/50 rounded-full text-[10px] font-sans uppercase tracking-widest hover:bg-white hover:text-black transition-all duration-500 magnetic-target">
                 View The Lookbook
               </Link>
             </div>
@@ -346,7 +444,7 @@ export default function HomePage() {
         </div>
 
         <div className="absolute bottom-10 left-10 hidden md:block">
-          <p className="text-[9px] uppercase tracking-widest leading-relaxed opacity-40 sans">
+          <p className="text-[9px] uppercase tracking-widest leading-relaxed opacity-40 font-sans">
             Designed. Crafted.<br />Worn in Darkness.<br />
             <span style={{ opacity: 0.6 }}>Ships from India · Worldwide</span>
           </p>
@@ -355,20 +453,20 @@ export default function HomePage() {
         {/* Scroll indicator */}
         <div className="absolute bottom-10 right-10 hidden md:flex flex-col items-center gap-3 opacity-30">
           <div className="scroll-line w-px h-12 bg-white origin-top" />
-          <p className="text-[8px] sans uppercase tracking-[0.4em]">Scroll</p>
+          <p className="text-[8px] font-sans uppercase tracking-[0.4em]">Scroll</p>
         </div>
       </header>
 
       {/* ── MANIFESTO ────────────────────────────────────────────────────── */}
       <section className="py-28 md:py-40 px-6 md:px-32 bg-[#030303]">
         <div className="max-w-4xl mx-auto text-center">
-          <p className="text-[8px] sans uppercase tracking-[0.6em] text-gray-600 mb-12">Our Philosophy</p>
-          <p className="highlight-text text-2xl md:text-4xl lg:text-5xl serif leading-[1.45] text-gray-300">
+          <p className="text-[8px] font-sans uppercase tracking-[0.6em] text-gray-600 mb-12">Our Philosophy</p>
+          <p className="highlight-text text-2xl md:text-4xl lg:text-5xl font-serif leading-[1.45] text-gray-300">
             {manifesto}
           </p>
           <div className="mt-16 flex items-center justify-center gap-8">
             <div className="h-px w-20 bg-white/10" />
-            <span className="text-[9px] sans uppercase tracking-[0.5em] text-gray-600">U.S Atelier</span>
+            <span className="text-[9px] font-sans uppercase tracking-[0.5em] text-gray-600">U.S Atelier</span>
             <div className="h-px w-20 bg-white/10" />
           </div>
         </div>
@@ -381,31 +479,17 @@ export default function HomePage() {
         <div className="max-w-screen-2xl mx-auto px-6 md:px-12 mb-10 md:mb-14">
           <div className="flex items-end justify-between reveal-heading">
             <div>
-              <p className="text-[10px] sans uppercase tracking-[0.3em] text-white/40 mb-3">Editorial Spotlight</p>
+              <p className="text-[10px] font-sans uppercase tracking-[0.3em] text-white/40 mb-3">Editorial Spotlight</p>
               <h2 className="font-serif text-4xl md:text-5xl text-white tracking-wide uppercase">Featured Pieces</h2>
             </div>
-            <Link href="/view-all" className="hidden md:block text-[10px] sans uppercase tracking-[0.2em] text-white/60 hover:text-white transition-colors border-b border-white/20 hover:border-white/60 pb-0.5">
+            <Link href="/view-all" className="hidden md:block text-[10px] font-sans uppercase tracking-[0.2em] text-white/60 hover:text-white transition-colors border-b border-white/20 hover:border-white/60 pb-0.5">
               Explore Collection →
             </Link>
           </div>
         </div>
 
-        <div className="w-full flex">
-          {featured === null ? (
-            <div className="flex gap-6 opacity-20 px-6">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="min-w-[75vw] md:min-w-[400px] aspect-[3/4] bg-white/5 animate-pulse" />
-              ))}
-            </div>
-          ) : (
-            <div className="animate-marquee-reverse flex gap-4 md:gap-6 pr-4 md:pr-6">
-              {[...featured, ...featured, ...featured].map((p, i) => (
-                <div key={`ft-${p.id}-${i}`} className="w-[75vw] md:w-[400px] flex-none bg-[#050505]">
-                  <ProductCard product={p} isPlaceholder={!config?.featured_product_ids?.length} />
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="w-full overflow-hidden">
+          <TouchCarousel items={featured} isPlaceholder={!config?.featured_product_ids?.length} />
         </div>
       </section>
 
@@ -428,13 +512,13 @@ export default function HomePage() {
               className="w-full h-full object-contain md:object-cover"
             />
             <div className="absolute bottom-0 left-0 right-0 p-8 md:p-10 bg-gradient-to-t from-black via-black/50 to-transparent">
-              <p className="text-[9px] sans uppercase tracking-[0.5em] text-gray-500 mb-1">Editorial View</p>
-              <h3 className="text-3xl md:text-5xl serif italic text-white mb-4">{enlargedProduct.name}</h3>
+              <p className="text-[9px] font-sans uppercase tracking-[0.5em] text-gray-500 mb-1">Editorial View</p>
+              <h3 className="text-3xl md:text-5xl font-serif italic text-white mb-4">{enlargedProduct.name}</h3>
               <div className="flex items-center justify-between">
-                <p className="text-sm sans uppercase tracking-widest text-[#d4af37]">₹{Number(enlargedProduct.price).toLocaleString("en-IN")}</p>
+                <p className="text-sm font-sans uppercase tracking-widest text-[#d4af37]">₹{Number(enlargedProduct.price).toLocaleString("en-IN")}</p>
                 <Link
                   href={`/product/${enlargedProduct.id}`}
-                  className="px-6 py-2 border border-white/20 text-[9px] sans uppercase tracking-widest hover:bg-white hover:text-black transition-all"
+                  className="px-6 py-2 border border-white/20 text-[9px] font-sans uppercase tracking-widest hover:bg-white hover:text-black transition-all"
                 >
                   View Details
                 </Link>

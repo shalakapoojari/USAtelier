@@ -87,7 +87,10 @@ export function Preloader() {
         ref={preloaderRef}
         style={{
           position: "fixed",
-          inset: 0,
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
           zIndex: 99999,
           display: "flex",
           alignItems: "center",
@@ -114,14 +117,15 @@ export function Preloader() {
 
         {/* Brand label */}
         <p style={{
-          fontSize: 8,
+          fontSize: 10,
           textTransform: "uppercase",
-          letterSpacing: "0.6em",
-          color: "rgba(240,240,240,0.2)",
+          letterSpacing: "0.18em",
+          color: "rgba(240,240,240,0.35)",
           marginBottom: 24,
-          fontFamily: "'Geist', sans-serif",
+          fontFamily: "'Geist', 'Inter', sans-serif",
+          fontWeight: 300,
         }}>
-          U.S ATELIER
+          U.S Atelier
         </p>
 
         {/* Monochromatic progress bar */}

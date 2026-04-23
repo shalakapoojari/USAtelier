@@ -596,7 +596,7 @@ export default function ProductsPage() {
                           <div className="flex gap-4">
                             <div className="relative w-16 h-20 bg-white/5 border border-white/10 shrink-0 overflow-hidden group/prev">
                               {img ? (
-                                <Image src={getImageUrl(img)} alt="Preview" fill className="object-cover" />
+                                <Image src={getImageUrl(img)} alt="Preview" fill className="object-contain" />
                               ) : (
                                 <div className="absolute inset-0 flex items-center justify-center text-gray-700">
                                   <Upload size={16} />
@@ -660,7 +660,7 @@ export default function ProductsPage() {
                       <div className="flex gap-4 p-4 border border-amber-500/10 bg-amber-500/2 hover:bg-amber-500/4 transition-all">
                         <div className="relative w-16 h-20 bg-white/5 border border-white/10 shrink-0 overflow-hidden">
                           {formData.sizeGuideImage ? (
-                            <Image src={getImageUrl(formData.sizeGuideImage)} alt="Size Guide" fill className="object-cover" />
+                            <Image src={getImageUrl(formData.sizeGuideImage)} alt="Size Guide" fill className="object-contain" />
                           ) : (
                             <div className="absolute inset-0 flex items-center justify-center text-gray-700">
                               <Upload size={16} />

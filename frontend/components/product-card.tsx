@@ -95,7 +95,7 @@ export function ProductCard({ product }: ProductCardProps) {
             </span>
           )}
           {(product.bestseller || (product as any).is_bestseller) && (
-            <span className="bg-purple-600 text-white text-[9px] uppercase tracking-widest px-2 py-0.5 font-medium flex items-center gap-1">
+            <span className="bg-amber-500 text-black text-[9px] uppercase tracking-widest px-2 py-0.5 font-medium flex items-center gap-1">
               <Award size={8} />
               Best
             </span>
@@ -111,7 +111,7 @@ export function ProductCard({ product }: ProductCardProps) {
       {/* Text info */}
       <div className="mt-3 space-y-0.5">
         <p className="text-[10px] uppercase tracking-widest text-gray-500">{product.category}</p>
-        <h3 className="text-sm font-medium text-balance group-hover:text-gray-300 transition-colors leading-snug">
+        <h3 className="text-xl font-serif text-balance group-hover:text-gray-300 transition-colors leading-snug">
           {product.name}
         </h3>
         <p className="text-sm text-gray-400">₹{product.price.toLocaleString('en-IN')}</p>
