@@ -32,7 +32,7 @@ interface HomepageData {
 
 
 // ─── Hero Media ───────────────────────────────────────────────────────────────
-function HeroMedia({ slide, configLoaded, fallbackImage, onImageLoad }: { slide: HeroSlide | null; configLoaded: boolean; fallbackImage: string; onImageLoad?: () => void }) {
+function HeroMedia({ slide, fallbackImage, onImageLoad }: { slide: HeroSlide | null; fallbackImage: string; onImageLoad?: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
@@ -43,23 +43,25 @@ function HeroMedia({ slide, configLoaded, fallbackImage, onImageLoad }: { slide:
     if (hasVideo && videoRef.current) { videoRef.current.load(); setVideoLoaded(false); }
   }, [slide?.video_url]);
 
-  // Only signal "no image" once config has actually loaded — prevents firing before API returns.
-  // If config loaded but there is genuinely no image URL, unblock the preloader immediately.
-  useEffect(() => {
-    if (configLoaded && !imgSrc) onImageLoad?.();
-  }, [configLoaded, imgSrc]);
+  // Guard: only signal load when there is a real src to load
+  const handleLoad  = imgSrc ? onImageLoad : undefined;
+  const handleError = imgSrc ? onImageLoad : undefined; // don't hang preloader on a broken image
 
   return (
-    <div className="absolute inset-0 z-0 overflow-hidden">
-      {imgSrc && (
-        <img
-          src={imgSrc} key={imgSrc}
-          className={`w-full h-full object-cover scale-110 hero-bg transition-opacity duration-1000 ${hasVideo && videoLoaded ? "opacity-0" : "opacity-60"}`}
-          alt={`U.S Atelier editorial hero — current season`} loading="eager"
-          onLoad={onImageLoad}
-          onError={onImageLoad} // don't hang the preloader on a broken image
-        />
-      )}
+    // Always render a dark fill behind the image so there's never a blank area
+    <div className="absolute inset-0 z-0 overflow-hidden bg-[#080808]">
+      {/* Always mount <img> so onLoad/onError fire the moment src is set */}
+      <img
+        src={imgSrc || undefined}
+        key={imgSrc}
+        className={`w-full h-full object-cover scale-110 hero-bg transition-opacity duration-700 ${
+          imgSrc ? (hasVideo && videoLoaded ? "opacity-0" : "opacity-60") : "opacity-0"
+        }`}
+        alt="U.S Atelier editorial hero"
+        loading="eager"
+        onLoad={handleLoad}
+        onError={handleError}
+      />
       {hasVideo && (
         <video
           ref={videoRef}
@@ -74,6 +76,7 @@ function HeroMedia({ slide, configLoaded, fallbackImage, onImageLoad }: { slide:
     </div>
   );
 }
+
 
 // ─── Product Card ─────────────────────────────────────────────────────────────
 // ─── Product Card ─────────────────────────────────────────────────────────────
@@ -240,20 +243,14 @@ export default function HomePage() {
   const [enlargedProduct, setEnlargedProduct] = useState<any | null>(null);
   const [featuredScrollPos, setFeaturedScrollPos] = useState(0);
   const featuredRef = useRef<HTMLDivElement>(null);
-  // Use null (not true) so we don't flash the preloader before sessionStorage check
-  const [showPreloader, setShowPreloader] = useState<boolean | null>(null);
+  // Lazy initializer reads sessionStorage synchronously — no null phase, no flash
+  const [showPreloader, setShowPreloader] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true; // SSR: always show
+    if (sessionStorage.getItem("hasSeenPreloader")) return false;
+    sessionStorage.setItem("hasSeenPreloader", "true");
+    return true;
+  });
   const [heroImageLoaded, setHeroImageLoaded] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      if (sessionStorage.getItem("hasSeenPreloader")) {
-        setShowPreloader(false);
-      } else {
-        sessionStorage.setItem("hasSeenPreloader", "true");
-        setShowPreloader(true);
-      }
-    }
-  }, []);
 
   const router = useRouter();
 
@@ -294,8 +291,6 @@ export default function HomePage() {
   // ─── GSAP Animations ────────────────────────────────────────────────────
   useEffect(() => {
     if (bestsellers === null || featured === null) return;
-    // showPreloader===null means sessionStorage check hasn't run yet — wait
-    if (showPreloader === null) return;
     // When preloader is shown, wait for the hero image to finish loading
     if (showPreloader && !heroImageLoaded) return;
 
@@ -387,25 +382,23 @@ export default function HomePage() {
     };
   }, [bestsellers, featured, heroImageLoaded, showPreloader]);
 
-
-  // Crawl the progress bar to 85% while waiting for the image to load
+  // Crawl the progress bar to 85% while waiting for the image to load.
+  // Safety timeout fires only after configLoaded so we know whether there is an image.
   useEffect(() => {
     if (!showPreloader || heroImageLoaded) return;
     const progress = { val: 0 };
     const crawl = gsap.to(progress, {
       val: 85,
-      duration: 2.5,
+      duration: 2.8,
       ease: "power1.inOut",
       onUpdate: () => setLoadingPercent(Math.round(progress.val)),
     });
-    // Safety: if image never fires (e.g. empty src / network error), unblock after 4s
-    const safety = window.setTimeout(() => setHeroImageLoaded(true), 4000);
+    // Safety: fire only after a generous window — the GSAP effect has its own 5s escape
+    const safety = window.setTimeout(() => setHeroImageLoaded(true), 8000);
     return () => { crawl.kill(); window.clearTimeout(safety); };
   }, [showPreloader, heroImageLoaded]);
 
   // ─── Derived values ──────────────────────────────────────────────────────
-  // config===null means API hasn't returned yet; config===object (even empty) means it has
-  const configLoaded = config !== null;
   const heroSlide = config?.hero_slides?.[0] || null;
   const fallbackHero = "";
   const manifesto = config?.manifesto_text || "We believe in the quiet power of silence. In a world of noise, U.S Atelier is the absence of it. We strip away the unnecessary to reveal the essential structure of the human form. This is not just clothing; this is architecture for the soul.";
@@ -475,7 +468,7 @@ export default function HomePage() {
 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
       <header className="relative w-full h-screen overflow-hidden flex items-center justify-center">
-        <HeroMedia slide={heroSlide} configLoaded={configLoaded} fallbackImage={fallbackHero} onImageLoad={() => setHeroImageLoaded(true)} />
+        <HeroMedia slide={heroSlide} fallbackImage={fallbackHero} onImageLoad={() => setHeroImageLoaded(true)} />
         <div className="absolute inset-0 bg-black/20" />
 
         <div className="z-10 text-center relative mix-blend-difference px-4">
