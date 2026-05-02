@@ -95,7 +95,7 @@ export function SiteHeader() {
     }, menuContainerRef);
 
     return () => ctx.revert();
-  }, [isMounted]);
+  }, []); // run once on mount — sets up GSAP timeline refs
 
   // 2. SIDE PANEL CROSSFADE (Hovering over links)
   useEffect(() => {

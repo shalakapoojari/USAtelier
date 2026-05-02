@@ -27,7 +27,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: "#FCFCFC",
+  themeColor: "#030303",
   width: "device-width",
   initialScale: 1,
 }
@@ -41,6 +41,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} ${cormorant.variable}`} style={{ backgroundColor: '#030303' }}>
+      <head>
+        {/* Preconnect to API and font CDN so DNS/TLS are resolved before JS runs */}
+        <link rel="preconnect" href="https://api.usatelier.in" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      </head>
       <body className="font-sans antialiased" style={{ backgroundColor: '#030303' }}>
         <AuthProvider>
           <WishlistProvider>

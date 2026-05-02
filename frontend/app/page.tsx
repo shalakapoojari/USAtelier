@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useCart } from "@/lib/cart-context";
@@ -50,15 +50,19 @@ function HeroMedia({ slide, fallbackImage, onImageLoad }: { slide: HeroSlide | n
   return (
     // Always render a dark fill behind the image so there's never a blank area
     <div className="absolute inset-0 z-0 overflow-hidden bg-[#080808]">
-      {/* Always mount <img> so onLoad/onError fire the moment src is set */}
+      {/* Stable key so the img element persists; only src changes, which fires onLoad naturally */}
       <img
         src={imgSrc || undefined}
-        key={imgSrc}
+        key="hero-img"
         className={`w-full h-full object-cover scale-110 hero-bg transition-opacity duration-700 ${
           imgSrc ? (hasVideo && videoLoaded ? "opacity-0" : "opacity-60") : "opacity-0"
         }`}
         alt="U.S Atelier editorial hero"
         loading="eager"
+        // fetchpriority tells the browser this is the LCP image — load it first
+        // @ts-ignore — fetchpriority is valid HTML but not yet in TS lib
+        fetchpriority="high"
+        decoding="async"
         onLoad={handleLoad}
         onError={handleError}
       />
@@ -231,17 +235,18 @@ function TouchCarousel({ items, isPlaceholder }: { items: any[] | null; isPlaceh
   );
 }
 
+// ─── Resolve API base immediately (no useEffect round-trip needed) ──────────
+const API_BASE_RESOLVED = typeof window !== "undefined" ? getApiBase() : "";
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const [loadingPercent, setLoadingPercent] = useState(0);
   const { items: cartItems = [] } = useCart() || {};
 
-  const [API_BASE, setApiBase] = useState("");
   const [config, setConfig] = useState<HomepageData | null>(null);
   const [bestsellers, setBestsellers] = useState<any[] | null>(null);
   const [featured, setFeatured] = useState<any[] | null>(null);
   const [enlargedProduct, setEnlargedProduct] = useState<any | null>(null);
-  const [featuredScrollPos, setFeaturedScrollPos] = useState(0);
   const featuredRef = useRef<HTMLDivElement>(null);
   // Lazy initializer reads sessionStorage synchronously — no null phase, no flash
   const [showPreloader, setShowPreloader] = useState<boolean>(() => {
@@ -252,16 +257,14 @@ export default function HomePage() {
   });
   const [heroImageLoaded, setHeroImageLoaded] = useState(false);
 
-  const router = useRouter();
-
-  useEffect(() => { setApiBase(getApiBase()); }, []);
-
-  // Fetch homepage config + products in parallel for faster loading
+  // Fetch homepage config + products immediately on mount (no API_BASE state delay)
   useEffect(() => {
+    const API_BASE = API_BASE_RESOLVED || getApiBase();
     if (!API_BASE) return;
     const run = async () => {
       try {
-        const configRes = await apiFetch(API_BASE, `/api/homepage?_t=${Date.now()}`);
+        // No cache-busting param — allows the browser to cache this lightweight response
+        const configRes = await apiFetch(API_BASE, `/api/homepage`);
         const data: HomepageData = configRes.ok ? await configRes.json() : {};
         setConfig(data);
 
@@ -286,7 +289,7 @@ export default function HomePage() {
       }
     };
     run();
-  }, [API_BASE]);
+  }, []); // no deps — API_BASE is resolved inline, never changes
 
   // ─── GSAP Animations ────────────────────────────────────────────────────
   useEffect(() => {
@@ -383,18 +386,17 @@ export default function HomePage() {
   }, [bestsellers, featured, heroImageLoaded, showPreloader]);
 
   // Crawl the progress bar to 85% while waiting for the image to load.
-  // Safety timeout fires only after configLoaded so we know whether there is an image.
   useEffect(() => {
     if (!showPreloader || heroImageLoaded) return;
     const progress = { val: 0 };
     const crawl = gsap.to(progress, {
       val: 85,
-      duration: 2.8,
+      duration: 2.5,
       ease: "power1.inOut",
       onUpdate: () => setLoadingPercent(Math.round(progress.val)),
     });
-    // Safety: fire only after a generous window — the GSAP effect has its own 5s escape
-    const safety = window.setTimeout(() => setHeroImageLoaded(true), 8000);
+    // Safety: force preloader lift after 4s max — GSAP effect has its own 5s escape
+    const safety = window.setTimeout(() => setHeroImageLoaded(true), 4000);
     return () => { crawl.kill(); window.clearTimeout(safety); };
   }, [showPreloader, heroImageLoaded]);
 
@@ -419,12 +421,6 @@ export default function HomePage() {
       <style jsx global>{`
         :root { --gold: #d4af37; }
 
-        .grain-overlay {
-          position: fixed; top:0; left:0; width:100%; height:100%;
-          pointer-events:none; z-index:9000; opacity:0.04;
-          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-        }
-
         /* Preloader — full viewport curtain */
         .js-preloader {
           position: fixed;
@@ -448,7 +444,7 @@ export default function HomePage() {
         .animate-fadein { animation: fadein 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
       `}</style>
 
-      <div className="grain-overlay" />
+      {/* Grain overlay is handled by body::before in globals.css — no extra div needed */}
 
       {/* Preloader — curtain wipe panel (null while sessionStorage check pending) */}
       {showPreloader === true && (
