@@ -373,7 +373,7 @@ export default function HomePage() {
   const heroSlide = config?.hero_slides?.[0] || null;
   const fallbackHero = "";
   const manifesto = config?.manifesto_text || "We believe in the quiet power of silence. In a world of noise, U.S Atelier is the absence of it. We strip away the unnecessary to reveal the essential structure of the human form. This is not just clothing; this is architecture for the soul.";
-  const seasonText = config?.season_label || "Fall Winter 2025";
+  const seasonText = config?.season_label || "Summer Collection 2026";
   const isLoading = bestsellers === null || featured === null;
 
   let title1 = "Be You", title2 = "Be Bold";
