@@ -283,7 +283,7 @@ export default function HomePage() {
 
     const progress = { val: 0 };
     const loadTl = gsap.timeline();
-    
+
     if (showPreloader) {
       loadTl
         .to(progress, { val: 100, duration: 1.8, ease: "power1.inOut", onUpdate: () => setLoadingPercent(Math.round(progress.val)) })
@@ -296,7 +296,7 @@ export default function HomePage() {
     } else {
       loadTl.from(".hero-main-text", { y: 120, duration: 1.4, stagger: 0.16, ease: "expo.out" }, "+=0.2");
     }
-    
+
     loadTl
       .from(".hero-sub-text", { y: 28, opacity: 0, duration: 0.9, ease: "power3.out" }, showPreloader ? "-=1.1" : "-=0.8")
       .to(".hero-cta", { opacity: 1, duration: 0.9 }, showPreloader ? "-=0.7" : "-=0.5");
@@ -376,7 +376,7 @@ export default function HomePage() {
   const seasonText = config?.season_label || "Fall Winter 2025";
   const isLoading = bestsellers === null || featured === null;
 
-  let title1 = "BE YOU", title2 = "BE BOLD";
+  let title1 = "Be You", title2 = "Be Bold";
   if (heroSlide?.content) {
     const words = heroSlide.content.split(" ");
     if (words.length > 1) {
