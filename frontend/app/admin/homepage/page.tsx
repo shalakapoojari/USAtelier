@@ -131,7 +131,7 @@ function HeroSlideEditor({
                             autoPlay muted loop playsInline
                         />
                     ) : slide.image ? (
-                        <Image src={resolveMediaUrl(slide.image)} alt="Hero" fill className="object-cover" />
+                        <Image src={resolveMediaUrl(slide.image)} alt="Hero" fill className="object-contain" />
                     ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-gray-700">
                             <ImageIcon size={32} />
@@ -246,7 +246,7 @@ function HeroSlideEditor({
                                                         className="group cursor-pointer space-y-2"
                                                     >
                                                         <div className="relative aspect-3/4 border border-white/5 group-hover:border-white/40 transition-all overflow-hidden bg-white/5">
-                                                            <Image src={imgUrl} alt={p.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                            <Image src={imgUrl} alt={p.name} fill className="object-contain group-hover:scale-105 transition-transform duration-500" />
                                                             <div className="absolute inset-0 bg-black/60 opacity-100 transition-opacity flex items-center justify-center">
                                                                 <span className="text-[8px] uppercase tracking-widest">Select</span>
                                                             </div>
@@ -390,7 +390,7 @@ function ProductSelectionRow({
                     const imageUrl = resolveMediaUrl(images && images[0] ? images[0] : "/placeholder.jpg")
                     return (
                         <div key={p.id} className="relative shrink-0 w-45 md:w-53.75 aspect-3/4 border border-white/5 group/card">
-                            <Image src={imageUrl} alt={p.name} fill className="object-cover opacity-80" />
+                            <Image src={imageUrl} alt={p.name} fill className="object-contain opacity-80" />
                             <div className="absolute inset-x-0 bottom-0 bg-black/80 p-4 backdrop-blur-sm border-t border-white/5">
                                 <p className="text-[10px] uppercase tracking-[0.2em] font-medium truncate mb-1">{p.name}</p>
                                 <p className="text-[7px] uppercase tracking-widest text-gray-500 font-mono">ID: {p.id}</p>
@@ -473,7 +473,7 @@ function ProductPickerDialog({
                                 className={`group cursor-pointer space-y-2 border transition-all ${isSelected ? "border-white" : "border-transparent"}`}
                             >
                                 <div className="relative aspect-3/4 border border-white/5 group-hover:border-white/40 transition-all overflow-hidden bg-white/5">
-                                    <Image src={imgUrl} alt={p.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                                    <Image src={imgUrl} alt={p.name} fill className="object-contain group-hover:scale-105 transition-transform duration-500" />
                                     <div className={`absolute inset-0 bg-black/60 transition-opacity flex items-center justify-center ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                                         {isSelected ? (
                                             <div className="bg-white text-black size-6 flex items-center justify-center rounded-full">

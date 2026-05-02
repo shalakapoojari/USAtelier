@@ -857,7 +857,7 @@ export default function ProductsPage() {
               <tr key={p.id} className={`border-b border-white/5 hover:bg-white/4 ${i % 2 === 0 ? "bg-white/2" : ""}`}>
                 <td className="px-4 md:px-8 py-4 md:py-6 flex items-center gap-4 md:gap-6">
                   <div className="relative w-16 h-20 bg-white/5">
-                    <Image src={getImageUrl(p.images)} alt={p.name} fill className="object-cover opacity-80" />
+                    <Image src={getImageUrl(p.images)} alt={p.name} fill className="object-contain opacity-80" />
                   </div>
                   <div>
                     <p className="font-medium text-sm">{p.name}</p>
