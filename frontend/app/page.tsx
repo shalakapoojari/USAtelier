@@ -240,7 +240,8 @@ export default function HomePage() {
   const [enlargedProduct, setEnlargedProduct] = useState<any | null>(null);
   const [featuredScrollPos, setFeaturedScrollPos] = useState(0);
   const featuredRef = useRef<HTMLDivElement>(null);
-  const [showPreloader, setShowPreloader] = useState(true);
+  // Use null (not true) so we don't flash the preloader before sessionStorage check
+  const [showPreloader, setShowPreloader] = useState<boolean | null>(null);
   const [heroImageLoaded, setHeroImageLoaded] = useState(false);
 
   useEffect(() => {
@@ -249,6 +250,7 @@ export default function HomePage() {
         setShowPreloader(false);
       } else {
         sessionStorage.setItem("hasSeenPreloader", "true");
+        setShowPreloader(true);
       }
     }
   }, []);
@@ -257,15 +259,16 @@ export default function HomePage() {
 
   useEffect(() => { setApiBase(getApiBase()); }, []);
 
-  // Fetch homepage config + products
+  // Fetch homepage config + products in parallel for faster loading
   useEffect(() => {
     if (!API_BASE) return;
     const run = async () => {
       try {
-        const res = await apiFetch(API_BASE, `/api/homepage?_t=${Date.now()}`);
-        const data: HomepageData = res.ok ? await res.json() : {};
+        const configRes = await apiFetch(API_BASE, `/api/homepage?_t=${Date.now()}`);
+        const data: HomepageData = configRes.ok ? await configRes.json() : {};
         setConfig(data);
 
+        // Now fetch products in parallel
         const fetchGroup = async (ids: string[]) => {
           if (!ids?.length) return [];
           const results = await Promise.all(
@@ -291,6 +294,8 @@ export default function HomePage() {
   // ─── GSAP Animations ────────────────────────────────────────────────────
   useEffect(() => {
     if (bestsellers === null || featured === null) return;
+    // showPreloader===null means sessionStorage check hasn't run yet — wait
+    if (showPreloader === null) return;
     // When preloader is shown, wait for the hero image to finish loading
     if (showPreloader && !heroImageLoaded) return;
 
@@ -380,7 +385,8 @@ export default function HomePage() {
       window.clearTimeout(preloaderSafety);
       cleanups.forEach(fn => fn());
     };
-  }, [bestsellers, featured, heroImageLoaded]);
+  }, [bestsellers, featured, heroImageLoaded, showPreloader]);
+
 
   // Crawl the progress bar to 85% while waiting for the image to load
   useEffect(() => {
@@ -392,8 +398,8 @@ export default function HomePage() {
       ease: "power1.inOut",
       onUpdate: () => setLoadingPercent(Math.round(progress.val)),
     });
-    // Safety: if image never fires (e.g. empty src / network error), unblock after 10s
-    const safety = window.setTimeout(() => setHeroImageLoaded(true), 10000);
+    // Safety: if image never fires (e.g. empty src / network error), unblock after 4s
+    const safety = window.setTimeout(() => setHeroImageLoaded(true), 4000);
     return () => { crawl.kill(); window.clearTimeout(safety); };
   }, [showPreloader, heroImageLoaded]);
 
@@ -451,8 +457,8 @@ export default function HomePage() {
 
       <div className="grain-overlay" />
 
-      {/* Preloader — curtain wipe panel */}
-      {showPreloader && (
+      {/* Preloader — curtain wipe panel (null while sessionStorage check pending) */}
+      {showPreloader === true && (
         <div className="js-preloader">
           <div className="text-center flex flex-col items-center gap-6">
             <p className="font-serif text-2xl tracking-[0.5em] text-white/80 uppercase select-none">U.S Atelier</p>

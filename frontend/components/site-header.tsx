@@ -53,20 +53,15 @@ export function SiteHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false)
   const [hoveredLink, setHoveredLink] = useState<string>('shop')
-  const [isMounted, setIsMounted] = useState(false)
 
   // GSAP Refs
   const menuContainerRef = useRef<HTMLDivElement>(null)
   const sidePanelRef = useRef<HTMLDivElement>(null)
   const timelineRef = useRef<gsap.core.Timeline | null>(null)
 
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
-
   // 1. MAIN REVEAL ANIMATION (Opening the Menu)
   useEffect(() => {
-    if (!isMounted || !menuContainerRef.current) return;
+    if (!menuContainerRef.current) return;
 
     const ctx = gsap.context(() => {
       // Set initial hidden states (hidden above the screen)
@@ -179,8 +174,6 @@ export function SiteHeader() {
       }, 150); // Tiny buffer to ensure the new route has painted
     });
   };
-
-  if (!isMounted) return null
 
   const activeData = panelData[hoveredLink as keyof typeof panelData] || panelData.shop;
   const ActiveIcon = activeData.Icon;
