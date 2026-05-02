@@ -32,7 +32,7 @@ interface HomepageData {
 
 
 // ─── Hero Media ───────────────────────────────────────────────────────────────
-function HeroMedia({ slide, fallbackImage }: { slide: HeroSlide | null; fallbackImage: string }) {
+function HeroMedia({ slide, fallbackImage, onImageLoad }: { slide: HeroSlide | null; fallbackImage: string; onImageLoad?: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
@@ -43,12 +43,19 @@ function HeroMedia({ slide, fallbackImage }: { slide: HeroSlide | null; fallback
     if (hasVideo && videoRef.current) { videoRef.current.load(); setVideoLoaded(false); }
   }, [slide?.video_url]);
 
+  // If there's no src at all, signal load immediately
+  useEffect(() => {
+    if (!imgSrc) onImageLoad?.();
+  }, [imgSrc]);
+
   return (
     <div className="absolute inset-0 z-0 overflow-hidden">
       <img
         src={imgSrc} key={imgSrc}
         className={`w-full h-full object-cover scale-110 hero-bg transition-opacity duration-1000 ${hasVideo && videoLoaded ? "opacity-0" : "opacity-60"}`}
         alt={`U.S Atelier editorial hero — current season`} loading="eager"
+        onLoad={onImageLoad}
+        onError={onImageLoad} // don't hang the preloader on a broken image
       />
       {hasVideo && (
         <video
@@ -231,6 +238,7 @@ export default function HomePage() {
   const [featuredScrollPos, setFeaturedScrollPos] = useState(0);
   const featuredRef = useRef<HTMLDivElement>(null);
   const [showPreloader, setShowPreloader] = useState(true);
+  const [heroImageLoaded, setHeroImageLoaded] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -280,13 +288,15 @@ export default function HomePage() {
   // ─── GSAP Animations ────────────────────────────────────────────────────
   useEffect(() => {
     if (bestsellers === null || featured === null) return;
+    // When preloader is shown, wait for the hero image to finish loading
+    if (showPreloader && !heroImageLoaded) return;
 
     const progress = { val: 0 };
     const loadTl = gsap.timeline();
 
     if (showPreloader) {
       loadTl
-        .to(progress, { val: 100, duration: 1.8, ease: "power1.inOut", onUpdate: () => setLoadingPercent(Math.round(progress.val)) })
+        .to(progress, { val: 100, duration: 0.6, ease: "power2.out", onUpdate: () => setLoadingPercent(Math.round(progress.val)) })
         .to(".js-preloader", {
           yPercent: -100,
           duration: 1.1,
@@ -367,7 +377,22 @@ export default function HomePage() {
       window.clearTimeout(preloaderSafety);
       cleanups.forEach(fn => fn());
     };
-  }, [bestsellers, featured]);
+  }, [bestsellers, featured, heroImageLoaded]);
+
+  // Crawl the progress bar to 85% while waiting for the image to load
+  useEffect(() => {
+    if (!showPreloader || heroImageLoaded) return;
+    const progress = { val: 0 };
+    const crawl = gsap.to(progress, {
+      val: 85,
+      duration: 2.5,
+      ease: "power1.inOut",
+      onUpdate: () => setLoadingPercent(Math.round(progress.val)),
+    });
+    // Safety: if image never fires (e.g. empty src / network error), unblock after 10s
+    const safety = window.setTimeout(() => setHeroImageLoaded(true), 10000);
+    return () => { crawl.kill(); window.clearTimeout(safety); };
+  }, [showPreloader, heroImageLoaded]);
 
   // ─── Derived values ──────────────────────────────────────────────────────
   const heroSlide = config?.hero_slides?.[0] || null;
@@ -439,7 +464,7 @@ export default function HomePage() {
 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
       <header className="relative w-full h-screen overflow-hidden flex items-center justify-center">
-        <HeroMedia slide={heroSlide} fallbackImage={fallbackHero} />
+        <HeroMedia slide={heroSlide} fallbackImage={fallbackHero} onImageLoad={() => setHeroImageLoaded(true)} />
         <div className="absolute inset-0 bg-black/20" />
 
         <div className="z-10 text-center relative mix-blend-difference px-4">
