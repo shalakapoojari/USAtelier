@@ -32,7 +32,7 @@ interface HomepageData {
 
 
 // ─── Hero Media ───────────────────────────────────────────────────────────────
-function HeroMedia({ slide, fallbackImage, onImageLoad }: { slide: HeroSlide | null; fallbackImage: string; onImageLoad?: () => void }) {
+function HeroMedia({ slide, configLoaded, fallbackImage, onImageLoad }: { slide: HeroSlide | null; configLoaded: boolean; fallbackImage: string; onImageLoad?: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
@@ -43,20 +43,23 @@ function HeroMedia({ slide, fallbackImage, onImageLoad }: { slide: HeroSlide | n
     if (hasVideo && videoRef.current) { videoRef.current.load(); setVideoLoaded(false); }
   }, [slide?.video_url]);
 
-  // If there's no src at all, signal load immediately
+  // Only signal "no image" once config has actually loaded — prevents firing before API returns.
+  // If config loaded but there is genuinely no image URL, unblock the preloader immediately.
   useEffect(() => {
-    if (!imgSrc) onImageLoad?.();
-  }, [imgSrc]);
+    if (configLoaded && !imgSrc) onImageLoad?.();
+  }, [configLoaded, imgSrc]);
 
   return (
     <div className="absolute inset-0 z-0 overflow-hidden">
-      <img
-        src={imgSrc} key={imgSrc}
-        className={`w-full h-full object-cover scale-110 hero-bg transition-opacity duration-1000 ${hasVideo && videoLoaded ? "opacity-0" : "opacity-60"}`}
-        alt={`U.S Atelier editorial hero — current season`} loading="eager"
-        onLoad={onImageLoad}
-        onError={onImageLoad} // don't hang the preloader on a broken image
-      />
+      {imgSrc && (
+        <img
+          src={imgSrc} key={imgSrc}
+          className={`w-full h-full object-cover scale-110 hero-bg transition-opacity duration-1000 ${hasVideo && videoLoaded ? "opacity-0" : "opacity-60"}`}
+          alt={`U.S Atelier editorial hero — current season`} loading="eager"
+          onLoad={onImageLoad}
+          onError={onImageLoad} // don't hang the preloader on a broken image
+        />
+      )}
       {hasVideo && (
         <video
           ref={videoRef}
@@ -395,6 +398,8 @@ export default function HomePage() {
   }, [showPreloader, heroImageLoaded]);
 
   // ─── Derived values ──────────────────────────────────────────────────────
+  // config===null means API hasn't returned yet; config===object (even empty) means it has
+  const configLoaded = config !== null;
   const heroSlide = config?.hero_slides?.[0] || null;
   const fallbackHero = "";
   const manifesto = config?.manifesto_text || "We believe in the quiet power of silence. In a world of noise, U.S Atelier is the absence of it. We strip away the unnecessary to reveal the essential structure of the human form. This is not just clothing; this is architecture for the soul.";
@@ -464,7 +469,7 @@ export default function HomePage() {
 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
       <header className="relative w-full h-screen overflow-hidden flex items-center justify-center">
-        <HeroMedia slide={heroSlide} fallbackImage={fallbackHero} onImageLoad={() => setHeroImageLoaded(true)} />
+        <HeroMedia slide={heroSlide} configLoaded={configLoaded} fallbackImage={fallbackHero} onImageLoad={() => setHeroImageLoaded(true)} />
         <div className="absolute inset-0 bg-black/20" />
 
         <div className="z-10 text-center relative mix-blend-difference px-4">

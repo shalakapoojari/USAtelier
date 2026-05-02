@@ -3300,7 +3300,45 @@ def update_homepage_config():
             config = HomepageConfig(config_type="main")
             db_mysql.session.add(config)
 
-        config.hero_slides     = data.get("hero_slides", [])
+        new_slides = data.get("hero_slides", [])
+
+        # ── Delete old uploaded files that are no longer referenced ───────────
+        # Compare existing hero slides with incoming ones; if a previously-stored
+        # local image/video URL is absent from the new payload, delete it from disk.
+        def _extract_local_urls(slides):
+            """Return the set of /uploads/... paths referenced in these slides."""
+            paths = set()
+            for s in slides:
+                for field in ("image", "video_url"):
+                    url = (s or {}).get(field, "") or ""
+                    # Only act on files stored on our own server
+                    if "/uploads/products/" in url or "/uploads/videos/" in url:
+                        # Normalise to a relative path (/uploads/...)
+                        try:
+                            rel = "/" + url.split("/uploads/", 1)[1]
+                            rel = "/uploads/" + rel.lstrip("/")
+                        except Exception:
+                            rel = url
+                        paths.add(rel)
+            return paths
+
+        old_local_urls = _extract_local_urls(config.hero_slides or [])
+        new_local_urls = _extract_local_urls(new_slides)
+        urls_to_delete = old_local_urls - new_local_urls
+
+        for rel_url in urls_to_delete:
+            try:
+                # Strip leading /uploads/ to get the sub-path (e.g. products/abc.jpg)
+                subpath = rel_url.lstrip("/").removeprefix("uploads/")
+                disk_path = os.path.realpath(os.path.join(UPLOAD_FOLDER, subpath))
+                # SECURITY: verify the resolved path is inside our upload folder
+                if disk_path.startswith(os.path.realpath(UPLOAD_FOLDER)) and os.path.isfile(disk_path):
+                    os.remove(disk_path)
+                    app.logger.info("homepage_old_file_deleted path=%s", disk_path)
+            except Exception as del_exc:
+                app.logger.warning("homepage_delete_failed url=%s err=%s", rel_url, del_exc)
+
+        config.hero_slides     = new_slides
         config.manifesto_text  = _sanitise_str(data.get("manifesto_text", ""), 2000)
         config.bestseller_ids  = data.get("bestseller_product_ids", [])
         config.featured_ids    = data.get("featured_product_ids", [])
@@ -3311,6 +3349,7 @@ def update_homepage_config():
         return jsonify({"success": True, "message": "Homepage updated"}), 200
     except Exception as exc:
         db_mysql.session.rollback()
+        app.logger.error("update_homepage_error err=%s", exc)
         return jsonify({"error": "Update failed"}), 500
 
 # ============================================================
