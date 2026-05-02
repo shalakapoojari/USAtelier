@@ -6,7 +6,7 @@ export function MarqueeTicker() {
     "Free Shipping Above ₹5000",
     "U.S Atelier",
     "Designed For The World",
-    "Fall Winter 2025",
+    "SUMMER COLLECTION 2026",
     "Limited Drops",
   ]
 
