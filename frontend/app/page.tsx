@@ -29,12 +29,7 @@ interface HomepageData {
   bestseller_product_ids?: string[];
 }
 
-const PLACEHOLDER_PRODUCTS = [
-  { id: "p1", name: "Vantablack Coat", price: 2400, images: ["https://images.unsplash.com/photo-1485230405346-71acb9518d9c?q=80&w=2694&auto=format&fit=crop"] },
-  { id: "p2", name: "Marble Silk Gown", price: 1850, images: ["https://images.unsplash.com/photo-1529139574466-a302c2d56aee?q=80&w=2576&auto=format&fit=crop"] },
-  { id: "p3", name: "Obsidian Trench", price: 3100, images: ["https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=2576&auto=format&fit=crop"] },
-  { id: "p4", name: "Smoke Linen Shirt", price: 980, images: ["https://images.unsplash.com/photo-1434389677669-e08b4cac3105?q=80&w=2400&auto=format&fit=crop"] },
-];
+
 
 // ─── Hero Media ───────────────────────────────────────────────────────────────
 function HeroMedia({ slide, fallbackImage }: { slide: HeroSlide | null; fallbackImage: string }) {
@@ -272,11 +267,11 @@ export default function HomePage() {
           fetchGroup(data.bestseller_product_ids || []),
           fetchGroup(data.featured_product_ids || []),
         ]);
-        setBestsellers(bs.length ? bs : PLACEHOLDER_PRODUCTS);
-        setFeatured(ft.length ? ft : PLACEHOLDER_PRODUCTS.slice().reverse());
+        setBestsellers(bs);
+        setFeatured(ft);
       } catch {
-        setBestsellers(PLACEHOLDER_PRODUCTS);
-        setFeatured(PLACEHOLDER_PRODUCTS.slice().reverse());
+        setBestsellers([]);
+        setFeatured([]);
       }
     };
     run();
@@ -376,7 +371,7 @@ export default function HomePage() {
 
   // ─── Derived values ──────────────────────────────────────────────────────
   const heroSlide = config?.hero_slides?.[0] || null;
-  const fallbackHero = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=2564&auto=format&fit=crop";
+  const fallbackHero = "";
   const manifesto = config?.manifesto_text || "We believe in the quiet power of silence. In a world of noise, U.S Atelier is the absence of it. We strip away the unnecessary to reveal the essential structure of the human form. This is not just clothing; this is architecture for the soul.";
   const seasonText = config?.season_label || "Fall Winter 2025";
   const isLoading = bestsellers === null || featured === null;
