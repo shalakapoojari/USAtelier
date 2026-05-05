@@ -43,14 +43,17 @@ function HeroMedia({ slide, fallbackImage, onImageLoad }: { slide: HeroSlide | n
     if (hasVideo && videoRef.current) { videoRef.current.load(); setVideoLoaded(false); }
   }, [slide?.video_url]);
 
-  // Guard: only signal load when there is a real src to load
-  const handleLoad  = imgSrc ? onImageLoad : undefined;
-  const handleError = imgSrc ? onImageLoad : undefined; // don't hang preloader on a broken image
+  // If there is no src at all, signal immediately so the preloader never hangs.
+  useEffect(() => {
+    if (!imgSrc && onImageLoad) onImageLoad();
+  }, [imgSrc, onImageLoad]);
+
+  // Always pass handlers — onError fires on broken images so preloader still resolves.
+  const handleLoad  = onImageLoad;
+  const handleError = onImageLoad;
 
   return (
-    // Always render a dark fill behind the image so there's never a blank area
     <div className="absolute inset-0 z-0 overflow-hidden bg-[#080808]">
-      {/* Stable key so the img element persists; only src changes, which fires onLoad naturally */}
       <img
         src={imgSrc || undefined}
         key="hero-img"
@@ -59,7 +62,6 @@ function HeroMedia({ slide, fallbackImage, onImageLoad }: { slide: HeroSlide | n
         }`}
         alt="U.S Atelier editorial hero"
         loading="eager"
-        // fetchpriority tells the browser this is the LCP image — load it first
         // @ts-ignore — fetchpriority is valid HTML but not yet in TS lib
         fetchpriority="high"
         decoding="async"
@@ -291,10 +293,9 @@ export default function HomePage() {
     run();
   }, []); // no deps — API_BASE is resolved inline, never changes
 
-  // ─── GSAP Animations ────────────────────────────────────────────────────
+  // ─── GSAP Hero + preloader (fires as soon as hero image is ready) ─────────
   useEffect(() => {
-    if (bestsellers === null || featured === null) return;
-    // When preloader is shown, wait for the hero image to finish loading
+    // Only gate on heroImageLoaded — products load independently below.
     if (showPreloader && !heroImageLoaded) return;
 
     const progress = { val: 0 };
@@ -302,20 +303,16 @@ export default function HomePage() {
 
     if (showPreloader) {
       loadTl
-        .to(progress, { val: 100, duration: 0.6, ease: "power2.out", onUpdate: () => setLoadingPercent(Math.round(progress.val)) })
-        .to(".js-preloader", {
-          yPercent: -100,
-          duration: 1.1,
-          ease: "expo.inOut",
-        }, ">0.25")
-        .from(".hero-main-text", { y: 120, duration: 1.4, stagger: 0.16, ease: "expo.out" }, "-=0.5");
+        .to(progress, { val: 100, duration: 0.5, ease: "power2.out", onUpdate: () => setLoadingPercent(Math.round(progress.val)) })
+        .to(".js-preloader", { yPercent: -100, duration: 1.0, ease: "expo.inOut" }, ">0.15")
+        .from(".hero-main-text", { y: 120, duration: 1.3, stagger: 0.15, ease: "expo.out" }, "-=0.5");
     } else {
-      loadTl.from(".hero-main-text", { y: 120, duration: 1.4, stagger: 0.16, ease: "expo.out" }, "+=0.2");
+      loadTl.from(".hero-main-text", { y: 120, duration: 1.3, stagger: 0.15, ease: "expo.out" }, "+=0.1");
     }
 
     loadTl
-      .from(".hero-sub-text", { y: 28, opacity: 0, duration: 0.9, ease: "power3.out" }, showPreloader ? "-=1.1" : "-=0.8")
-      .to(".hero-cta", { opacity: 1, duration: 0.9 }, showPreloader ? "-=0.7" : "-=0.5");
+      .from(".hero-sub-text", { y: 28, opacity: 0, duration: 0.8, ease: "power3.out" }, showPreloader ? "-=1.0" : "-=0.7")
+      .to(".hero-cta", { opacity: 1, duration: 0.8 }, showPreloader ? "-=0.6" : "-=0.4");
 
     // Hero bg parallax
     gsap.fromTo(".hero-bg", { y: 0, scale: 1.12 }, {
@@ -325,6 +322,36 @@ export default function HomePage() {
 
     // Scroll indicator
     gsap.to(".scroll-line", { scaleY: 1.6, repeat: -1, yoyo: true, duration: 1.2, ease: "power1.inOut" });
+
+    // Magnetic
+    const magneticWraps = document.querySelectorAll<HTMLElement>(".magnetic-wrap");
+    const cleanups: Array<() => void> = [];
+    magneticWraps.forEach(wrap => {
+      const target = wrap.querySelector<HTMLElement>(".magnetic-target");
+      if (!target) return;
+      const onMove = (e: MouseEvent) => { const r = wrap.getBoundingClientRect(); gsap.to(target, { x: (e.clientX - r.left - r.width / 2) * 0.3, y: (e.clientY - r.top - r.height / 2) * 0.3, duration: 0.5, ease: "power2.out" }); };
+      const onLeave = () => gsap.to(target, { x: 0, y: 0, duration: 0.5, ease: "elastic.out(1,0.3)" });
+      wrap.addEventListener("mousemove", onMove);
+      wrap.addEventListener("mouseleave", onLeave);
+      cleanups.push(() => { wrap.removeEventListener("mousemove", onMove); wrap.removeEventListener("mouseleave", onLeave); });
+    });
+
+    // Hard safety: force preloader off after 2.5 s no matter what
+    const preloaderSafety = window.setTimeout(() => {
+      gsap.to(".js-preloader", { yPercent: -100, duration: 0.7, ease: "expo.inOut", overwrite: true });
+    }, 2500);
+
+    return () => {
+      ScrollTrigger.getAll().forEach(t => t.kill());
+      loadTl.kill();
+      window.clearTimeout(preloaderSafety);
+      cleanups.forEach(fn => fn());
+    };
+  }, [heroImageLoaded, showPreloader]);
+
+  // ─── GSAP scroll animations (fires once products are ready) ───────────────
+  useEffect(() => {
+    if (bestsellers === null || featured === null) return;
 
     // Section headings
     gsap.utils.toArray<HTMLElement>(".reveal-heading").forEach(el => {
@@ -360,43 +387,19 @@ export default function HomePage() {
       scrollTrigger: { trigger: ".highlight-text", start: "top 80%", end: "bottom 40%", scrub: true },
     });
 
-    // Magnetic
-    const magneticWraps = document.querySelectorAll<HTMLElement>(".magnetic-wrap");
-    const cleanups: Array<() => void> = [];
-    magneticWraps.forEach(wrap => {
-      const target = wrap.querySelector<HTMLElement>(".magnetic-target");
-      if (!target) return;
-      const onMove = (e: MouseEvent) => { const r = wrap.getBoundingClientRect(); gsap.to(target, { x: (e.clientX - r.left - r.width / 2) * 0.3, y: (e.clientY - r.top - r.height / 2) * 0.3, duration: 0.5, ease: "power2.out" }); };
-      const onLeave = () => gsap.to(target, { x: 0, y: 0, duration: 0.5, ease: "elastic.out(1,0.3)" });
-      wrap.addEventListener("mousemove", onMove);
-      wrap.addEventListener("mouseleave", onLeave);
-      cleanups.push(() => { wrap.removeEventListener("mousemove", onMove); wrap.removeEventListener("mouseleave", onLeave); });
-    });
+    return () => { ScrollTrigger.getAll().forEach(t => t.kill()); };
+  }, [bestsellers, featured]);
 
-    const preloaderSafety = window.setTimeout(() => {
-      gsap.to(".js-preloader", { yPercent: -100, duration: 0.8, ease: "expo.inOut", overwrite: true });
-    }, 5000);
-
-    return () => {
-      ScrollTrigger.getAll().forEach(t => t.kill());
-      loadTl.kill();
-      window.clearTimeout(preloaderSafety);
-      cleanups.forEach(fn => fn());
-    };
-  }, [bestsellers, featured, heroImageLoaded, showPreloader]);
-
-  // Crawl the progress bar to 85% while waiting for the image to load.
+  // Crawl the progress bar to 85% while waiting for the hero image.
   useEffect(() => {
     if (!showPreloader || heroImageLoaded) return;
     const progress = { val: 0 };
     const crawl = gsap.to(progress, {
-      val: 85,
-      duration: 2.5,
-      ease: "power1.inOut",
+      val: 85, duration: 1.8, ease: "power1.inOut",
       onUpdate: () => setLoadingPercent(Math.round(progress.val)),
     });
-    // Safety: force preloader lift after 4s max — GSAP effect has its own 5s escape
-    const safety = window.setTimeout(() => setHeroImageLoaded(true), 4000);
+    // Safety: force heroImageLoaded after 1.8 s so preloader never sticks
+    const safety = window.setTimeout(() => setHeroImageLoaded(true), 1800);
     return () => { crawl.kill(); window.clearTimeout(safety); };
   }, [showPreloader, heroImageLoaded]);
 

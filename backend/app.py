@@ -2186,6 +2186,160 @@ def check_qr_status():
         return jsonify({"error": "Failed to check payment status"}), 500
 
 
+@app.route("/api/payments/recover-order", methods=["POST"])
+@csrf.exempt
+def recover_order():
+    """
+    Recovery handler for the race condition:
+      Payment captured on Razorpay → UI/network failure → order never confirmed.
+
+    The frontend calls this on mount / retry when it detects a pending payment
+    (e.g. from localStorage) with no confirmed orderId.
+
+    Flow:
+      1. If an Order already exists for this payment → return it (idempotent success).
+      2. Otherwise call the Razorpay API to confirm the payment was captured.
+      3. Return {payment_captured, payment, order} so the frontend can either:
+           a. Show the existing order (order_found=true), OR
+           b. Re-submit /api/orders with the original payload now that it knows
+              the payment is confirmed (order_found=false, payment_captured=true).
+
+    This endpoint is read-only — it NEVER creates an order itself.
+    Order creation still goes through /api/orders which validates stock, address, etc.
+    """
+    if not razorpay_client:
+        return jsonify({"error": "Payment gateway not configured"}), 500
+
+    data           = request.get_json() or {}
+    rzp_order_id   = _sanitise_str(data.get("razorpay_order_id",   ""), 255)
+    rzp_payment_id = _sanitise_str(data.get("razorpay_payment_id", ""), 255)
+
+    if not rzp_order_id and not rzp_payment_id:
+        return jsonify({"error": "razorpay_order_id or razorpay_payment_id required"}), 400
+
+    # ── Step 1: Check if the order was already created in our DB ─────────────
+    existing_order = None
+    if rzp_payment_id:
+        existing_order = OrderSQL.query.filter_by(razorpay_payment_id=rzp_payment_id).first()
+    if not existing_order and rzp_order_id:
+        existing_order = OrderSQL.query.filter_by(razorpay_order_id=rzp_order_id).first()
+
+    if existing_order:
+        # Order exists — the UI just missed the confirmation response.
+        app.logger.info(
+            "recover_order_found order=%s rzp_order=%s rzp_payment=%s",
+            existing_order.order_number, rzp_order_id, rzp_payment_id,
+        )
+        return jsonify({
+            "success":          True,
+            "order_found":      True,
+            "payment_captured": True,
+            "order":            existing_order.to_dict(),
+            "message":          "Your order was placed successfully.",
+        }), 200
+
+    # ── Step 2: Order not in DB — verify payment status with Razorpay ────────
+    captured     = False
+    payment_info = {}
+    rzp_amount   = None
+
+    try:
+        client = get_razorpay_client()
+
+        # Prefer payment-level fetch (most precise)
+        if rzp_payment_id:
+            rzp_pay = client.payment.fetch(rzp_payment_id)
+            captured = rzp_pay.get("status") in ("captured", "authorized")
+            rzp_amount = rzp_pay.get("amount", 0) / 100   # paise → ₹
+            payment_info = {
+                "razorpay_payment_id": rzp_payment_id,
+                "razorpay_order_id":   rzp_pay.get("order_id") or rzp_order_id,
+                "amount":              rzp_amount,
+                "method":              rzp_pay.get("method"),
+                "status":              rzp_pay.get("status"),
+            }
+        elif rzp_order_id:
+            # Fallback: check the Razorpay order status
+            rzp_order_obj = client.order.fetch(rzp_order_id)
+            captured  = rzp_order_obj.get("status") == "paid"
+            rzp_amount = rzp_order_obj.get("amount", 0) / 100
+            payment_info = {
+                "razorpay_order_id": rzp_order_id,
+                "amount":            rzp_amount,
+                "status":            rzp_order_obj.get("status"),
+            }
+    except Exception as exc:
+        app.logger.error(
+            "recover_order_rzp_fetch_error rzp_order=%s rzp_payment=%s err=%s",
+            rzp_order_id, rzp_payment_id, exc,
+        )
+        return jsonify({
+            "success":          False,
+            "order_found":      False,
+            "payment_captured": None,   # unknown — Razorpay unreachable
+            "message":          "Could not verify payment status. Please try again in a moment.",
+        }), 503
+
+    if not captured:
+        app.logger.info(
+            "recover_order_not_captured rzp_order=%s rzp_payment=%s",
+            rzp_order_id, rzp_payment_id,
+        )
+        return jsonify({
+            "success":          False,
+            "order_found":      False,
+            "payment_captured": False,
+            "payment":          payment_info,
+            "message":          "Payment has not been captured yet.",
+        }), 200
+
+    # ── Step 3: Payment IS captured but order is missing ─────────────────────
+    # Upsert our local Payment record so /api/orders can link to it on retry.
+    try:
+        linked_rzp_order_id = payment_info.get("razorpay_order_id") or rzp_order_id
+
+        local_payment = None
+        if rzp_payment_id:
+            local_payment = Payment.query.filter_by(razorpay_payment_id=rzp_payment_id).first()
+        if not local_payment and linked_rzp_order_id:
+            local_payment = Payment.query.filter_by(razorpay_order_id=linked_rzp_order_id).first()
+
+        if not local_payment:
+            local_payment = Payment(
+                razorpay_order_id   = linked_rzp_order_id or None,
+                razorpay_payment_id = rzp_payment_id or None,
+                amount              = rzp_amount or 0,
+                status              = "captured",
+                method              = payment_info.get("method"),
+            )
+            db_mysql.session.add(local_payment)
+        else:
+            if rzp_payment_id:
+                local_payment.razorpay_payment_id = rzp_payment_id
+            local_payment.status = "captured"
+
+        db_mysql.session.commit()
+    except Exception as exc:
+        db_mysql.session.rollback()
+        app.logger.warning("recover_order_payment_upsert_error err=%s", exc)
+        # Non-fatal — the frontend can still re-submit /api/orders
+
+    app.logger.info(
+        "recover_order_payment_captured_no_order rzp_order=%s rzp_payment=%s amount=%.2f",
+        rzp_order_id, rzp_payment_id, rzp_amount or 0,
+    )
+    return jsonify({
+        "success":          True,
+        "order_found":      False,
+        "payment_captured": True,
+        "payment":          payment_info,
+        "message":          (
+            "Your payment was captured. "
+            "Please resubmit your order — it will be linked to this payment automatically."
+        ),
+    }), 200
+
+
 @app.route("/api/webhooks/razorpay", methods=["POST"])
 def razorpay_webhook():
     webhook_secret = os.getenv("RAZORPAY_WEBHOOK_SECRET")
