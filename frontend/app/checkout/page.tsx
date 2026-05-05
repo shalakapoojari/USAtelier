@@ -268,9 +268,10 @@ export default function CheckoutPage() {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                email: formData.email,        // ✅ ADD THIS
+                email: formData.email,
                 phone: formData.phone,
                 total: grandTotal,
+                idempotencyKey: response.razorpay_order_id,
                 items: items.map((item) => ({
                   id: item.id,
                   name: item.name,

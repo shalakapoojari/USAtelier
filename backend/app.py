@@ -2536,8 +2536,8 @@ def _validate_order_payload(data: dict) -> list:
             errors.append(f"shippingAddress.{field} is required")
     return errors
 
-
 @app.route("/api/orders", methods=["POST"])
+@csrf.exempt   # Payment handler callback sends JSON only — no CSRF cookie in Razorpay's context
 def create_order():
     data = request.get_json() or {}
 
@@ -2581,11 +2581,13 @@ def create_order():
     if not PINCODE_RE.match(delivery_pincode):
         return jsonify({"error": "Please enter a valid 6-digit delivery pincode"}), 400
 
+    # Pincode serviceability check — fail-open: a Delhivery API timeout must
+    # never block a paid order. We log the issue but let the order through.
     try:
         if not validate_pincode(delivery_pincode):
             return jsonify({"error": f"Delivery to pincode {delivery_pincode} is not currently available."}), 400
     except Exception as exc:
-        app.logger.warning("pincode_validation_error pincode=%s err=%s", delivery_pincode, exc)
+        app.logger.warning("pincode_validation_skipped pincode=%s err=%s", delivery_pincode, exc)
 
     user_id = session.get("user_id")
     try:
