@@ -751,7 +751,7 @@ def serve_uploads_short(filename):
         target = _safe_join(app.config["UPLOAD_FOLDER"], filename)
         if not target or not os.path.isfile(target):
             return jsonify({"error": "File not found"}), 404
-            
+
         # Add CORS header to allow images to be loaded cross-origin (e.g. from the main site)
         resp = send_from_directory(os.path.dirname(target), os.path.basename(target))
         resp.headers["Access-Control-Allow-Origin"] = "*"
@@ -1563,12 +1563,12 @@ def add_product():
             return jsonify({"error": f"Field '{field}' is required"}), 400
 
     # SECURITY: Validate and sanitise all product fields
-    name        = _sanitise_str(data.get("name", ""), 300)
+    name        = _sanitise_str(data.get("name", ""), 255)
     description = _sanitise_str(data.get("description", ""), 5000)
     category    = _sanitise_str(data.get("category", ""), 100)
     subcategory = _sanitise_str(data.get("subcategory", ""), 100)
     gender      = _sanitise_str(data.get("gender", "Unisex"), 50)
-    fabric      = _sanitise_str(data.get("fabric", ""), 500)
+    fabric      = _sanitise_str(data.get("fabric", ""), 255)
     care        = _sanitise_str(data.get("care", ""), 500)
 
     try:
@@ -1637,7 +1637,7 @@ def update_product(product_id):
 
     data = request.get_json() or {}
 
-    if "name"          in data: product.name          = _sanitise_str(data["name"], 300)
+    if "name"          in data: product.name          = _sanitise_str(data["name"], 255)
     if "price"         in data:
         try:
             p = float(data["price"])
@@ -1669,7 +1669,7 @@ def update_product(product_id):
         product.is_new = bool(data.get("newArrival", data.get("is_new", False)))
     if "bestseller"    in data or "is_bestseller" in data:
         product.is_bestseller = bool(data.get("bestseller", data.get("is_bestseller", False)))
-    if "fabric"        in data: product.fabric        = _sanitise_str(data["fabric"], 500)
+    if "fabric"        in data: product.fabric        = _sanitise_str(data["fabric"], 255)
     if "care"          in data: product.care          = _sanitise_str(data["care"], 500)
     if "sizeGuideImage" in data or "size_guide_image" in data:
         product.size_guide_image = _sanitise_str(data.get("sizeGuideImage", data.get("size_guide_image", "")), 500)
@@ -1810,14 +1810,14 @@ def add_to_cart():
             return jsonify({"error": "Authentication required"}), 401
 
         existing = CartItem.query.filter_by(
-            user_id=uid, product_id=product_id, size=size,
+            user_id=uid, product_id=pid, size=size,
         ).first()
         try:
             if existing:
                 existing.quantity = min(existing.quantity + quantity, 99)
             else:
                 db_mysql.session.add(CartItem(
-                    user_id=uid, product_id=product_id,
+                    user_id=uid, product_id=pid,
                     quantity=quantity, size=size,
                 ))
             db_mysql.session.commit()
@@ -1860,7 +1860,11 @@ def update_cart_item(item_id):
     if not item:
         return jsonify({"error": "Item not found"}), 404
     item.quantity = quantity
-    db_mysql.session.commit()
+    try:
+        db_mysql.session.commit()
+    except Exception:
+        db_mysql.session.rollback()
+        return jsonify({"error": "Failed to update cart item"}), 500
     return jsonify({"success": True})
 
 
@@ -1874,8 +1878,12 @@ def remove_cart_item(item_id):
 
     item = CartItem.query.filter_by(id=item_id, user_id=uid).first()
     if item:
-        db_mysql.session.delete(item)
-        db_mysql.session.commit()
+        try:
+            db_mysql.session.delete(item)
+            db_mysql.session.commit()
+        except Exception:
+            db_mysql.session.rollback()
+            return jsonify({"error": "Failed to remove cart item"}), 500
     return jsonify({"success": True})
 
 # ============================================================
@@ -1931,12 +1939,12 @@ def add_to_wishlist():
     except (ValueError, TypeError):
         return jsonify({"error": "Authentication required"}), 401
 
-    existing = WishlistItem.query.filter_by(user_id=uid, product_id=product_id).first()
+    existing = WishlistItem.query.filter_by(user_id=uid, product_id=pid).first()
     if existing:
         return jsonify({"message": "Already in wishlist"}), 200
 
     try:
-        db_mysql.session.add(WishlistItem(user_id=uid, product_id=product_id))
+        db_mysql.session.add(WishlistItem(user_id=uid, product_id=pid))
         db_mysql.session.commit()
         return jsonify({"success": True}), 201
     except Exception as exc:
@@ -2348,7 +2356,7 @@ def _validate_order_payload(data: dict) -> list:
         errors.append("total must be a number")
 
     addr        = data.get("shippingAddress") or data.get("shipping_address") or {}
-    street_val  = addr.get("street") or addr.get("address")
+    street_val  = addr.get("street") or addr.get("address") or addr.get("line1")
     if not str(street_val or "").strip():
         errors.append("shippingAddress.address is required")
     for field in ("city", "state", "zip"):
@@ -2365,7 +2373,7 @@ def create_order():
         return jsonify({"error": "Terms and Conditions must be accepted"}), 400
 
     # Idempotency
-    idempotency_key = _sanitise_str(data.get("idempotencyKey", ""), 200) or None
+    idempotency_key = _sanitise_str(data.get("idempotencyKey", ""), 64) or None
     if idempotency_key:
         existing_order = OrderSQL.query.filter_by(idempotency_key=idempotency_key).first()
         if existing_order:
@@ -2408,7 +2416,10 @@ def create_order():
         app.logger.warning("pincode_validation_error pincode=%s err=%s", delivery_pincode, exc)
 
     user_id = session.get("user_id")
-    user    = User.query.get(int(user_id)) if user_id else None
+    try:
+        user = User.query.get(int(user_id)) if user_id else None
+    except (ValueError, TypeError):
+        user = None
 
     if not user:
         email      = _sanitise_str(data.get("email") or addr.get("email") or "", 254).lower()
@@ -2501,17 +2512,17 @@ def create_order():
 
     try:
         new_order = OrderSQL(
-            order_number          = order_number,
-            idempotency_key       = idempotency_key,
-            user_id               = user.id,
-            total                 = client_total,
-            status                = "Pickup",
-            payment_status        = payment_status,
-            shipping_address_json = json.dumps(addr),
-            coupon_code           = coupon_code,
-            discount_amount       = discount_amount,
-            razorpay_order_id     = rzp_order_id,
-            razorpay_payment_id   = rzp_payment_id,
+            order_number      = order_number,
+            idempotency_key   = idempotency_key,
+            user_id           = user.id,
+            total             = client_total,
+            status            = "Pickup",
+            payment_status    = payment_status,
+            shipping_address  = addr,
+            coupon_code       = coupon_code,
+            discount_amount   = discount_amount,
+            razorpay_order_id = rzp_order_id,
+            razorpay_payment_id = rzp_payment_id,
         )
 
         db_mysql.session.add(new_order)
@@ -2595,7 +2606,7 @@ def cancel_order(order_number):
     if order.status in ("Cancelled", "Delivered"):
         return jsonify({"error": f"Order is already {order.status}"}), 400
 
-    cutoff = order.created_at + timedelta(minutes=30)
+    cutoff = order.created_at.replace(tzinfo=timezone.utc) + timedelta(minutes=30)
     if datetime.now(timezone.utc) > cutoff:
         return jsonify({"error": "30-minute cancellation window has closed"}), 400
 
@@ -2673,7 +2684,11 @@ def update_order_status(order_id):
 
     order.status = new_status
     _audit("order_status_updated", "order", order.id, {"status": new_status})
-    db_mysql.session.commit()
+    try:
+        db_mysql.session.commit()
+    except Exception as exc:
+        db_mysql.session.rollback()
+        return jsonify({"error": "Failed to update order status"}), 500
 
     user = User.query.get(order.user_id)
     if user:
@@ -3167,7 +3182,11 @@ def update_customer_status(customer_id):
 
     user.is_blocked = bool(is_blocked)
     _audit("customer_blocked" if is_blocked else "customer_unblocked", "user", customer_id)
-    db_mysql.session.commit()
+    try:
+        db_mysql.session.commit()
+    except Exception:
+        db_mysql.session.rollback()
+        return jsonify({"error": "Failed to update customer status"}), 500
     action = "blocked" if is_blocked else "unblocked"
     return jsonify({"success": True, "message": f"Customer {action}"}), 200
 
@@ -3184,7 +3203,7 @@ def get_categories():
             result.append({
                 "id":            c.id,
                 "name":          c.name,
-                "subcategories": json.loads(c.subcategories) if c.subcategories else [],
+                "subcategories": c.subcategories,
             })
         return jsonify(result)
     except Exception as exc:
@@ -3257,7 +3276,11 @@ def delete_subcategory(cat_id):
     if subcategory in subs:
         subs.remove(subcategory)
         cat.subcategories = subs
-        db_mysql.session.commit()
+        try:
+            db_mysql.session.commit()
+        except Exception:
+            db_mysql.session.rollback()
+            return jsonify({"error": "Failed to delete subcategory"}), 500
         return jsonify({"success": True}), 200
     return jsonify({"error": "Subcategory not found"}), 404
 
@@ -3349,7 +3372,6 @@ def update_homepage_config():
         return jsonify({"success": True, "message": "Homepage updated"}), 200
     except Exception as exc:
         db_mysql.session.rollback()
-        app.logger.error("update_homepage_error err=%s", exc)
         return jsonify({"error": "Update failed"}), 500
 
 # ============================================================
