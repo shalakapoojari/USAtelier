@@ -283,23 +283,24 @@ app.config["PERMANENT_SESSION_LIFETIME"]   = 86400 * 7  # 7 days
 if is_production:
     app.config["SESSION_COOKIE_DOMAIN"] = None
 
-# MySQL — Tuned for PythonAnywhere free tier (1 connection max)
-# pool_size=1 avoids "too many connections" errors on shared hosting
-# pool_recycle=200 refreshes idle connections below MySQL's ~300s wait_timeout
-# pool_pre_ping=True detects "MySQL has gone away" before executing queries
+# MySQL — NullPool is correct for PythonAnywhere free tier (single-threaded WSGI,
+# hard limit of 1 DB connection).  A regular pool keeps connections open between
+# requests; MySQL kills them after wait_timeout (~300 s on PA), producing the
+# classic (2006, "MySQL server has gone away") / (2013, "Lost connection") pair.
+# NullPool creates one connection per request and closes it immediately after,
+# so there is never a stale connection in the pool to cause BrokenPipe on teardown.
+from sqlalchemy.pool import NullPool as _NullPool
+
 app.config["SQLALCHEMY_DATABASE_URI"]        = os.getenv("SQLALCHEMY_DATABASE_URI")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_size":      1,
-    "pool_timeout":   30,
-    "pool_recycle":   200,   # below PythonAnywhere's ~300s idle timeout
-    "pool_pre_ping":  True,  # avoids "MySQL server has gone away"
-    "max_overflow":   2,     # allow 2 extra connections briefly
+    "poolclass":  _NullPool,     # no pool — fresh connect/close each request
+    "pool_pre_ping": True,       # kept as belt-and-suspenders for any future pool change
     "connect_args": {
-        "connect_timeout":    10,
-        "read_timeout":       30,
-        "write_timeout":      30,
-        "autocommit":         False,
+        "connect_timeout": 10,
+        "read_timeout":    30,
+        "write_timeout":   30,
+        "autocommit":      False,
     },
 }
 
@@ -825,6 +826,23 @@ def security_headers(response):
     response.headers.pop("Server", None)
     response.headers.pop("X-Powered-By", None)
     return response
+
+
+@app.teardown_appcontext
+def _safe_teardown_db(exc):
+    """
+    Safely remove the SQLAlchemy scoped session after every request.
+    With NullPool the underlying TCP connection is already gone by the time
+    Flask calls teardown, so we must swallow BrokenPipe / OperationalError
+    instead of letting them bubble up and produce a second traceback in the
+    WSGI error log.
+    """
+    try:
+        db_mysql.session.remove()
+    except Exception:
+        # Connection is already dead — nothing to roll back, nothing to return.
+        # Flask-SQLAlchemy will create a fresh session on the next request.
+        pass
 
 # ============================================================
 # Page routes
@@ -3624,6 +3642,30 @@ def run_dispatch():
 # ============================================================
 # Generic error handlers — never leak stack traces to clients
 # ============================================================
+
+from sqlalchemy.exc import OperationalError as _SAOperationalError
+
+@app.errorhandler(_SAOperationalError)
+@cross_origin(supports_credentials=True, origins=origins)
+def handle_db_gone_away(e):
+    """
+    Handles MySQL 2006 / 2013 "gone away" / "lost connection" errors.
+    With NullPool these should never occur, but this handler is kept as a
+    safety net (e.g. if the MySQL server is temporarily restarting).
+    Rolls back any open transaction, removes the session so the next
+    request gets a clean connection, and returns a retriable 503.
+    """
+    try:
+        db_mysql.session.rollback()
+    except Exception:
+        pass
+    try:
+        db_mysql.session.remove()
+    except Exception:
+        pass
+    app.logger.error("db_gone_away err=%s", e)
+    return jsonify({"error": "Database temporarily unavailable. Please retry."}), 503
+
 
 @app.errorhandler(400)
 @cross_origin(supports_credentials=True, origins=origins)
