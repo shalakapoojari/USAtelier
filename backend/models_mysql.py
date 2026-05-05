@@ -607,3 +607,91 @@ class AuditLog(db_mysql.Model):
             "ip_address":  self.ip_address,
             "created_at":  self.created_at.isoformat() if self.created_at else None,
         }
+
+
+# ---------------------------------------------------------------------------
+# CartEvent  — tracks add / remove / checkout events per user+product
+# ---------------------------------------------------------------------------
+
+class CartEvent(db_mysql.Model):
+    __tablename__ = "cart_events"
+
+    id              = db_mysql.Column(db_mysql.Integer, primary_key=True)
+    user_id         = db_mysql.Column(db_mysql.Integer, db_mysql.ForeignKey("users.id"), nullable=True)
+    user_email      = db_mysql.Column(db_mysql.String(255), nullable=False, index=True)
+    product_id      = db_mysql.Column(db_mysql.Integer, db_mysql.ForeignKey("products.id"), nullable=True)
+    product_name    = db_mysql.Column(db_mysql.String(255), nullable=True)   # denormalised for speed
+    event_type      = db_mysql.Column(db_mysql.String(20), nullable=False)   # "add" | "remove" | "checkout"
+    cart_snapshot   = db_mysql.Column(db_mysql.JSON, nullable=True)          # full cart at time of event
+    timestamp       = db_mysql.Column(db_mysql.DateTime, default=datetime.utcnow, index=True)
+
+    def to_dict(self):
+        return {
+            "id":           self.id,
+            "user_id":      self.user_id,
+            "user_email":   self.user_email,
+            "product_id":   self.product_id,
+            "product_name": self.product_name,
+            "event_type":   self.event_type,
+            "cart_snapshot": self.cart_snapshot,
+            "timestamp":    self.timestamp.isoformat() if self.timestamp else None,
+        }
+
+
+# ---------------------------------------------------------------------------
+# AbandonedCartEmail  — log of recovery emails sent
+# ---------------------------------------------------------------------------
+
+class AbandonedCartEmail(db_mysql.Model):
+    __tablename__ = "abandoned_cart_emails"
+
+    id              = db_mysql.Column(db_mysql.Integer, primary_key=True)
+    user_id         = db_mysql.Column(db_mysql.Integer, db_mysql.ForeignKey("users.id"), nullable=True)
+    user_email      = db_mysql.Column(db_mysql.String(255), nullable=False, index=True)
+    cart_snapshot   = db_mysql.Column(db_mysql.JSON, nullable=True)
+    sent_at         = db_mysql.Column(db_mysql.DateTime, default=datetime.utcnow)
+    reminder_count  = db_mysql.Column(db_mysql.Integer, default=1)    # 1 = first email, 2 = follow-up
+    converted       = db_mysql.Column(db_mysql.Boolean, default=False)
+    email_status    = db_mysql.Column(db_mysql.String(20), default="sent")  # "sent" | "failed"
+
+    def to_dict(self):
+        items = self.cart_snapshot or []
+        return {
+            "id":             self.id,
+            "user_id":        self.user_id,
+            "user_email":     self.user_email,
+            "cart_snapshot":  items,
+            "item_count":     sum(i.get("quantity", 1) for i in items),
+            "total_value":    sum(float(i.get("price", 0)) * int(i.get("quantity", 1)) for i in items),
+            "sent_at":        self.sent_at.isoformat() if self.sent_at else None,
+            "reminder_count": self.reminder_count,
+            "converted":      self.converted,
+            "email_status":   self.email_status,
+        }
+
+
+# ---------------------------------------------------------------------------
+# CartSettings  — singleton config (id always = 1)
+# ---------------------------------------------------------------------------
+
+class CartSettings(db_mysql.Model):
+    __tablename__ = "cart_settings"
+
+    id                      = db_mysql.Column(db_mysql.Integer, primary_key=True)
+    abandonment_emails_on   = db_mysql.Column(db_mysql.Boolean, default=True)
+    first_email_delay_hours = db_mysql.Column(db_mysql.Integer, default=1)
+    second_email_delay_hours = db_mysql.Column(db_mysql.Integer, default=24)
+    discount_code_enabled   = db_mysql.Column(db_mysql.Boolean, default=False)
+    discount_code           = db_mysql.Column(db_mysql.String(50), nullable=True)
+    updated_at              = db_mysql.Column(db_mysql.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id":                       self.id,
+            "abandonment_emails_on":    self.abandonment_emails_on,
+            "first_email_delay_hours":  self.first_email_delay_hours,
+            "second_email_delay_hours": self.second_email_delay_hours,
+            "discount_code_enabled":    self.discount_code_enabled,
+            "discount_code":            self.discount_code,
+            "updated_at":               self.updated_at.isoformat() if self.updated_at else None,
+        }

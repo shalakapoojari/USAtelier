@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>You left something behind — U.S ATELIER</title>
+</head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#e8e8e3;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:48px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+          <!-- Header -->
+          <tr>
+            <td style="padding:0 32px 40px;border-bottom:1px solid #222;text-align:center;">
+              <p style="margin:0 0 4px;font-size:9px;letter-spacing:0.4em;text-transform:uppercase;color:#555;">U.S ATELIER</p>
+              <h1 style="margin:0;font-size:28px;font-weight:300;letter-spacing:0.05em;color:#e8e8e3;font-family:Georgia,'Times New Roman',serif;">
+                Your cart is waiting.
+              </h1>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:36px 32px 0;">
+              <p style="margin:0 0 8px;font-size:13px;color:#999;letter-spacing:0.1em;">
+                Hello {{ first_name }},
+              </p>
+              <p style="margin:0 0 32px;font-size:14px;color:#aaa;line-height:1.8;">
+                You left some pieces behind. We're holding them for you — but they won't last forever.
+              </p>
+
+              <!-- Product list -->
+              {% for item in items %}
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;border:1px solid #1e1e1e;background:#111;">
+                <tr>
+                  {% if item.image %}
+                  <td width="80" style="padding:12px;">
+                    <img src="{{ item.image }}" alt="{{ item.name }}" width="72" height="90"
+                         style="display:block;object-fit:cover;width:72px;height:90px;background:#1a1a1a;" />
+                  </td>
+                  {% endif %}
+                  <td style="padding:14px 16px;vertical-align:top;">
+                    <p style="margin:0 0 4px;font-size:13px;color:#e8e8e3;letter-spacing:0.05em;">{{ item.name }}</p>
+                    {% if item.size %}
+                    <p style="margin:0 0 4px;font-size:10px;text-transform:uppercase;letter-spacing:0.2em;color:#666;">
+                      Size: {{ item.size }} &nbsp;·&nbsp; Qty: {{ item.quantity or 1 }}
+                    </p>
+                    {% endif %}
+                    <p style="margin:0;font-size:14px;color:#c8a45d;">₹{{ "{:,.0f}".format(item.price | float) }}</p>
+                  </td>
+                </tr>
+              </table>
+              {% endfor %}
+
+              <!-- Discount code -->
+              {% if discount_code %}
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;border:1px dashed #333;padding:16px 20px;background:#0f0f0f;">
+                <tr>
+                  <td>
+                    <p style="margin:0 0 4px;font-size:9px;text-transform:uppercase;letter-spacing:0.3em;color:#666;">Exclusive Offer</p>
+                    <p style="margin:0;font-size:18px;font-family:Georgia,serif;letter-spacing:0.15em;color:#c8a45d;">{{ discount_code }}</p>
+                    <p style="margin:4px 0 0;font-size:10px;color:#555;letter-spacing:0.1em;">Apply at checkout</p>
+                  </td>
+                </tr>
+              </table>
+              {% endif %}
+
+              <!-- CTA -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin:32px 0;">
+                <tr>
+                  <td align="center">
+                    <a href="{{ cart_url }}"
+                       style="display:inline-block;padding:16px 48px;background:#e8e8e3;color:#0a0a0a;font-size:10px;letter-spacing:0.3em;text-transform:uppercase;text-decoration:none;font-weight:600;">
+                      Complete Your Purchase
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:32px 32px 0;border-top:1px solid #1e1e1e;text-align:center;">
+              <p style="margin:0 0 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.3em;color:#444;">U.S ATELIER · Mumbai</p>
+              <p style="margin:0;font-size:9px;color:#333;letter-spacing:0.05em;">
+                You received this email because you have an active account.
+                If you no longer wish to receive cart reminders,
+                <a href="{{ unsubscribe_url }}" style="color:#555;text-decoration:underline;">unsubscribe here</a>.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

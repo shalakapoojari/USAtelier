@@ -4,6 +4,7 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
+import { getApiBase } from "@/lib/api-base"
 
 export type CartItem = {
   id: string
@@ -21,8 +22,8 @@ type CartContextType = {
   removeItem: (id: string, size: string) => void
   updateQuantity: (id: string, size: string, quantity: number) => void
   clearCart: () => void
+  trackCheckout: () => void   // call this after a successful order
   total: number
-  // "Unseen" badge — clears when user visits /cart
   unseenCount: number
   clearUnseen: () => void
   isHydrated: boolean
@@ -34,70 +35,89 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
   const [isHydrated, setIsHydrated] = useState(false)
   const [unseenCount, setUnseenCount] = useState(0)
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const router = useRouter()
 
-  // Load from localStorage once after mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem("cart")
       if (saved) setItems(JSON.parse(saved))
-    } catch {
-      // ignore corrupt data
-    }
+    } catch { /* ignore */ }
     setIsHydrated(true)
   }, [])
 
-  // Persist to localStorage — only after hydration
   useEffect(() => {
     if (!isHydrated) return
     localStorage.setItem("cart", JSON.stringify(items))
   }, [items, isHydrated])
 
-  // Cart persists in localStorage regardless of auth state
-  // (no wipe on logout — guest cart is preserved)
+  // ── Fire-and-forget cart event tracking ──────────────────────────────
+  const trackEvent = (
+    event_type: "add" | "remove" | "checkout",
+    product_id: string | null,
+    product_name: string,
+    snapshot: CartItem[],
+  ) => {
+    if (!isAuthenticated || !(user as any)?.email) return
+    const API_BASE = getApiBase()
+    if (!API_BASE) return
+    fetch(`${API_BASE}/api/cart/event`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event_type,
+        product_id,
+        product_name,
+        cart_snapshot: snapshot.map(i => ({
+          id: i.id, name: i.name, price: i.price,
+          size: i.size, quantity: i.quantity, image: i.image,
+        })),
+      }),
+    }).catch(() => { /* silent */ })
+  }
 
   const addItem = (newItem: Omit<CartItem, "quantity">) => {
     setItems((prev) => {
-      const existing = prev.find(
-        (i) => i.id === newItem.id && i.size === newItem.size
-      )
-      
+      const existing = prev.find((i) => i.id === newItem.id && i.size === newItem.size)
+      let next: CartItem[]
       if (existing) {
         if (existing.quantity >= newItem.stock) {
-          // Dispatch custom event to show toast since context isn't available here
-          window.dispatchEvent(new CustomEvent('toast-show', { 
-            detail: { message: `Only ${newItem.stock} units available in stock`, type: 'info' } 
+          window.dispatchEvent(new CustomEvent('toast-show', {
+            detail: { message: `Only ${newItem.stock} units available in stock`, type: 'info' }
           }))
           return prev
         }
         setUnseenCount((c) => c + 1)
-        return prev.map((i) =>
-          i.id === newItem.id && i.size === newItem.size
-            ? { ...i, quantity: i.quantity + 1 }
-            : i
+        next = prev.map((i) =>
+          i.id === newItem.id && i.size === newItem.size ? { ...i, quantity: i.quantity + 1 } : i
         )
+      } else {
+        setUnseenCount((c) => c + 1)
+        next = [...prev, { ...newItem, quantity: 1 }]
       }
-      setUnseenCount((c) => c + 1)
-      return [...prev, { ...newItem, quantity: 1 }]
+      setTimeout(() => trackEvent("add", newItem.id, newItem.name, next), 0)
+      return next
     })
   }
 
   const removeItem = (id: string, size: string) => {
-    setItems((prev) => prev.filter((i) => !(i.id === id && i.size === size)))
+    setItems((prev) => {
+      const removed = prev.find((i) => i.id === id && i.size === size)
+      const next = prev.filter((i) => !(i.id === id && i.size === size))
+      if (removed) setTimeout(() => trackEvent("remove", id, removed.name, next), 0)
+      return next
+    })
   }
 
   const updateQuantity = (id: string, size: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeItem(id, size)
-      return
-    }
+    if (quantity <= 0) { removeItem(id, size); return }
     setItems((prev) =>
       prev.map((i) => {
         if (i.id === id && i.size === size) {
           if (quantity > i.stock) {
-            window.dispatchEvent(new CustomEvent('toast-show', { 
-                detail: { message: `Maximum stock limit reached (${i.stock} units)`, type: 'info' } 
+            window.dispatchEvent(new CustomEvent('toast-show', {
+              detail: { message: `Maximum stock limit reached (${i.stock} units)`, type: 'info' }
             }))
             return { ...i, quantity: i.stock }
           }
@@ -110,24 +130,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = () => setItems([])
 
-  const clearUnseen = () => setUnseenCount(0)
+  const trackCheckout = () => {
+    setItems((current) => {
+      setTimeout(() => trackEvent("checkout", null, "", current), 0)
+      return current
+    })
+  }
 
+  const clearUnseen = () => setUnseenCount(0)
   const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0)
 
   return (
-    <CartContext.Provider
-      value={{
-        items,
-        addItem,
-        removeItem,
-        updateQuantity,
-        clearCart,
-        total,
-        unseenCount,
-        clearUnseen,
-        isHydrated,
-      }}
-    >
+    <CartContext.Provider value={{ items, addItem, removeItem, updateQuantity, clearCart, trackCheckout, total, unseenCount, clearUnseen, isHydrated }}>
       {children}
     </CartContext.Provider>
   )

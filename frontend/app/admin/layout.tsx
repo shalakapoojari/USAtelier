@@ -15,17 +15,19 @@ import {
   ArrowLeft,
   Paintbrush,
   BarChart3,
+  ShoppingBag,
 } from "lucide-react"
 
 const navItems = [
-  ["/admin", "Dashboard", LayoutDashboard],
-  ["/admin/analysis", "Analysis", BarChart3],
-  ["/admin/orders", "Orders", ShoppingCart],
-  ["/admin/products", "Products", Package],
-  ["/admin/categories", "Categories", FolderOpen],
-  ["/admin/homepage", "Homepage Design", Paintbrush],
-  ["/admin/payments", "Payments", CreditCard],
-  ["/admin/customers", "Customers", Users],
+  ["/admin",                "Dashboard",      LayoutDashboard],
+  ["/admin/analysis",       "Analysis",       BarChart3],
+  ["/admin/orders",         "Orders",         ShoppingCart],
+  ["/admin/products",       "Products",       Package],
+  ["/admin/categories",     "Categories",     FolderOpen],
+  ["/admin/homepage",       "Homepage Design",Paintbrush],
+  ["/admin/payments",       "Payments",       CreditCard],
+  ["/admin/customers",      "Customers",      Users],
+  ["/admin/cart-analytics", "Cart Analytics", ShoppingBag],
 ] as const
 
 export default function AdminLayout({

@@ -66,6 +66,7 @@ from models_mysql import (
     Order as OrderSQL, OrderItem, CartItem, WishlistItem,
     Review, HomepageConfig, Payment,
     DispatchJob, Coupon, PasswordResetToken, AuditLog,
+    CartEvent, AbandonedCartEmail, CartSettings,
 )
 from delhivery_utils import create_shipment, calculate_shipping, validate_pincode
 
@@ -2439,15 +2440,55 @@ def razorpay_webhook():
 @app.route("/api/admin/payments", methods=["GET"])
 @admin_required
 def get_admin_payments():
-    return jsonify([p.to_dict() for p in Payment.query.order_by(Payment.created_at.desc()).all()])
+    """
+    Returns all Payment records plus any orders that have a razorpay_payment_id
+    but no matching Payment row (created before the Payment table was added, or
+    via the webhook path). Deduplicates on razorpay_payment_id.
+    """
+    # Confirmed Payment table rows
+    payment_rows = {p.razorpay_payment_id: p.to_dict()
+                    for p in Payment.query.order_by(Payment.created_at.desc()).all()}
+
+    # Orders with payment IDs that aren’t in the Payment table yet
+    orders_with_pay = OrderSQL.query.filter(
+        OrderSQL.razorpay_payment_id.isnot(None),
+        OrderSQL.razorpay_payment_id != "",
+    ).order_by(OrderSQL.created_at.desc()).all()
+
+    for o in orders_with_pay:
+        pid = o.razorpay_payment_id
+        if pid and pid not in payment_rows:
+            payment_rows[pid] = {
+                "id":                  None,
+                "user_id":             o.user_id,
+                "order_id":            o.id,
+                "razorpay_order_id":   o.razorpay_order_id or "",
+                "razorpay_payment_id": pid,
+                "amount":              float(o.total or 0),
+                "currency":            "INR",
+                "status":              "captured" if o.payment_status == "Paid" else
+                                       "refunded" if o.payment_status == "Refunded" else
+                                       "pending",
+                "method":              None,
+                "email":               o.shipping_address.get("email") if isinstance(o.shipping_address, dict) else None,
+                "phone":               None,
+                "created_at":          o.created_at.isoformat() if o.created_at else None,
+                "updated_at":          o.updated_at.isoformat() if hasattr(o, "updated_at") and o.updated_at else None,
+            }
+
+    # Sort by created_at descending
+    result = sorted(
+        payment_rows.values(),
+        key=lambda x: x.get("created_at") or "",
+        reverse=True,
+    )
+    return jsonify(result)
 
 
 @app.route("/api/admin/orders/<order_id>/cancel", methods=["POST"])
+@csrf.exempt   # Admin panel sends JSON with session auth; no CSRF cookie in AJAX context
 @admin_required
 def cancel_admin_order(order_id):
-    if not razorpay_client:
-        return jsonify({"error": "Payment gateway not configured"}), 500
-
     # SECURITY: Sanitise order_id before lookup
     order_id = _sanitise_str(str(order_id), 100)
     order = OrderSQL.query.get(order_id) or OrderSQL.query.filter_by(order_number=order_id).first()
@@ -2460,25 +2501,46 @@ def cancel_admin_order(order_id):
     rzp_payment_id = order.razorpay_payment_id
     amount         = order.total
 
-    payment = Payment.query.filter_by(razorpay_payment_id=rzp_payment_id).first()
-    order_direct = OrderSQL.query.filter_by(razorpay_payment_id=rzp_payment_id).first()
+    payment      = Payment.query.filter_by(razorpay_payment_id=rzp_payment_id).first() if rzp_payment_id else None
+    order_direct = OrderSQL.query.filter_by(razorpay_payment_id=rzp_payment_id).first() if rzp_payment_id else None
 
+    # ── Already refunded guards ─────────────────────────────────────────────
     if payment and payment.status == "refunded":
-        if payment.order_id:
-            order_via_payment = OrderSQL.query.get(payment.order_id)
-            if order_via_payment and order_via_payment.payment_status != "Refunded":
-                order_via_payment.payment_status = "Refunded"
-                order_via_payment.status = "Cancelled"
-                db_mysql.session.commit()
-        if order_direct and order_direct.payment_status != "Refunded":
-            order_direct.payment_status = "Refunded"
-            order_direct.status = "Cancelled"
+        try:
+            if payment.order_id:
+                o2 = OrderSQL.query.get(payment.order_id)
+                if o2 and o2.payment_status != "Refunded":
+                    o2.payment_status = "Refunded"
+                    o2.status = "Cancelled"
+            if order_direct and order_direct.payment_status != "Refunded":
+                order_direct.payment_status = "Refunded"
+                order_direct.status = "Cancelled"
             db_mysql.session.commit()
+        except Exception:
+            db_mysql.session.rollback()
         return jsonify({"success": True, "message": "Payment was already refunded", "already_refunded": True}), 200
 
     if order_direct and order_direct.payment_status == "Refunded":
         return jsonify({"success": True, "message": "Payment was already refunded", "already_refunded": True}), 200
 
+    # ── No payment ID — cancel order only, no refund ────────────────────────────
+    if not rzp_payment_id or not razorpay_client:
+        try:
+            for item in order.items:
+                prod = ProductSQL.query.get(item.product_id)
+                if prod:
+                    prod.stock += item.quantity
+            order.status         = "Cancelled"
+            order.payment_status = "Cancelled"
+            _audit("order_cancelled_admin_no_payment", "order", order.id, {})
+            db_mysql.session.commit()
+        except Exception:
+            db_mysql.session.rollback()
+            return jsonify({"error": "Failed to cancel order"}), 500
+        msg = "Payment gateway not configured" if not razorpay_client else "No payment ID on order"
+        return jsonify({"success": True, "refunded": False, "message": f"Order cancelled. ({msg} — no refund issued.)"}), 200
+
+    # ── Razorpay refund ─────────────────────────────────────────────────────
     try:
         client      = get_razorpay_client()
         refund_data = {}
@@ -2511,7 +2573,7 @@ def cancel_admin_order(order_id):
 
         _audit("order_cancelled_admin", "order", order.id, {"razorpay_payment_id": rzp_payment_id})
         db_mysql.session.commit()
-        return jsonify({"success": True, "delhivery_cancelled": delhivery_cancelled}), 200
+        return jsonify({"success": True, "refunded": True, "delhivery_cancelled": delhivery_cancelled}), 200
     except razorpay.errors.BadRequestError as exc:
         err_msg = str(exc)
         db_mysql.session.rollback()
@@ -2528,11 +2590,11 @@ def cancel_admin_order(order_id):
             except Exception:
                 db_mysql.session.rollback()
             return jsonify({"success": True, "message": "Payment was already refunded", "already_refunded": True}), 200
-        return jsonify({"error": "Razorpay rejected the refund"}), 400
+        return jsonify({"error": "Razorpay rejected the refund", "detail": err_msg}), 400
     except Exception as exc:
         db_mysql.session.rollback()
         app.logger.error("Refund failed: %s", traceback.format_exc())
-        return jsonify({"error": "Refund failed"}), 500
+        return jsonify({"error": "Refund failed", "detail": str(exc)}), 500
 
 # ============================================================
 # ORDERS
@@ -3731,7 +3793,418 @@ def handle_exception(e):
     return jsonify({"error": "Internal server error", "details": str(e), "trace": traceback.format_exc()}), 500
 
 # ============================================================
-# Entry point
+# CART ANALYTICS + ABANDONED CART
+# ============================================================
+
+def _get_cart_settings() -> CartSettings:
+    """Return the singleton CartSettings row, creating it if absent."""
+    s = CartSettings.query.get(1)
+    if not s:
+        s = CartSettings(id=1)
+        db_mysql.session.add(s)
+        db_mysql.session.commit()
+    return s
+
+
+@app.route("/api/cart/event", methods=["POST"])
+@csrf.exempt
+def track_cart_event():
+    """
+    Called fire-and-forget by the frontend on every cart mutation.
+    Requires an authenticated session (user_id in session).
+    """
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"ok": False, "reason": "not_authenticated"}), 200  # silent — guests ok
+
+    data       = request.get_json(silent=True) or {}
+    event_type = data.get("event_type", "")   # "add" | "remove" | "checkout"
+    if event_type not in ("add", "remove", "checkout"):
+        return jsonify({"ok": False, "reason": "invalid_event_type"}), 200
+
+    try:
+        user = User.query.get(int(user_id))
+    except Exception:
+        return jsonify({"ok": False}), 200
+    if not user:
+        return jsonify({"ok": False}), 200
+
+    product_id   = data.get("product_id")
+    product_name = data.get("product_name", "")
+    snapshot     = data.get("cart_snapshot") or []   # full cart array
+
+    try:
+        event = CartEvent(
+            user_id      = int(user_id),
+            user_email   = user.email,
+            product_id   = int(product_id) if product_id else None,
+            product_name = _sanitise_str(str(product_name), 255),
+            event_type   = event_type,
+            cart_snapshot = snapshot,
+        )
+        db_mysql.session.add(event)
+
+        # If this is a checkout event, mark any pending abandoned-cart emails as converted
+        if event_type == "checkout":
+            pending = AbandonedCartEmail.query.filter_by(
+                user_email=user.email, converted=False
+            ).all()
+            for rec in pending:
+                rec.converted = True
+
+        db_mysql.session.commit()
+        return jsonify({"ok": True}), 200
+    except Exception as exc:
+        db_mysql.session.rollback()
+        app.logger.warning("cart_event_error err=%s", exc)
+        return jsonify({"ok": False}), 200
+
+
+@app.route("/api/admin/cart-analytics", methods=["GET"])
+@admin_required
+def get_cart_analytics():
+    """
+    Per-product cart analytics.
+    Optional query params: range = today | 7d | 30d (default: all-time)
+    """
+    from datetime import timedelta
+    date_range = request.args.get("range", "all")
+    now = datetime.now(timezone.utc)
+    if date_range == "today":
+        since = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif date_range == "7d":
+        since = now - timedelta(days=7)
+    elif date_range == "30d":
+        since = now - timedelta(days=30)
+    else:
+        since = None
+
+    q = CartEvent.query
+    if since:
+        q = q.filter(CartEvent.timestamp >= since)
+
+    events = q.all()
+
+    # Build per-product stats
+    stats: dict = {}   # product_id -> {name, adds, removes, checkouts}
+    for ev in events:
+        pid = ev.product_id
+        if not pid:
+            continue
+        if pid not in stats:
+            stats[pid] = {"product_id": pid, "product_name": ev.product_name or "",
+                          "adds": 0, "removes": 0, "checkouts": 0}
+        if ev.event_type == "add":
+            stats[pid]["adds"] += 1
+        elif ev.event_type == "remove":
+            stats[pid]["removes"] += 1
+        elif ev.event_type == "checkout":
+            stats[pid]["checkouts"] += 1
+
+    # Fetch product images from DB for each product in stats
+    product_objs = {p.id: p for p in ProductSQL.query.filter(
+        ProductSQL.id.in_(list(stats.keys()))
+    ).all()} if stats else {}
+
+    result = []
+    for pid, s in stats.items():
+        adds      = s["adds"]
+        checkouts = s["checkouts"]
+        conversion = round(checkouts / adds * 100, 1) if adds > 0 else 0.0
+        abandonment = round((adds - checkouts) / adds * 100, 1) if adds > 0 else 0.0
+        prod = product_objs.get(pid)
+        image = ""
+        if prod and prod.images:
+            imgs = prod.images
+            if isinstance(imgs, list) and imgs:
+                image = imgs[0]
+        result.append({
+            "product_id":       pid,
+            "product_name":     s["product_name"] or (prod.name if prod else ""),
+            "product_image":    image,
+            "total_adds":       adds,
+            "total_removes":    s["removes"],
+            "total_checkouts":  checkouts,
+            "conversion_rate":  conversion,
+            "abandonment_rate": abandonment,
+        })
+
+    sort_by = request.args.get("sort", "total_adds")
+    if sort_by in ("total_adds", "total_removes", "abandonment_rate", "conversion_rate"):
+        result.sort(key=lambda x: x.get(sort_by, 0), reverse=True)
+
+    return jsonify(result)
+
+
+@app.route("/api/admin/cart-analytics/summary", methods=["GET"])
+@admin_required
+def get_cart_analytics_summary():
+    """Summary cards: active carts, total value, avg abandonment, top abandoned."""
+    # Get the most recent cart snapshot per user (latest "add" event with a non-empty snapshot)
+    from sqlalchemy import func
+
+    subq = db_mysql.session.query(
+        CartEvent.user_email,
+        func.max(CartEvent.timestamp).label("latest")
+    ).filter(
+        CartEvent.event_type == "add",
+        CartEvent.cart_snapshot.isnot(None)
+    ).group_by(CartEvent.user_email).subquery()
+
+    latest_events = db_mysql.session.query(CartEvent).join(
+        subq,
+        (CartEvent.user_email == subq.c.user_email) &
+        (CartEvent.timestamp == subq.c.latest)
+    ).all()
+
+    active_carts  = 0
+    total_value   = 0.0
+    product_abandonment: dict = {}   # product_id -> abandon_count
+
+    for ev in latest_events:
+        snap = ev.cart_snapshot or []
+        if not snap:
+            continue
+        # Check user hasn't completed a purchase since this event
+        order_after = OrderSQL.query.filter(
+            OrderSQL.shipping_address.isnot(None)
+        ).filter(
+            db_mysql.func.json_extract(OrderSQL.shipping_address, '$.email') == ev.user_email
+        ).filter(OrderSQL.created_at > ev.timestamp).first()
+        if order_after:
+            continue
+        active_carts += 1
+        for item in snap:
+            price = float(item.get("price", 0))
+            qty   = int(item.get("quantity", 1))
+            total_value += price * qty
+            pid = item.get("id")
+            if pid:
+                product_abandonment[pid] = product_abandonment.get(pid, 0) + 1
+
+    # Overall abandonment rate
+    total_adds     = CartEvent.query.filter_by(event_type="add").count()
+    total_checkouts = CartEvent.query.filter_by(event_type="checkout").count()
+    avg_abandonment = round((total_adds - total_checkouts) / total_adds * 100, 1) if total_adds > 0 else 0.0
+
+    # Top 3 abandoned products
+    top3_ids = sorted(product_abandonment, key=lambda x: product_abandonment[x], reverse=True)[:3]
+    top3 = []
+    for pid in top3_ids:
+        try:
+            prod = ProductSQL.query.get(int(pid))
+            top3.append({"product_id": pid,
+                         "product_name": prod.name if prod else str(pid),
+                         "abandon_count": product_abandonment[pid]})
+        except Exception:
+            pass
+
+    return jsonify({
+        "active_carts":       active_carts,
+        "total_cart_value":   round(total_value, 2),
+        "avg_abandonment_rate": avg_abandonment,
+        "top_abandoned":      top3,
+    })
+
+
+@app.route("/api/admin/cart-analytics/users/<int:product_id>", methods=["GET"])
+@admin_required
+def get_cart_users_for_product(product_id):
+    """Users who currently have product_id in their active cart."""
+    from sqlalchemy import func
+    subq = db_mysql.session.query(
+        CartEvent.user_email,
+        func.max(CartEvent.timestamp).label("latest")
+    ).filter(
+        CartEvent.event_type == "add",
+        CartEvent.cart_snapshot.isnot(None)
+    ).group_by(CartEvent.user_email).subquery()
+
+    latest_events = db_mysql.session.query(CartEvent).join(
+        subq,
+        (CartEvent.user_email == subq.c.user_email) &
+        (CartEvent.timestamp == subq.c.latest)
+    ).all()
+
+    users_in_cart = []
+    for ev in latest_events:
+        snap = ev.cart_snapshot or []
+        ids_in_snap = [str(item.get("id", "")) for item in snap]
+        if str(product_id) not in ids_in_snap:
+            continue
+        user = User.query.filter_by(email=ev.user_email).first()
+        item = next((i for i in snap if str(i.get("id")) == str(product_id)), {})
+        users_in_cart.append({
+            "user_email":    ev.user_email,
+            "user_name":     f"{user.first_name or ''} {user.last_name or ''}".strip() if user else ev.user_email,
+            "quantity":      item.get("quantity", 1),
+            "size":          item.get("size", ""),
+            "added_at":      ev.timestamp.isoformat() if ev.timestamp else None,
+            "hours_in_cart": round((datetime.now(timezone.utc) - ev.timestamp.replace(tzinfo=timezone.utc)).total_seconds() / 3600, 1) if ev.timestamp else 0,
+        })
+
+    return jsonify(users_in_cart)
+
+
+@app.route("/api/admin/cart-settings", methods=["GET"])
+@admin_required
+def get_cart_settings_api():
+    return jsonify(_get_cart_settings().to_dict())
+
+
+@app.route("/api/admin/cart-settings", methods=["POST"])
+@csrf.exempt
+@admin_required
+def update_cart_settings():
+    data = request.get_json() or {}
+    s = _get_cart_settings()
+    if "abandonment_emails_on" in data:
+        s.abandonment_emails_on = bool(data["abandonment_emails_on"])
+    if "first_email_delay_hours" in data:
+        try: s.first_email_delay_hours = max(0, int(data["first_email_delay_hours"]))
+        except (TypeError, ValueError): pass
+    if "second_email_delay_hours" in data:
+        try: s.second_email_delay_hours = max(1, int(data["second_email_delay_hours"]))
+        except (TypeError, ValueError): pass
+    if "discount_code_enabled" in data:
+        s.discount_code_enabled = bool(data["discount_code_enabled"])
+    if "discount_code" in data:
+        s.discount_code = _sanitise_str(str(data["discount_code"]), 50) or None
+    db_mysql.session.commit()
+    return jsonify(s.to_dict())
+
+
+@app.route("/api/admin/abandoned-emails", methods=["GET"])
+@admin_required
+def get_abandoned_emails():
+    rows = AbandonedCartEmail.query.order_by(AbandonedCartEmail.sent_at.desc()).limit(500).all()
+    return jsonify([r.to_dict() for r in rows])
+
+
+@app.route("/api/internal/run-abandoned-cart", methods=["POST"])
+@csrf.exempt
+def run_abandoned_cart_job():
+    """
+    Called by PythonAnywhere scheduled task (or manual trigger) every hour.
+    Protected by X-Cron-Secret header.
+    """
+    secret = os.getenv("CRON_SECRET", "")
+    if secret and request.headers.get("X-Cron-Secret") != secret:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    sent, skipped, errors = _run_abandoned_cart_emails()
+    return jsonify({"sent": sent, "skipped": skipped, "errors": errors})
+
+
+def _run_abandoned_cart_emails() -> tuple:
+    """Core abandonment detection + email dispatch logic."""
+    from datetime import timedelta
+    from sqlalchemy import func
+
+    settings = _get_cart_settings()
+    if not settings.abandonment_emails_on:
+        return 0, 0, 0
+
+    sent = skipped = errors = 0
+    now  = datetime.now(timezone.utc)
+    first_delay  = timedelta(hours=settings.first_email_delay_hours)
+    second_delay = timedelta(hours=settings.second_email_delay_hours)
+
+    # Get latest cart snapshot per user
+    subq = db_mysql.session.query(
+        CartEvent.user_email,
+        func.max(CartEvent.timestamp).label("latest")
+    ).filter(
+        CartEvent.event_type == "add",
+        CartEvent.cart_snapshot.isnot(None)
+    ).group_by(CartEvent.user_email).subquery()
+
+    latest_events = db_mysql.session.query(CartEvent).join(
+        subq,
+        (CartEvent.user_email == subq.c.user_email) &
+        (CartEvent.timestamp == subq.c.latest)
+    ).all()
+
+    for ev in latest_events:
+        try:
+            snap = ev.cart_snapshot or []
+            if not snap:
+                skipped += 1
+                continue
+
+            event_ts = ev.timestamp.replace(tzinfo=timezone.utc)
+
+            # Skip if not yet past first delay
+            if now - event_ts < first_delay:
+                skipped += 1
+                continue
+
+            # Skip if user completed a purchase after this cart event
+            user = User.query.filter_by(email=ev.user_email).first()
+            if not user:
+                skipped += 1
+                continue
+
+            order_after = OrderSQL.query.filter(
+                OrderSQL.user_id == user.id,
+                OrderSQL.created_at > ev.timestamp,
+                OrderSQL.payment_status == "Paid"
+            ).first()
+            if order_after:
+                skipped += 1
+                continue
+
+            # Check existing emails for this session
+            existing_emails = AbandonedCartEmail.query.filter_by(
+                user_email=ev.user_email, converted=False
+            ).order_by(AbandonedCartEmail.sent_at.desc()).all()
+
+            reminder_count = len(existing_emails)
+
+            if reminder_count >= 2:
+                skipped += 1
+                continue
+
+            # For second email: check 24h+ since first email
+            if reminder_count == 1:
+                last_sent = existing_emails[0].sent_at.replace(tzinfo=timezone.utc)
+                if now - last_sent < second_delay:
+                    skipped += 1
+                    continue
+
+            # Send the email
+            first_name = user.first_name or "Valued Customer"
+            discount   = settings.discount_code if settings.discount_code_enabled else None
+            ok = send_abandoned_cart_email(mail, ev.user_email, first_name, snap, discount)
+
+            log = AbandonedCartEmail(
+                user_id        = user.id,
+                user_email     = ev.user_email,
+                cart_snapshot  = snap,
+                reminder_count = reminder_count + 1,
+                email_status   = "sent" if ok else "failed",
+            )
+            db_mysql.session.add(log)
+            db_mysql.session.commit()
+
+            if ok:
+                sent += 1
+            else:
+                errors += 1
+
+        except Exception as exc:
+            db_mysql.session.rollback()
+            app.logger.warning("abandoned_cart_email_error email=%s err=%s", ev.user_email, exc)
+            errors += 1
+
+    return sent, skipped, errors
+
+
+# Import here to avoid circular dependency with mail instance
+from mail_utils import send_abandoned_cart_email  # noqa: E402
+
+# ============================================================
+# Error handlers
 # ============================================================
 
 if __name__ == "__main__":

@@ -1,11 +1,11 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { Shield, Truck, CheckCircle, MapPin, CreditCard, Package, ChevronRight, AlertTriangle } from "lucide-react"
+import { Shield, Truck, CheckCircle, MapPin, CreditCard, Package, ChevronRight, AlertTriangle, WifiOff } from "lucide-react"
 
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
@@ -17,6 +17,12 @@ import { Input } from "@/components/ui/input"
 
 const API_BASE = getApiBase()
 
+type FormData = {
+  email: string; firstName: string; lastName: string
+  address: string; city: string; state: string
+  zip: string; country: string; phone: string
+}
+
 declare global {
   interface Window {
     Razorpay: any
@@ -24,7 +30,7 @@ declare global {
 }
 
 export default function CheckoutPage() {
-  const { items, total, clearCart, isHydrated } = useCart()
+  const { items, total, clearCart, trackCheckout, isHydrated } = useCart()
   const { user, isAuthenticated, isAuthLoading, refreshUser } = useAuth()
   const router = useRouter()
 
@@ -57,17 +63,46 @@ export default function CheckoutPage() {
 
 
   const [step, setStep] = useState<"shipping" | "review" | "payment">("shipping")
-  const [formData, setFormData] = useState({
-    email: "",
-    firstName: "",
-    lastName: "",
-    address: "",
-    city: "",
-    state: "",
-    zip: "",
-    country: "India",
-    phone: "",
+
+  // ─ sessionStorage key for form persistence across reloads
+  const FORM_KEY = "checkout_form_draft"
+
+  const [formData, setFormData] = useState(() => {
+    // Restore from sessionStorage if available (survives F5 but not tab close)
+    if (typeof window !== "undefined") {
+      try {
+        const saved = sessionStorage.getItem(FORM_KEY)
+        if (saved) return JSON.parse(saved)
+      } catch { /* ignore */ }
+    }
+    return {
+      email: "", firstName: "", lastName: "",
+      address: "", city: "", state: "",
+      zip: "", country: "India", phone: "",
+    }
   })
+
+  // Persist form to sessionStorage on every change
+  useEffect(() => {
+    try { sessionStorage.setItem(FORM_KEY, JSON.stringify(formData)) } catch { /* ignore */ }
+  }, [formData])
+
+  const [isOnline, setIsOnline] = useState(true)
+  const [showOfflineBanner, setShowOfflineBanner] = useState(false)
+
+  useEffect(() => {
+    const goOnline  = () => { setIsOnline(true);  setShowOfflineBanner(false) }
+    const goOffline = () => { setIsOnline(false); setShowOfflineBanner(true) }
+    window.addEventListener("online",  goOnline)
+    window.addEventListener("offline", goOffline)
+    // Set initial state
+    setIsOnline(navigator.onLine)
+    if (!navigator.onLine) setShowOfflineBanner(true)
+    return () => {
+      window.removeEventListener("online",  goOnline)
+      window.removeEventListener("offline", goOffline)
+    }
+  }, [])
 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isProcessing, setIsProcessing] = useState(false)
@@ -88,11 +123,10 @@ export default function CheckoutPage() {
   const shipping = shippingEstimate?.shipping_cost ?? (total >= 2000 ? 0 : 149)
   const grandTotal = total + shipping + tax
 
-
   useEffect(() => {
     if (user) {
       const address = user.addresses && user.addresses.length > 0 ? user.addresses[0] : null;
-      setFormData(prev => ({
+      setFormData((prev: FormData) => ({
         ...prev,
         email: user.email || prev.email,
         firstName: user.firstName || prev.firstName,
@@ -166,7 +200,7 @@ export default function CheckoutPage() {
 
       // Autofill city/state from pincode lookup
       if (lookupData.success) {
-        setFormData(prev => ({
+        setFormData((prev: FormData) => ({
           ...prev,
           city: lookupData.city || prev.city,
           state: lookupData.state || prev.state,
@@ -306,6 +340,9 @@ export default function CheckoutPage() {
                 address: formData,
                 paymentId: response.razorpay_payment_id,
               }))
+              // Clear the form draft — order is confirmed
+              try { sessionStorage.removeItem(FORM_KEY) } catch { /* ignore */ }
+              trackCheckout()  // marks cart as converted for analytics
               clearCart()
               await refreshUser()
               router.push(`/account/orders/${finalData.orderId}`)
@@ -353,7 +390,33 @@ export default function CheckoutPage() {
 
   return (
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen">
-      <SiteHeader />
+      {/* ── Offline warning banner ── */}
+      {showOfflineBanner && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-900/95 border-b border-amber-500/40 px-4 py-3 flex items-center justify-between gap-4 backdrop-blur-sm">
+          <div className="flex items-center gap-3 text-amber-300">
+            <WifiOff size={14} />
+            <span className="text-[10px] uppercase tracking-widest font-medium">
+              No internet connection — your details are saved. Please reconnect before placing your order.
+            </span>
+          </div>
+          {isOnline && (
+            <button onClick={() => setShowOfflineBanner(false)} className="text-amber-500/60 hover:text-amber-300 text-xs">×</button>
+          )}
+        </div>
+      )}
+
+      {/* ── Distraction-free checkout header ── */}
+      <header className={`fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#030303]/95 backdrop-blur-md ${showOfflineBanner ? 'mt-[44px]' : ''}`}>
+        <div className="max-w-[1400px] mx-auto px-6 md:px-12 h-16 flex items-center justify-between">
+          <Link href="/" className="font-serif text-lg tracking-[0.3em] uppercase text-[#e8e8e3]">
+            U.S Atelier
+          </Link>
+          <div className="flex items-center gap-2 text-[9px] uppercase tracking-widest text-gray-500">
+            <Shield size={11} className="text-green-500/60" />
+            Secure Checkout
+          </div>
+        </div>
+      </header>
 
       <main className="pt-36 md:pt-48 pb-20 md:pb-32 px-4 md:px-12">
         {/* Progress Stepper */}
@@ -638,11 +701,13 @@ export default function CheckoutPage() {
 
                 <Button
                   onClick={handlePayAndPlaceOrder}
-                  disabled={isProcessing || !checkoutTermsAccepted}
+                  disabled={isProcessing || !checkoutTermsAccepted || !isOnline}
                   className="w-full border border-white/40 bg-white/5 uppercase tracking-widest text-xs hover:bg-white hover:text-black transition-all py-6 md:py-8 disabled:opacity-40 group"
                 >
                   <div className="flex items-center justify-center gap-3">
-                    {isProcessing ? (
+                    {!isOnline ? (
+                      <><WifiOff size={14} className="text-amber-400" />No Connection</>
+                    ) : isProcessing ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin group-hover:border-black/30 group-hover:border-t-black" />
                         Processing Payment...
@@ -728,7 +793,17 @@ export default function CheckoutPage() {
         </div>
       </main>
 
-      <SiteFooter />
+      {/* Minimal checkout footer */}
+      <footer className="border-t border-white/5 py-6 px-6 md:px-12">
+        <div className="max-w-[1400px] mx-auto flex flex-wrap items-center justify-between gap-4 text-[8px] uppercase tracking-widest text-gray-700">
+          <span>© {new Date().getFullYear()} U.S Atelier. All rights reserved.</span>
+          <div className="flex items-center gap-6">
+            <Link href="/privacy-policy" className="hover:text-gray-400 transition-colors">Privacy</Link>
+            <Link href="/terms%26conditions" className="hover:text-gray-400 transition-colors">Terms</Link>
+            <Link href="/refund-policy" className="hover:text-gray-400 transition-colors">Refunds</Link>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

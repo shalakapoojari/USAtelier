@@ -95,3 +95,36 @@ def send_otp_email(mail, email, otp, first_name=None):
     except Exception as e:
         logger.error(f"Failed to send OTP email to {email}: {e}")
         return False
+
+
+def send_abandoned_cart_email(mail, email: str, first_name: str, items: list, discount_code: str | None = None) -> bool:
+    """
+    Send an abandoned-cart recovery email.
+    items: list of dicts with keys {name, price, quantity, size, image}
+    discount_code: optional code to display in the email
+    Returns True on success, False on failure.
+    """
+    import os
+    try:
+        site_url    = os.getenv("FRONTEND_URL", "https://www.usatelier.in")
+        cart_url        = f"{site_url}/cart"
+        unsubscribe_url = f"{site_url}/account"
+
+        msg = Message(
+            "You left something behind! 🛒",
+            recipients=[email],
+        )
+        msg.html = render_template(
+            "emails/abandoned_cart.html",
+            first_name=first_name,
+            items=items,
+            discount_code=discount_code,
+            cart_url=cart_url,
+            unsubscribe_url=unsubscribe_url,
+        )
+        mail.send(msg)
+        logger.info(f"Abandoned cart email sent to {email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send abandoned cart email to {email}: {e}")
+        return False
