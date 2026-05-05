@@ -628,7 +628,7 @@ export default function CheckoutPage() {
                       className="mt-0.5 h-4 w-4 rounded border-white/30 bg-transparent accent-white"
                     />
                     <span>
-                      I agree to the <Link href="/terms&conditions" target="_blank" className="text-[#C8A45D] hover:text-white underline underline-offset-4">Terms & Conditions</Link> and authorize order placement.
+                      I agree to the <Link href="/terms%26conditions" target="_blank" className="text-[#C8A45D] hover:text-white underline underline-offset-4">Terms &amp; Conditions</Link> and authorize order placement.
                     </span>
                   </label>
                   {checkoutTermsError && (

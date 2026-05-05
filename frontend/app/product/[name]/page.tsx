@@ -72,18 +72,11 @@ export default function ProductPage({
           return
         }
 
-        const [productRes, reviewsRes] = await Promise.all([
-          apiFetch(API_BASE, `/api/products/${targetProduct.id}`),
-          apiFetch(API_BASE, `/api/products/${targetProduct.id}/reviews`),
-        ])
+        // Product data already in allProducts — set it directly, no second fetch needed
+        setProduct(targetProduct)
 
-        if (productRes.ok) {
-          const data = await productRes.json()
-          setProduct(data)
-        } else {
-          setProduct(null)
-        }
-
+        // Fetch reviews separately (needs the confirmed product ID)
+        const reviewsRes = await apiFetch(API_BASE, `/api/products/${targetProduct.id}/reviews`)
         if (reviewsRes.ok) {
           const rData = await reviewsRes.json()
           setReviews(rData)

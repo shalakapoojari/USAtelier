@@ -259,32 +259,38 @@ export default function HomePage() {
   });
   const [heroImageLoaded, setHeroImageLoaded] = useState(false);
 
-  // Fetch homepage config + products immediately on mount (no API_BASE state delay)
+  // Fetch homepage config + all products on mount
   useEffect(() => {
     const API_BASE = API_BASE_RESOLVED || getApiBase();
     if (!API_BASE) return;
     const run = async () => {
       try {
-        // No cache-busting param — allows the browser to cache this lightweight response
-        const configRes = await apiFetch(API_BASE, `/api/homepage`);
+        // Parallel: config + all products
+        const [configRes, productsRes] = await Promise.all([
+          apiFetch(API_BASE, `/api/homepage`),
+          apiFetch(API_BASE, `/api/products`),
+        ]);
+
         const data: HomepageData = configRes.ok ? await configRes.json() : {};
+        const allProducts: any[] = productsRes.ok ? await productsRes.json() : [];
         setConfig(data);
 
-        // Now fetch products in parallel
-        const fetchGroup = async (ids: string[]) => {
-          if (!ids?.length) return [];
-          const results = await Promise.all(
-            ids.map(id => apiFetch(API_BASE, `/api/products/${id}`).then(r => r.ok ? r.json() : null))
-          );
-          return results.filter(Boolean);
+        // Helper: resolve IDs from config to real products, fall back to flag-based filter
+        const resolveGroup = (ids: string[] | undefined, flagKey: "is_featured" | "is_bestseller") => {
+          if (ids && ids.length > 0) {
+            // Config IDs → map to real products (skip any that no longer exist)
+            const byId = ids
+              .map(id => allProducts.find((p: any) => String(p.id) === String(id)))
+              .filter(Boolean);
+            if (byId.length > 0) return byId;
+          }
+          // Flag-based fallback (always works even when config is stale)
+          const flagged = allProducts.filter((p: any) => p[flagKey]);
+          return flagged.length > 0 ? flagged : allProducts.slice(0, 6);
         };
 
-        const [bs, ft] = await Promise.all([
-          fetchGroup(data.bestseller_product_ids || []),
-          fetchGroup(data.featured_product_ids || []),
-        ]);
-        setBestsellers(bs);
-        setFeatured(ft);
+        setBestsellers(resolveGroup(data.bestseller_product_ids, "is_bestseller"));
+        setFeatured(resolveGroup(data.featured_product_ids, "is_featured"));
       } catch {
         setBestsellers([]);
         setFeatured([]);

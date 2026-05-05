@@ -1563,9 +1563,31 @@ def get_products():
     return jsonify([p.to_dict() for p in q.all()])
 
 
-@app.route("/api/products/<int:product_id>", methods=["GET"])
-def get_product(product_id):
-    product = ProductSQL.query.get(product_id)
+@app.route("/api/products/<product_identifier>", methods=["GET"])
+def get_product(product_identifier):
+    """
+    Accept both numeric ID and product name (URL-encoded).
+    Lookup order: integer PK → exact name → case-insensitive name.
+    """
+    product = None
+
+    # 1. Try numeric primary-key lookup
+    try:
+        pid = int(product_identifier)
+        product = ProductSQL.query.get(pid)
+    except (ValueError, TypeError):
+        pass
+
+    # 2. If not found by ID, try name-based lookup (URL-decoded)
+    if not product:
+        from urllib.parse import unquote as _unquote
+        name = _unquote(product_identifier).strip()
+        # Exact match first (faster)
+        product = ProductSQL.query.filter(ProductSQL.name == name).first()
+        # Case-insensitive fallback
+        if not product:
+            product = ProductSQL.query.filter(ProductSQL.name.ilike(name)).first()
+
     if not product:
         return jsonify({"error": "Product not available"}), 404
     return jsonify(product.to_dict()), 200
