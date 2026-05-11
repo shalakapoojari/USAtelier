@@ -6,7 +6,7 @@ export function SiteFooter() {
   return (
     <footer className="relative overflow-hidden bg-white pt-20 pb-12 px-6 md:px-16 border-t border-gray-100">
 
-      {/* Giant ghost brand text - Refined for subtle impact */}
+      {/* Giant ghost brand text fixing tings - Refined for subtle impact */}
       <div className="absolute bottom-[-2%] left-0 w-full overflow-hidden pointer-events-none select-none">
         <span className="text-[20vw] font-serif italic text-gray-50 leading-none whitespace-nowrap tracking-tighter block">
           U.S Atelier
