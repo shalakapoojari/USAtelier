@@ -34,6 +34,7 @@ interface HomepageData {
 // ─── Hero Media ───────────────────────────────────────────────────────────────
 function HeroMedia({ slide, fallbackImage, onImageLoad }: { slide: HeroSlide | null; fallbackImage: string; onImageLoad?: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const hasVideo = !!(slide?.video_url) && !videoFailed;
@@ -42,6 +43,25 @@ function HeroMedia({ slide, fallbackImage, onImageLoad }: { slide: HeroSlide | n
   useEffect(() => {
     if (hasVideo && videoRef.current) { videoRef.current.load(); setVideoLoaded(false); }
   }, [slide?.video_url]);
+
+  useEffect(() => {
+    const img = imageRef.current;
+    if (!img || !onImageLoad) return;
+
+    if (img.complete) {
+      onImageLoad();
+      return;
+    }
+
+    const handleReady = () => onImageLoad();
+    img.addEventListener("load", handleReady, { once: true });
+    img.addEventListener("error", handleReady, { once: true });
+
+    return () => {
+      img.removeEventListener("load", handleReady);
+      img.removeEventListener("error", handleReady);
+    };
+  }, [imgSrc, onImageLoad]);
 
   // If there is no src at all, signal immediately so the preloader never hangs.
   useEffect(() => {
@@ -55,6 +75,7 @@ function HeroMedia({ slide, fallbackImage, onImageLoad }: { slide: HeroSlide | n
   return (
     <div className="absolute inset-0 z-0 overflow-hidden bg-[#080808]">
       <img
+        ref={imageRef}
         src={imgSrc || undefined}
         key="hero-img"
         className={`w-full h-full object-cover scale-110 hero-bg transition-opacity duration-700 ${
@@ -62,8 +83,7 @@ function HeroMedia({ slide, fallbackImage, onImageLoad }: { slide: HeroSlide | n
         }`}
         alt="U.S Atelier editorial hero"
         loading="eager"
-        // @ts-ignore — fetchpriority is valid HTML but not yet in TS lib
-        fetchpriority="high"
+        fetchPriority="high"
         decoding="async"
         onLoad={handleLoad}
         onError={handleError}
@@ -250,13 +270,7 @@ export default function HomePage() {
   const [featured, setFeatured] = useState<any[] | null>(null);
   const [enlargedProduct, setEnlargedProduct] = useState<any | null>(null);
   const featuredRef = useRef<HTMLDivElement>(null);
-  // Lazy initializer reads sessionStorage synchronously — no null phase, no flash
-  const [showPreloader, setShowPreloader] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true; // SSR: always show
-    if (sessionStorage.getItem("hasSeenPreloader")) return false;
-    sessionStorage.setItem("hasSeenPreloader", "true");
-    return true;
-  });
+  const [showPreloader] = useState(true);
   const [heroImageLoaded, setHeroImageLoaded] = useState(false);
 
   // Fetch homepage config + all products on mount
@@ -299,26 +313,21 @@ export default function HomePage() {
     run();
   }, []); // no deps — API_BASE is resolved inline, never changes
 
-  // ─── GSAP Hero + preloader (fires as soon as hero image is ready) ─────────
+  // ─── GSAP Hero + preloader (kept short so the page is usable immediately) ─────────
   useEffect(() => {
-    // Only gate on heroImageLoaded — products load independently below.
-    if (showPreloader && !heroImageLoaded) return;
+    if (!showPreloader) return;
 
     const progress = { val: 0 };
     const loadTl = gsap.timeline();
 
-    if (showPreloader) {
-      loadTl
-        .to(progress, { val: 100, duration: 0.5, ease: "power2.out", onUpdate: () => setLoadingPercent(Math.round(progress.val)) })
-        .to(".js-preloader", { yPercent: -100, duration: 1.0, ease: "expo.inOut" }, ">0.15")
-        .from(".hero-main-text", { y: 120, duration: 1.3, stagger: 0.15, ease: "expo.out" }, "-=0.5");
-    } else {
-      loadTl.from(".hero-main-text", { y: 120, duration: 1.3, stagger: 0.15, ease: "expo.out" }, "+=0.1");
-    }
+    loadTl
+      .to(progress, { val: 100, duration: 0.18, ease: "power1.out", onUpdate: () => setLoadingPercent(Math.round(progress.val)) })
+      .to(".js-preloader", { yPercent: -100, duration: 0.45, ease: "expo.inOut" }, ">0.05")
+      .fromTo(".hero-main-text", { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.55, stagger: 0.04, ease: "power3.out" }, "-=0.2");
 
     loadTl
-      .from(".hero-sub-text", { y: 28, opacity: 0, duration: 0.8, ease: "power3.out" }, showPreloader ? "-=1.0" : "-=0.7")
-      .to(".hero-cta", { opacity: 1, duration: 0.8 }, showPreloader ? "-=0.6" : "-=0.4");
+      .fromTo(".hero-sub-text", { y: 12, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "power2.out" }, "-=0.25")
+      .to(".hero-cta", { opacity: 1, duration: 0.35 }, "-=0.15");
 
     // Hero bg parallax
     gsap.fromTo(".hero-bg", { y: 0, scale: 1.12 }, {
@@ -342,10 +351,10 @@ export default function HomePage() {
       cleanups.push(() => { wrap.removeEventListener("mousemove", onMove); wrap.removeEventListener("mouseleave", onLeave); });
     });
 
-    // Hard safety: force preloader off after 2.5 s no matter what
+    // Hard safety: force preloader off quickly so the page never feels blocked
     const preloaderSafety = window.setTimeout(() => {
       gsap.to(".js-preloader", { yPercent: -100, duration: 0.7, ease: "expo.inOut", overwrite: true });
-    }, 2500);
+    }, 450);
 
     return () => {
       ScrollTrigger.getAll().forEach(t => t.kill());
@@ -353,7 +362,7 @@ export default function HomePage() {
       window.clearTimeout(preloaderSafety);
       cleanups.forEach(fn => fn());
     };
-  }, [heroImageLoaded, showPreloader]);
+  }, [showPreloader]);
 
   // ─── GSAP scroll animations (fires once products are ready) ───────────────
   useEffect(() => {
@@ -396,22 +405,9 @@ export default function HomePage() {
     return () => { ScrollTrigger.getAll().forEach(t => t.kill()); };
   }, [bestsellers, featured]);
 
-  // Crawl the progress bar to 85% while waiting for the hero image.
-  useEffect(() => {
-    if (!showPreloader || heroImageLoaded) return;
-    const progress = { val: 0 };
-    const crawl = gsap.to(progress, {
-      val: 85, duration: 1.8, ease: "power1.inOut",
-      onUpdate: () => setLoadingPercent(Math.round(progress.val)),
-    });
-    // Safety: force heroImageLoaded after 1.8 s so preloader never sticks
-    const safety = window.setTimeout(() => setHeroImageLoaded(true), 1800);
-    return () => { crawl.kill(); window.clearTimeout(safety); };
-  }, [showPreloader, heroImageLoaded]);
-
   // ─── Derived values ──────────────────────────────────────────────────────
   const heroSlide = config?.hero_slides?.[0] || null;
-  const fallbackHero = "";
+  const fallbackHero = "/minimal-fashion-editorial-hero-image-model-wearing.jpg";
   const manifesto = config?.manifesto_text || "We believe in the quiet power of silence. In a world of noise, U.S Atelier is the absence of it. We strip away the unnecessary to reveal the essential structure of the human form. This is not just clothing; this is architecture for the soul.";
   const seasonText = config?.season_label || "Summer Collection 2026";
   const isLoading = bestsellers === null || featured === null;
@@ -444,9 +440,9 @@ export default function HomePage() {
           will-change: transform;
         }
 
-        /* Line-mask: hides text until GSAP slides it into view */
-        .line-mask { overflow: hidden; }
-        .line-mask span { display: block; transform: translateY(100%); }
+        /* Line-mask wrapper for staged hero text */
+        .line-mask { overflow: visible; }
+        .line-mask span { display: block; }
         .highlight-text span { opacity: 0.15; }
 
         @keyframes fadein { from{opacity:0;transform:translateY(24px) scale(0.98)} to{opacity:1;transform:none} }
@@ -481,10 +477,10 @@ export default function HomePage() {
             <h2 className="hero-sub-text text-[10px] font-sans uppercase tracking-[0.6em] text-gray-300">{seasonText}</h2>
           </div>
           <div className="line-mask">
-            <h1 className="text-[13vw] md:text-[11vw] leading-[0.85] font-serif text-white hero-main-text">{title1}</h1>
+            <h1 className="text-[13vw] md:text-[11vw] leading-[0.95] font-serif text-white hero-main-text">{title1}</h1>
           </div>
           <div className="line-mask">
-            <h1 className="text-[13vw] md:text-[11vw] leading-[0.85] font-serif italic text-gray-400 hero-main-text">{title2}</h1>
+            <h1 className="text-[13vw] md:text-[11vw] leading-[0.95] font-serif italic text-gray-400 hero-main-text">{title2}</h1>
           </div>
           <div className="mt-12 opacity-0 hero-cta">
             <div className="magnetic-wrap">

@@ -9,6 +9,8 @@ import { AuthProvider } from "@/lib/auth-context"
 import { ToastProvider } from "@/lib/toast-context"
 import { ScrollRevealProvider } from "@/components/scroll-reveal-provider"
 import { CookieConsentBanner } from "@/components/cookie-consent-banner"
+import { LenisProvider } from "@/components/lenis-provider"
+import { organizationJsonLd, rootMetadata, rootViewport, websiteJsonLd } from "@/lib/seo"
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
@@ -21,18 +23,9 @@ const inter = Inter({
   variable: "--font-sans",
 })
 
-export const metadata: Metadata = {
-  title: "ATELIER - Premium Fashion",
-  description: "Curated collection of premium clothing and timeless essentials",
-}
+export const metadata: Metadata = rootMetadata
 
-export const viewport: Viewport = {
-  themeColor: "#030303",
-  width: "device-width",
-  initialScale: 1,
-}
-
-import { LenisProvider } from "@/components/lenis-provider"
+export const viewport: Viewport = rootViewport
 
 export default function RootLayout({
   children,
@@ -45,6 +38,8 @@ export default function RootLayout({
         {/* Preconnect to API and font CDN so DNS/TLS are resolved before JS runs */}
         <link rel="preconnect" href="https://api.usatelier.in" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }} />
       </head>
       <body className="font-sans antialiased" style={{ backgroundColor: '#030303' }}>
         <AuthProvider>
