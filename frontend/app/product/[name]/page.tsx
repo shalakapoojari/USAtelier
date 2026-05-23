@@ -437,7 +437,7 @@ export default function ProductPage({
 
           {/* ── IMAGES CAROUSEL (single-image controlled view) ── */}
           <div
-            className="relative w-full overflow-hidden select-none bg-[#111] aspect-[3/4] md:aspect-[4/5]"
+            className="relative w-full overflow-hidden bg-[#111] aspect-[3/4] md:aspect-[4/5]"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
@@ -445,11 +445,12 @@ export default function ProductPage({
             <img
               src={resolveMediaUrl(images[selectedImage])}
               alt={`${product.name} - View ${selectedImage + 1}`}
-              className="w-full h-full object-cover block transition-opacity duration-300"
+              className="w-full h-full object-cover block transition-opacity duration-300 select-none"
+              draggable={false}
             />
 
             {/* Badges top-left */}
-            <div className="absolute top-4 left-4 flex flex-col gap-2">
+            <div className="absolute top-4 left-4 flex flex-col gap-2 pointer-events-none">
               {(product.newArrival || product.is_new) && (
                 <span className="bg-white text-black text-[10px] uppercase tracking-widest px-3 py-1 font-medium flex items-center gap-1">
                   <Sparkles size={10} />
@@ -473,28 +474,36 @@ export default function ProductPage({
             {images.length > 1 && (
               <>
                 <button
-                  onClick={goToPrevImage}
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); goToPrevImage() }}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onTouchEnd={(e) => { e.stopPropagation(); goToPrevImage() }}
                   aria-label="Previous image"
-                  className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm border border-white/20 text-white hover:bg-black/80 hover:border-white/50 transition-all duration-200 shadow-lg"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 z-20 flex items-center justify-center w-10 h-10 rounded-full bg-black/60 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 hover:border-white/60 active:scale-95 transition-all duration-200 shadow-lg cursor-pointer pointer-events-auto"
                 >
-                  <ChevronLeft size={18} />
+                  <ChevronLeft size={20} strokeWidth={2.5} />
                 </button>
                 <button
-                  onClick={goToNextImage}
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); goToNextImage() }}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onTouchEnd={(e) => { e.stopPropagation(); goToNextImage() }}
                   aria-label="Next image"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm border border-white/20 text-white hover:bg-black/80 hover:border-white/50 transition-all duration-200 shadow-lg"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 z-20 flex items-center justify-center w-10 h-10 rounded-full bg-black/60 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 hover:border-white/60 active:scale-95 transition-all duration-200 shadow-lg cursor-pointer pointer-events-auto"
                 >
-                  <ChevronRight size={18} />
+                  <ChevronRight size={20} strokeWidth={2.5} />
                 </button>
 
                 {/* Dot indicators */}
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
                   {images.map((_: string, idx: number) => (
                     <button
                       key={idx}
-                      onClick={() => setSelectedImage(idx)}
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setSelectedImage(idx) }}
+                      onTouchEnd={(e) => { e.stopPropagation(); setSelectedImage(idx) }}
                       aria-label={`View image ${idx + 1}`}
-                      className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${
+                      className={`w-2 h-2 rounded-full transition-all duration-200 cursor-pointer pointer-events-auto ${
                         idx === selectedImage
                           ? 'bg-white scale-125'
                           : 'bg-white/40 hover:bg-white/70'
