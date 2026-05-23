@@ -441,13 +441,19 @@ export default function ProductPage({
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
-            {/* Active image */}
-            <img
-              src={resolveMediaUrl(images[selectedImage])}
-              alt={`${product.name} - View ${selectedImage + 1}`}
-              className="w-full h-full object-cover block transition-opacity duration-300 select-none"
-              draggable={false}
-            />
+            {/* All images pre-rendered as stacked layers — browser fetches all upfront,
+                switching is instant CSS opacity, no network wait on arrow click */}
+            {images.map((img: string, idx: number) => (
+              <img
+                key={idx}
+                src={resolveMediaUrl(img)}
+                alt={`${product.name} - View ${idx + 1}`}
+                className={`absolute inset-0 w-full h-full object-cover block select-none transition-opacity duration-150 ${
+                  idx === selectedImage ? "opacity-100" : "opacity-0 pointer-events-none"
+                }`}
+                draggable={false}
+              />
+            ))}
 
             {/* Badges top-left */}
             <div className="absolute top-4 left-4 flex flex-col gap-2 pointer-events-none">
