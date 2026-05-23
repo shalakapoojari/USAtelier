@@ -15,7 +15,7 @@ import { useAuth } from "@/lib/auth-context"
 import { getApiBase, apiFetch } from "@/lib/api-base"
 import { resolveMediaUrl } from "@/lib/media-url"
 
-import { ChevronDown, ChevronUp, ShoppingBag, Heart, Star, Check, Sparkles, Award, ArrowLeft, Loader2, Share2, MessageCircle, Twitter, Facebook, Link2 } from "lucide-react"
+import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ShoppingBag, Heart, Star, Check, Sparkles, Award, ArrowLeft, Loader2, Share2, MessageCircle, Twitter, Facebook, Link2 } from "lucide-react"
 
 const API_BASE = getApiBase()
 
@@ -186,6 +186,32 @@ export default function ProductPage({
       return [product.images]
     }
   })()
+
+  // Shared slugify — must match route resolution logic
+  const slugify = (text: string) =>
+    text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+
+  // Image carousel navigation helpers
+  const goToPrevImage = () =>
+    setSelectedImage((prev) => (prev - 1 + images.length) % images.length)
+  const goToNextImage = () =>
+    setSelectedImage((prev) => (prev + 1) % images.length)
+
+  // Rich-text description renderer: supports **bold** and \n line breaks
+  const renderDescription = (text: string) => {
+    if (!text) return null
+    return text.split('\n').map((line, lineIdx) => {
+      const parts = line.split(/\*\*(.+?)\*\*/g)
+      return (
+        <span key={lineIdx}>
+          {parts.map((part, i) =>
+            i % 2 === 1 ? <strong key={i} className="text-white font-semibold">{part}</strong> : part
+          )}
+          {lineIdx < text.split('\n').length - 1 && <br />}
+        </span>
+      )
+    })
+  }
 
   const SIZE_ORDER = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL", "2XL", "3XL", "4XL", "Free Size", "One Size"]
 
@@ -409,40 +435,75 @@ export default function ProductPage({
       <main className="pt-10 px-6 md:px-12 pb-32">
         <div className="grid md:grid-cols-2 gap-16 lg:gap-24 items-start max-w-350 mx-auto">
 
-          {/* ── IMAGES CAROUSEL ── */}
-          <div className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar space-x-4 md:space-x-0 w-full relative">
-            {images.map((img: string, idx: number) => (
-              <div key={idx} className="relative w-full flex-none snap-center overflow-hidden select-none bg-[#111] aspect-[3/4] md:aspect-[4/5]">
-                <img
-                  src={resolveMediaUrl(img)}
-                  alt={`${product.name} - View ${idx + 1}`}
-                  className="w-full h-full object-cover block"
-                />
-                
-                {/* Badges top-left (only on first image) */}
-                {idx === 0 && (
-                  <div className="absolute top-4 left-4 flex flex-col gap-2">
-                    {(product.newArrival || product.is_new) && (
-                      <span className="bg-white text-black text-[10px] uppercase tracking-widest px-3 py-1 font-medium flex items-center gap-1">
-                        <Sparkles size={10} />
-                        New
-                      </span>
-                    )}
-                    {(product.bestseller || product.is_bestseller) && (
-                      <span className="bg-amber-500 text-black text-[10px] uppercase tracking-widest px-3 py-1 font-medium flex items-center gap-1">
-                        <Award size={10} />
-                        Bestseller
-                      </span>
-                    )}
-                    {!isInStock && (
-                      <span className="bg-white/10 text-white/50 border border-white/20 text-[10px] uppercase tracking-widest px-3 py-1 font-medium">
-                        Out of Stock
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+          {/* ── IMAGES CAROUSEL (single-image controlled view) ── */}
+          <div
+            className="relative w-full overflow-hidden select-none bg-[#111] aspect-[3/4] md:aspect-[4/5]"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            {/* Active image */}
+            <img
+              src={resolveMediaUrl(images[selectedImage])}
+              alt={`${product.name} - View ${selectedImage + 1}`}
+              className="w-full h-full object-cover block transition-opacity duration-300"
+            />
+
+            {/* Badges top-left */}
+            <div className="absolute top-4 left-4 flex flex-col gap-2">
+              {(product.newArrival || product.is_new) && (
+                <span className="bg-white text-black text-[10px] uppercase tracking-widest px-3 py-1 font-medium flex items-center gap-1">
+                  <Sparkles size={10} />
+                  New
+                </span>
+              )}
+              {(product.bestseller || product.is_bestseller) && (
+                <span className="bg-amber-500 text-black text-[10px] uppercase tracking-widest px-3 py-1 font-medium flex items-center gap-1">
+                  <Award size={10} />
+                  Bestseller
+                </span>
+              )}
+              {!isInStock && (
+                <span className="bg-white/10 text-white/50 border border-white/20 text-[10px] uppercase tracking-widest px-3 py-1 font-medium">
+                  Out of Stock
+                </span>
+              )}
+            </div>
+
+            {/* Navigation arrows — only render when there are multiple images */}
+            {images.length > 1 && (
+              <>
+                <button
+                  onClick={goToPrevImage}
+                  aria-label="Previous image"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm border border-white/20 text-white hover:bg-black/80 hover:border-white/50 transition-all duration-200 shadow-lg"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <button
+                  onClick={goToNextImage}
+                  aria-label="Next image"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm border border-white/20 text-white hover:bg-black/80 hover:border-white/50 transition-all duration-200 shadow-lg"
+                >
+                  <ChevronRight size={18} />
+                </button>
+
+                {/* Dot indicators */}
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                  {images.map((_: string, idx: number) => (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedImage(idx)}
+                      aria-label={`View image ${idx + 1}`}
+                      className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${
+                        idx === selectedImage
+                          ? 'bg-white scale-125'
+                          : 'bg-white/40 hover:bg-white/70'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
           {/* ── DETAILS COLUMN ── */}
@@ -649,8 +710,8 @@ export default function ProductPage({
                   {showDescription ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </button>
                 {showDescription && (
-                  <p className="pb-5 text-gray-400 text-sm leading-relaxed">
-                    {product.description}
+                  <p className="pb-5 text-gray-400 text-sm leading-relaxed whitespace-pre-line">
+                    {renderDescription(product.description)}
                   </p>
                 )}
               </div>
@@ -702,7 +763,7 @@ export default function ProductPage({
                   <div className="pb-5 text-gray-400 text-sm space-y-2 leading-relaxed">
                     <p>Complimentary standard shipping on all orders over ₹2,000.</p>
                     <p>Express delivery available at checkout.</p>
-                    <p>Returns accepted within 30 days of delivery. Items must be unworn and in original packaging.</p>
+                    <p>Returns accepted within 7 days of delivery only.</p>
                   </div>
                 )}
               </div>
@@ -841,7 +902,7 @@ export default function ProductPage({
               {relatedProducts.map((p: any) => {
                 const pImages = Array.isArray(p.images) ? p.images : (() => { try { return JSON.parse(p.images) } catch { return [p.images] } })()
                 return (
-                  <Link key={p.id} href={`/product/${p.id}`} className="group block">
+                  <Link key={p.id} href={`/product/${encodeURIComponent(slugify(p.name))}`} className="group block">
                     <div className="relative aspect-3/4 overflow-hidden mb-4 bg-[#111]">
                       <Image
                         src={resolveMediaUrl(pImages[0])}

@@ -49,7 +49,7 @@ export default function OrdersPage() {
   }, [isAuthLoading])
 
   const [activeTab, setActiveTab] = useState<
-    "all" | "pending" | "completed"
+    "all" | "pending" | "completed" | "cancelled"
   >("all")
 
   const filteredOrders = orders.filter((order) => {
@@ -58,6 +58,8 @@ export default function OrdersPage() {
       return !["shipped", "delivered", "cancelled", "refunded", "out for delivery", "returned"].includes(s)
     if (activeTab === "completed")
       return ["shipped", "delivered", "out for delivery"].includes(s)
+    if (activeTab === "cancelled")
+      return ["cancelled", "refunded", "returned"].includes(s)
     return true
   })
 
@@ -123,6 +125,25 @@ export default function OrdersPage() {
               (o) => {
                 const s = (o.status || "").toLowerCase()
                 return ["shipped", "delivered", "out for delivery"].includes(s)
+              }
+            ).length
+          }
+          )
+        </button>
+
+        <button
+          onClick={() => setActiveTab("cancelled")}
+          className={`${tabBase} ${activeTab === "cancelled"
+              ? "text-white border-b border-white"
+              : "text-gray-500 hover:text-white"
+            }`}
+        >
+          Cancelled / Returned (
+          {
+            orders.filter(
+              (o) => {
+                const s = (o.status || "").toLowerCase()
+                return ["cancelled", "refunded", "returned"].includes(s)
               }
             ).length
           }
