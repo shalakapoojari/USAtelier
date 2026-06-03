@@ -679,6 +679,31 @@ with app.app_context():
     except Exception as exc:
         app.logger.error("MySQL create_all failed: %s", exc)
 
+    # --- Auto-migration: add display_order column if missing ----------------
+    try:
+        db_mysql.session.execute(text(
+            "SELECT display_order FROM products LIMIT 1"
+        ))
+        db_mysql.session.commit()
+    except Exception:
+        db_mysql.session.rollback()
+        try:
+            db_mysql.session.execute(text(
+                "ALTER TABLE products ADD COLUMN display_order INT DEFAULT 0"
+            ))
+            # Initialise display_order for existing rows based on id
+            db_mysql.session.execute(text(
+                "UPDATE products SET display_order = id WHERE display_order = 0 OR display_order IS NULL"
+            ))
+            db_mysql.session.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_products_display_order ON products (display_order)"
+            ))
+            db_mysql.session.commit()
+            app.logger.info("Migration: display_order column added to products")
+        except Exception as mig_exc:
+            db_mysql.session.rollback()
+            app.logger.warning("Migration display_order skipped: %s", mig_exc)
+
 
 def seed_database():
     admin_email    = os.getenv("ADMIN_EMAIL")
@@ -1559,7 +1584,7 @@ def get_products():
     elif sort_raw == "price_desc":
         q = q.order_by(ProductSQL.price.desc())
     else:
-        q = q.order_by(ProductSQL.created_at.desc())
+        q = q.order_by(ProductSQL.display_order.asc(), ProductSQL.created_at.desc())
 
     return jsonify([p.to_dict() for p in q.all()])
 
@@ -1636,12 +1661,17 @@ def add_product():
             images           = images,
             sizes            = sizes_data,
             stock            = sum(int(v) for v in sizes_data.values() if str(v).isdigit()) if isinstance(sizes_data, dict) else int(data.get("stock", 0)),
+            display_order    = 0,
             is_featured      = bool(data.get("featured", data.get("is_featured", False))),
             is_new           = bool(data.get("newArrival", data.get("is_new", False))),
             is_bestseller    = bool(data.get("bestseller", data.get("is_bestseller", False))),
             fabric           = fabric,
             care             = care,
             size_guide_image = _sanitise_str(data.get("sizeGuideImage", data.get("size_guide_image", "")), 500),
+        )
+        # Shift all existing products down so the new one appears at top
+        db_mysql.session.execute(
+            text("UPDATE products SET display_order = display_order + 1")
         )
         db_mysql.session.add(new_product)
         db_mysql.session.flush()   # get new_product.id before audit
@@ -1739,6 +1769,47 @@ def delete_product(product_id):
     except Exception as exc:
         db_mysql.session.rollback()
         return jsonify({"error": "Delete failed"}), 500
+
+
+@app.route("/api/products/reorder", methods=["PATCH"])
+@csrf.exempt
+@admin_required
+def reorder_products():
+    """
+    Batch-update display_order for all products.
+    Expects JSON body: { "order": [ {"id": 1, "display_order": 0}, ... ] }
+    """
+    data = request.get_json() or {}
+    order_list = data.get("order", [])
+
+    if not isinstance(order_list, list) or len(order_list) == 0:
+        return jsonify({"error": "order must be a non-empty list"}), 400
+
+    # Validate structure
+    for entry in order_list:
+        if not isinstance(entry, dict):
+            return jsonify({"error": "Each entry must be an object with id and display_order"}), 400
+        if "id" not in entry or "display_order" not in entry:
+            return jsonify({"error": "Each entry must have id and display_order"}), 400
+        try:
+            int(entry["id"])
+            int(entry["display_order"])
+        except (TypeError, ValueError):
+            return jsonify({"error": "id and display_order must be integers"}), 400
+
+    try:
+        for entry in order_list:
+            db_mysql.session.execute(
+                text("UPDATE products SET display_order = :order WHERE id = :pid"),
+                {"order": int(entry["display_order"]), "pid": int(entry["id"])}
+            )
+        db_mysql.session.commit()
+        _audit("products_reordered", "product", None, {"count": len(order_list)})
+        return jsonify({"success": True, "message": f"Reordered {len(order_list)} products"}), 200
+    except Exception as exc:
+        db_mysql.session.rollback()
+        app.logger.error("reorder_products_error err=%s", exc)
+        return jsonify({"error": "Reorder failed"}), 500
 
 # ============================================================
 # REVIEWS

@@ -1,8 +1,25 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Image from "next/image"
-import { Plus, X, Loader2, Upload, Link as LinkIcon, Search, Scissors } from "lucide-react"
+import { Plus, X, Loader2, Upload, Link as LinkIcon, Search, Scissors, GripVertical, Save, ArrowUpDown } from "lucide-react"
 import ImageCropperDialog from "@/components/image-cropper-dialog"
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 
 import {
   Dialog,
@@ -58,6 +75,62 @@ type Category = {
 }
 
 
+// ─── Sortable table row for drag-and-drop reordering ────────────────────────
+function SortableProductRow({ product, index, onEdit, onDelete, getImageUrl }: {
+  product: any; index: number; onEdit: (p: any) => void; onDelete: (id: string) => void; getImageUrl: (imgs: any) => string
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: product.id })
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    position: "relative" as const,
+    zIndex: isDragging ? 50 : undefined,
+  }
+
+  return (
+    <tr ref={setNodeRef} style={style} className={`border-b border-white/5 hover:bg-white/4 ${index % 2 === 0 ? "bg-white/2" : ""} ${isDragging ? "!bg-white/10 shadow-2xl" : ""}`}>
+      <td className="px-3 md:px-5 py-4 md:py-6">
+        <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-600 hover:text-white transition-colors p-1 touch-none">
+          <GripVertical size={16} />
+        </button>
+      </td>
+      <td className="px-4 md:px-8 py-4 md:py-6">
+        <div className="flex items-center gap-4 md:gap-6">
+          <div className="relative w-16 h-20 bg-white/5 shrink-0">
+            <Image src={getImageUrl(product.images)} alt={product.name} fill className="object-contain opacity-80" />
+          </div>
+          <div>
+            <p className="font-medium text-sm">{product.name}</p>
+            <p className="text-[10px] tracking-[0.3em] text-gray-600 uppercase mt-1">ID {String(product.id).slice(-6)}</p>
+          </div>
+        </div>
+      </td>
+      <td className="px-4 md:px-8 py-4 md:py-6 text-xs tracking-widest">
+        {product.category}
+        {product.subcategory && <span className="text-gray-600 block text-[9px] mt-1 italic">{product.subcategory}</span>}
+      </td>
+      <td className="px-4 md:px-8 py-4 md:py-6 font-mono text-xs">₹{product.price?.toLocaleString('en-IN')}</td>
+      <td className="px-4 md:px-8 py-4 md:py-6 text-[10px] tracking-widest text-gray-500 uppercase">
+        {[product.is_featured && "Featured", product.is_new && "New", product.is_bestseller && "Best"].filter(Boolean).join(" · ") || "—"}
+      </td>
+      <td className="px-4 md:px-8 py-4 md:py-6 text-[10px] tracking-widest uppercase">
+        {product.stock > 0 ? <span className="text-white">In Stock ({product.stock})</span> : <span className="text-red-500/60">Sold Out</span>}
+      </td>
+      <td className="px-4 md:px-8 py-4 md:py-6 text-right space-x-4 whitespace-nowrap">
+        <button onClick={() => onEdit(product)} className="uppercase tracking-widest text-[10px] text-gray-400 hover:text-white transition-colors">
+          Edit
+        </button>
+        <button onClick={() => onDelete(product.id)} className="uppercase tracking-widest text-[10px] text-red-400/40 hover:text-red-400 transition-colors">
+          Delete
+        </button>
+      </td>
+    </tr>
+  )
+}
+
+
 export default function ProductsPage() {
   const API_BASE = getApiBase()
 
@@ -77,6 +150,16 @@ export default function ProductsPage() {
   const [pendingCropFile, setPendingCropFile] = useState<File | null>(null)
   const [pendingCropIndex, setPendingCropIndex] = useState<number>(-1)
   const [isSizeGuideSlot, setIsSizeGuideSlot] = useState(false)
+
+  // Reorder mode
+  const [reorderMode, setReorderMode] = useState(false)
+  const [reorderProducts, setReorderProducts] = useState<any[]>([])
+  const [isSavingOrder, setIsSavingOrder] = useState(false)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
 
   const [formData, setFormData] = useState({
     name: "",
@@ -403,6 +486,55 @@ export default function ProductsPage() {
     return matchesSearch && matchesCategory
   })
 
+  // ─── Reorder helpers ──────────────────────────────────────────────────
+  const enterReorderMode = useCallback(() => {
+    const sorted = [...products].sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
+    setReorderProducts(sorted)
+    setReorderMode(true)
+  }, [products])
+
+  const exitReorderMode = () => {
+    setReorderMode(false)
+    setReorderProducts([])
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setReorderProducts(prev => {
+      const oldIndex = prev.findIndex((p: any) => p.id === active.id)
+      const newIndex = prev.findIndex((p: any) => p.id === over.id)
+      return arrayMove(prev, oldIndex, newIndex)
+    })
+  }
+
+  const handleSaveOrder = async () => {
+    setIsSavingOrder(true)
+    try {
+      const orderPayload = reorderProducts.map((p: any, idx: number) => ({
+        id: p.id,
+        display_order: idx,
+      }))
+      const res = await apiFetch(API_BASE, "/api/products/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order: orderPayload }),
+      })
+      if (res.ok) {
+        showToast("Product order saved", "info")
+        setReorderMode(false)
+        fetchProducts()
+      } else {
+        const data = await res.json()
+        showToast(data.error || "Failed to save order", "info")
+      }
+    } catch {
+      showToast("Network error", "info")
+    } finally {
+      setIsSavingOrder(false)
+    }
+  }
+
   return (
     <>
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen px-4 sm:px-6 md:px-8 py-10 md:py-16">
@@ -415,6 +547,38 @@ export default function ProductsPage() {
           <p className="mt-4 text-sm tracking-widest text-gray-500">
             Editorial product catalog Management.
           </p>
+        </div>
+
+        {/* Reorder Controls */}
+        <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
+          {reorderMode ? (
+            <>
+              <Button
+                onClick={exitReorderMode}
+                variant="outline"
+                className="border-white/20 text-gray-400 hover:text-white hover:bg-white/5 px-6 py-6 uppercase tracking-widest text-xs transition-all rounded-none"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveOrder}
+                disabled={isSavingOrder}
+                className="bg-emerald-600 text-white hover:bg-emerald-500 px-8 py-6 uppercase tracking-widest text-xs transition-all rounded-none flex items-center gap-2"
+              >
+                {isSavingOrder ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+                Save Order
+              </Button>
+            </>
+          ) : (
+            <Button
+              onClick={enterReorderMode}
+              variant="outline"
+              className="border-white/20 text-gray-400 hover:text-white hover:bg-white/5 px-6 py-6 uppercase tracking-widest text-xs transition-all rounded-none flex items-center gap-2"
+            >
+              <ArrowUpDown size={14} />
+              Reorder
+            </Button>
+          )}
         </div>
 
         <Dialog open={dialogOpen} onOpenChange={(open) => {
@@ -797,8 +961,8 @@ export default function ProductsPage() {
         </Dialog>
       </div>
 
-      {/* Filter Bar */}
-      <div className="max-w-350 mx-auto mb-12 flex flex-col md:flex-row gap-8 items-start md:items-end justify-between border-t border-white/5 pt-12">
+      {/* Filter Bar — hidden in reorder mode */}
+      {!reorderMode && <div className="max-w-350 mx-auto mb-12 flex flex-col md:flex-row gap-8 items-start md:items-end justify-between border-t border-white/5 pt-12">
         <div className="space-y-4 w-full md:w-96">
           <p className="text-[10px] uppercase tracking-[0.3em] text-gray-500">Search Catalog</p>
           <div className="relative group">
@@ -826,14 +990,56 @@ export default function ProductsPage() {
             </SelectContent>
           </Select>
         </div>
-      </div>
+      </div>}
 
+      {/* Reorder Mode Info Banner */}
+      {reorderMode && (
+        <div className="max-w-350 mx-auto mb-8 border-t border-white/5 pt-12">
+          <div className="flex items-center gap-3 p-4 border border-emerald-500/20 bg-emerald-950/30">
+            <ArrowUpDown size={14} className="text-emerald-400 shrink-0" />
+            <p className="text-xs uppercase tracking-[0.2em] text-emerald-400/80">
+              Drag products to reorder · {reorderProducts.length} products · Click &quot;Save Order&quot; when done
+            </p>
+          </div>
+        </div>
+      )}
+
+      {reorderMode ? (
+      <div className="max-w-350 mx-auto border border-white/10 overflow-x-auto">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-white/10">
+                <th className="px-3 md:px-5 py-4 md:py-6 text-left uppercase tracking-widest text-xs text-gray-500 w-12"></th>
+                {["Product", "Category", "Price", "Tags", "Stock", ""].map((h, i) => (
+                  <th key={`${h}-${i}`} className="px-4 md:px-8 py-4 md:py-6 text-left uppercase tracking-widest text-xs text-gray-500">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <SortableContext items={reorderProducts.map((p: any) => p.id)} strategy={verticalListSortingStrategy}>
+              <tbody>
+                {reorderProducts.map((p: any, i: number) => (
+                  <SortableProductRow
+                    key={p.id}
+                    product={p}
+                    index={i}
+                    onEdit={handleEditProduct}
+                    onDelete={handleDeleteProduct}
+                    getImageUrl={getImageUrl}
+                  />
+                ))}
+              </tbody>
+            </SortableContext>
+          </table>
+        </DndContext>
+      </div>
+      ) : (
       <div className="max-w-350 mx-auto border border-white/10 overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-white/10">
-              {["Product", "Category", "Price", "Tags", "Stock", ""].map(h => (
-                <th key={h} className="px-4 md:px-8 py-4 md:py-6 text-left uppercase tracking-widest text-xs text-gray-500">{h}</th>
+              {["Product", "Category", "Price", "Tags", "Stock", ""].map((h, i) => (
+                <th key={`${h}-${i}`} className="px-4 md:px-8 py-4 md:py-6 text-left uppercase tracking-widest text-xs text-gray-500">{h}</th>
               ))}
             </tr>
           </thead>
@@ -855,13 +1061,15 @@ export default function ProductsPage() {
               </tr>
             ) : filteredProductsList.map((p, i) => (
               <tr key={p.id} className={`border-b border-white/5 hover:bg-white/4 ${i % 2 === 0 ? "bg-white/2" : ""}`}>
-                <td className="px-4 md:px-8 py-4 md:py-6 flex items-center gap-4 md:gap-6">
-                  <div className="relative w-16 h-20 bg-white/5">
-                    <Image src={getImageUrl(p.images)} alt={p.name} fill className="object-contain opacity-80" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">{p.name}</p>
-                    <p className="text-[10px] tracking-[0.3em] text-gray-600 uppercase mt-1">ID {String(p.id).slice(-6)}</p>
+                <td className="px-4 md:px-8 py-4 md:py-6">
+                  <div className="flex items-center gap-4 md:gap-6">
+                    <div className="relative w-16 h-20 bg-white/5 shrink-0">
+                      <Image src={getImageUrl(p.images)} alt={p.name} fill className="object-contain opacity-80" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{p.name}</p>
+                      <p className="text-[10px] tracking-[0.3em] text-gray-600 uppercase mt-1">ID {String(p.id).slice(-6)}</p>
+                    </div>
                   </div>
                 </td>
                 <td className="px-4 md:px-8 py-4 md:py-6 text-xs tracking-widest">
@@ -888,6 +1096,7 @@ export default function ProductsPage() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
 
     <ImageCropperDialog

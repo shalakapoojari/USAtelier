@@ -117,6 +117,7 @@ class Product(db_mysql.Model):
     sizes            = db_mysql.Column(db_mysql.JSON, default=dict)
 
     stock            = db_mysql.Column(db_mysql.Integer, default=0)
+    display_order    = db_mysql.Column(db_mysql.Integer, default=0, index=True)
     is_featured      = db_mysql.Column(db_mysql.Boolean, default=False)
     is_new           = db_mysql.Column(db_mysql.Boolean, default=False)
     is_bestseller    = db_mysql.Column(db_mysql.Boolean, default=False)
@@ -196,6 +197,8 @@ class Product(db_mysql.Model):
             "is_bestseller": bool(self.is_bestseller),
             "fabric":        self.fabric or "",
             "care":          self.care or "",
+            # Display order for admin manual reordering
+            "display_order": self.display_order if self.display_order is not None else 0,
             # Size guide — both spellings
             "sizeGuideImage":  _fix_url(self.size_guide_image),
             "size_guide_image": _fix_url(self.size_guide_image),
