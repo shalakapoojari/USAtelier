@@ -226,6 +226,7 @@ class Payment(db_mysql.Model):
     phone                 = db_mysql.Column(db_mysql.String(50), nullable=True)
     error_code            = db_mysql.Column(db_mysql.String(100), nullable=True)
     error_description     = db_mysql.Column(db_mysql.Text, nullable=True)
+    checkout_payload_json = db_mysql.Column(db_mysql.Text, nullable=True)
     created_at            = db_mysql.Column(db_mysql.DateTime, default=datetime.utcnow)
     updated_at            = db_mysql.Column(db_mysql.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -242,6 +243,7 @@ class Payment(db_mysql.Model):
             "method":              self.method,
             "email":               self.email,
             "phone":               self.phone,
+            "checkout_payload":     json.loads(self.checkout_payload_json) if self.checkout_payload_json else None,
             "created_at":          self.created_at.isoformat() if self.created_at else None,
             "updated_at":          self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -261,6 +263,9 @@ class Order(db_mysql.Model):
     total                 = db_mysql.Column(db_mysql.Float, nullable=False)
     status                = db_mysql.Column(db_mysql.String(50), default="Pending")
     payment_status        = db_mysql.Column(db_mysql.String(50), default="Pending")
+    payment_method        = db_mysql.Column(db_mysql.String(20), default="prepaid")
+    cod_fee               = db_mysql.Column(db_mysql.Float, default=0.0)
+    cod_collectable_amount = db_mysql.Column(db_mysql.Float, default=0.0)
     shipping_address_json = db_mysql.Column(db_mysql.Text)
     coupon_code           = db_mysql.Column(db_mysql.String(50), nullable=True)
     discount_amount       = db_mysql.Column(db_mysql.Float, default=0.0)
@@ -290,6 +295,9 @@ class Order(db_mysql.Model):
             "total":                  self.total,
             "status":                 self.status,
             "payment_status":         self.payment_status,
+            "payment_method":         self.payment_method,
+            "cod_fee":                self.cod_fee,
+            "cod_collectable_amount": self.cod_collectable_amount,
             "razorpay_payment_id":    self.razorpay_payment_id,
             "shipping_address":       self.shipping_address,
             "delhivery_tracking_url": self.delhivery_tracking_url,

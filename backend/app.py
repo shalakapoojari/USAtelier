@@ -580,6 +580,9 @@ def _run_dispatch_job(job_id: int):
                 delivery_location=delivery_location,
                 customer_phone=customer_phone,
                 customer_name=customer_name,
+                payment_mode="COD" if (order.payment_method or "").lower() == "cod" else "Prepaid",
+                cod_amount=order.cod_collectable_amount or 0,
+                order_amount=order.total or 0,
                 existing_shipment_id=order.delhivery_shipment_id,
                 existing_tracking_url=order.delhivery_tracking_url,
             )
@@ -703,6 +706,26 @@ with app.app_context():
         except Exception as mig_exc:
             db_mysql.session.rollback()
             app.logger.warning("Migration display_order skipped: %s", mig_exc)
+
+    migration_columns = [
+        ("orders", "payment_method", "ALTER TABLE orders ADD COLUMN payment_method VARCHAR(20) DEFAULT 'prepaid'"),
+        ("orders", "cod_fee", "ALTER TABLE orders ADD COLUMN cod_fee FLOAT DEFAULT 0"),
+        ("orders", "cod_collectable_amount", "ALTER TABLE orders ADD COLUMN cod_collectable_amount FLOAT DEFAULT 0"),
+        ("payments", "checkout_payload_json", "ALTER TABLE payments ADD COLUMN checkout_payload_json TEXT"),
+    ]
+    for table_name, column_name, alter_sql in migration_columns:
+        try:
+            db_mysql.session.execute(text(f"SELECT {column_name} FROM {table_name} LIMIT 1"))
+            db_mysql.session.commit()
+        except Exception:
+            db_mysql.session.rollback()
+            try:
+                db_mysql.session.execute(text(alter_sql))
+                db_mysql.session.commit()
+                app.logger.info("Migration: %s.%s column added", table_name, column_name)
+            except Exception as mig_exc:
+                db_mysql.session.rollback()
+                app.logger.warning("Migration %s.%s skipped: %s", table_name, column_name, mig_exc)
 
 
 def seed_database():
@@ -2249,12 +2272,14 @@ def create_razorpay_order():
         })
         try:
             user_id = session.get("user_id")
+            checkout_payload = data.get("checkoutPayload") if isinstance(data.get("checkoutPayload"), dict) else None
             payment = Payment(
                 user_id=int(user_id) if user_id else None,
                 razorpay_order_id=rzp_order.get("id"),
                 amount=amount,
                 currency="INR",
                 status="pending",
+                checkout_payload_json=json.dumps(checkout_payload) if checkout_payload else None,
             )
             db_mysql.session.add(payment)
             db_mysql.session.commit()
@@ -2562,6 +2587,27 @@ def razorpay_webhook():
             ).first()
 
             if existing and existing.status == "captured":
+                linked_order = OrderSQL.query.filter_by(razorpay_payment_id=rzp_payment_id).first()
+                if not linked_order and existing.checkout_payload_json:
+                    try:
+                        checkout_payload = json.loads(existing.checkout_payload_json)
+                        checkout_payload["razorpay_order_id"] = rzp_order_id
+                        checkout_payload["razorpay_payment_id"] = rzp_payment_id
+                        checkout_payload["idempotencyKey"] = checkout_payload.get("idempotencyKey") or rzp_order_id
+                        response, status = _finalize_order_from_payload(
+                            checkout_payload,
+                            require_signature=False,
+                            verified_payment=pp,
+                        )
+                        if 200 <= status < 300:
+                            app.logger.info("PAYMENT_RECOVERED_FROM_EXISTING_ROW payment=%s", rzp_payment_id)
+                            return jsonify({"success": True}), 200
+                    except Exception as recover_exc:
+                        app.logger.exception(
+                            "PAYMENT_EXISTING_ROW_RECOVERY_FAILED payment=%s err=%s",
+                            rzp_payment_id,
+                            recover_exc,
+                        )
 
                 app.logger.info(
                     "PAYMENT_ALREADY_CAPTURED payment=%s",
@@ -2631,6 +2677,25 @@ def razorpay_webhook():
                     rzp_payment_id,
                     amount
                 )
+                if payment.checkout_payload_json:
+                    checkout_payload = json.loads(payment.checkout_payload_json)
+                    checkout_payload["razorpay_order_id"] = rzp_order_id
+                    checkout_payload["razorpay_payment_id"] = rzp_payment_id
+                    checkout_payload["idempotencyKey"] = checkout_payload.get("idempotencyKey") or rzp_order_id
+                    response, status = _finalize_order_from_payload(
+                        checkout_payload,
+                        require_signature=False,
+                        verified_payment=pp,
+                    )
+                    if 200 <= status < 300:
+                        app.logger.info("ORPHAN_PAYMENT_RECOVERED payment=%s", rzp_payment_id)
+                        return jsonify({"success": True}), 200
+                    app.logger.error(
+                        "ORPHAN_PAYMENT_RECOVERY_FAILED payment=%s status=%s body=%s",
+                        rzp_payment_id,
+                        status,
+                        response.get_data(as_text=True)[:500],
+                    )
 
             db_mysql.session.commit()
 
@@ -2890,6 +2955,12 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
     if not bool(data.get("termsAccepted")):
         return jsonify({"error": "Terms and Conditions must be accepted"}), 400
 
+    payment_method = _sanitise_str(data.get("paymentMethod", "prepaid"), 20).lower()
+    if payment_method not in ("prepaid", "cod"):
+        return jsonify({"error": "Invalid payment method"}), 400
+    is_cod = payment_method == "cod"
+    cod_fee = 150.0 if is_cod else 0.0
+
     idempotency_key = _sanitise_str(data.get("idempotencyKey", ""), 64) or None
     if idempotency_key:
         existing_order = OrderSQL.query.filter_by(idempotency_key=idempotency_key).first()
@@ -2918,15 +2989,17 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
     if existing_by_payment:
         return jsonify({"success": True, "orderId": existing_by_payment.order_number, "duplicate": True}), 200
 
-    if not rzp_order_id or not rzp_payment_id:
+    if not is_cod and (not rzp_order_id or not rzp_payment_id):
         return jsonify({"error": "Payment verification required. Please complete payment first."}), 400
-    if require_signature and not rzp_signature:
+    if not is_cod and require_signature and not rzp_signature:
         return jsonify({"error": "Payment verification required. Please complete payment first."}), 400
 
-    if not razorpay_client:
+    if not is_cod and not razorpay_client:
         return jsonify({"error": "Payment gateway not configured"}), 500
 
-    if require_signature:
+    if is_cod:
+        payment_status = "COD Pending"
+    elif require_signature:
         try:
             razorpay_client.utility.verify_payment_signature({
                 "razorpay_order_id":   rzp_order_id,
@@ -2935,11 +3008,11 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
             })
         except Exception:
             return jsonify({"error": "Payment verification failed. Please try again."}), 400
+        payment_status = "Paid"
     else:
         if verified_payment.get("status") not in ("captured", "authorized"):
             return jsonify({"error": "Captured payment verification failed"}), 400
-
-    payment_status = "Paid"
+        payment_status = "Paid"
 
     addr             = data.get("shippingAddress") or {}
     delivery_pincode = _sanitise_str(str(addr.get("zip", "")), 10)
@@ -3067,11 +3140,11 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
     else:
         expected_tax = discounted_subtotal * 0.05
 
-    expected_min = discounted_subtotal + expected_shipping + expected_tax - 1.0
+    expected_min = discounted_subtotal + expected_shipping + expected_tax + cod_fee - 1.0
     if client_total < expected_min:
         db_mysql.session.rollback()
         return jsonify({"error": "Order total mismatch"}), 400
-    if verified_amount is not None and verified_amount + 1.0 < client_total:
+    if not is_cod and verified_amount is not None and verified_amount + 1.0 < client_total:
         db_mysql.session.rollback()
         return jsonify({"error": "Payment amount is lower than order total"}), 400
 
@@ -3085,6 +3158,9 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
             total             = client_total,
             status            = "Pickup",
             payment_status    = payment_status,
+            payment_method    = payment_method,
+            cod_fee           = cod_fee,
+            cod_collectable_amount = client_total if is_cod else 0.0,
             shipping_address  = addr,
             coupon_code       = coupon_code,
             discount_amount   = discount_amount,

@@ -230,6 +230,9 @@ def create_shipment(
     customer_name: str,
     weight_kg: float = 1.0,
     items_description: str = "Apparel",
+    payment_mode: str = "Prepaid",
+    cod_amount: float = 0.0,
+    order_amount: float | None = None,
     existing_shipment_id: str = None,
     existing_tracking_url: str = None,
 ) -> dict:
@@ -356,6 +359,9 @@ def create_shipment(
     pickup_state = pickup_location.get("state") or os.getenv("STORE_STATE") or "Maharashtra"
     pickup_address = pickup_location.get("address") or os.getenv("STORE_ADDRESS") or "Default Store Address"
     seller_gst = os.getenv("SELLER_GST_TIN", "")
+    clean_payment_mode = "COD" if str(payment_mode).strip().lower() == "cod" else "Prepaid"
+    clean_cod_amount = max(0.0, float(cod_amount or 0))
+    clean_order_amount = max(clean_cod_amount, float(order_amount if order_amount is not None else clean_cod_amount or 100))
 
     shipment_data = {
         "shipments": [{
@@ -367,9 +373,9 @@ def create_shipment(
             "country":          "India",
             "phone":            str(customer_phone).strip(),
             "order":            str(order_id),
-            "payment_mode":     "Prepaid",
-            "cod_amount":       "0",
-            "total_amount":     max(100, float(weight_kg) * 100),
+            "payment_mode":     clean_payment_mode,
+            "cod_amount":       f"{clean_cod_amount:.2f}" if clean_payment_mode == "COD" else "0",
+            "total_amount":     f"{clean_order_amount:.2f}",
             "weight":           weight_kg,
             "shipment_length":  10,
             "shipment_width":   10,
@@ -377,7 +383,7 @@ def create_shipment(
             "quantity":         1,
             "product_desc":     items_description,
             "shipping_mode":    "Surface",
-            "cod_info":         "",
+            "cod_info":         f"{clean_cod_amount:.2f}" if clean_payment_mode == "COD" else "",
             # Return address (required by Delhivery)
             "return_pin":       pickup_pin,
             "return_city":      pickup_city,
