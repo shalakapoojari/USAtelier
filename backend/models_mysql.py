@@ -536,7 +536,11 @@ class Coupon(db_mysql.Model):
         """
         if not self.is_active:
             return False, "Coupon is inactive"
-        if self.expires_at and self.expires_at < datetime.now(timezone.utc):
+        now = datetime.utcnow()
+        expires_at = self.expires_at
+        if expires_at and expires_at.tzinfo is not None:
+            expires_at = expires_at.astimezone(timezone.utc).replace(tzinfo=None)
+        if expires_at and expires_at < now:
             return False, "Coupon has expired"
         if self.max_uses is not None and self.uses >= self.max_uses:
             return False, "Coupon usage limit reached"

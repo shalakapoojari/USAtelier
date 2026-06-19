@@ -1,11 +1,11 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { Shield, Truck, CheckCircle, MapPin, CreditCard, Package, ChevronRight, AlertTriangle, WifiOff } from "lucide-react"
+import { Shield, Truck, CheckCircle, MapPin, CreditCard, Package, ChevronRight, AlertTriangle, WifiOff, Tag, X } from "lucide-react"
 
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
@@ -66,6 +66,7 @@ export default function CheckoutPage() {
 
   // ─ sessionStorage key for form persistence across reloads
   const FORM_KEY = "checkout_form_draft"
+  const PENDING_PAYMENT_KEY = "checkout_pending_payment"
 
   const [formData, setFormData] = useState(() => {
     // Restore from sessionStorage if available (survives F5 but not tab close)
@@ -112,16 +113,22 @@ export default function CheckoutPage() {
   const [pincodeStatus, setPincodeStatus] = useState<"idle" | "checking" | "valid" | "invalid">("idle")
   const [pincodeMessage, setPincodeMessage] = useState("")
   const [shippingEstimate, setShippingEstimate] = useState<any>(null)
+  const [couponCode, setCouponCode] = useState("")
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null)
+  const [couponMessage, setCouponMessage] = useState("")
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
 
   const isMumbai = formData.zip.startsWith("400") || formData.zip.startsWith("401")
   const isOut = formData.zip.length === 6 && !isMumbai
-  const cgst = shippingEstimate?.cgst ?? (isMumbai ? total * 0.025 : 0)
-  const sgst = shippingEstimate?.sgst ?? (isMumbai ? total * 0.025 : 0)
-  const igst = shippingEstimate?.igst ?? (isOut ? total * 0.05 : 0)
+  const discountAmount = appliedCoupon?.discount_amount ?? 0
+  const discountedSubtotal = Math.max(0, total - discountAmount)
+  const cgst = shippingEstimate?.cgst ?? (isMumbai ? discountedSubtotal * 0.025 : 0)
+  const sgst = shippingEstimate?.sgst ?? (isMumbai ? discountedSubtotal * 0.025 : 0)
+  const igst = shippingEstimate?.igst ?? (isOut ? discountedSubtotal * 0.05 : 0)
   const tax = shippingEstimate?.tax_total ?? (cgst + sgst + igst)
 
-  const shipping = shippingEstimate?.shipping_cost ?? (total >= 2000 ? 0 : 149)
-  const grandTotal = total + shipping + tax
+  const shipping = shippingEstimate?.shipping_cost ?? (discountedSubtotal >= 2000 ? 0 : 149)
+  const grandTotal = discountedSubtotal + shipping + tax
 
   useEffect(() => {
     if (user) {
@@ -139,6 +146,110 @@ export default function CheckoutPage() {
       }))
     }
   }, [user])
+
+  const buildCheckoutPayload = (payment?: any) => ({
+    email: formData.email,
+    phone: formData.phone,
+    total: grandTotal,
+    idempotencyKey: payment?.razorpay_order_id,
+    items: items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      size: item.size,
+      quantity: item.quantity,
+      price: item.price,
+      image: item.image,
+    })),
+    shippingAddress: {
+      ...formData,
+      street: formData.address,
+    },
+    termsAccepted: checkoutTermsAccepted,
+    couponCode: appliedCoupon?.code || couponCode.trim().toUpperCase() || undefined,
+    razorpay_order_id: payment?.razorpay_order_id,
+    razorpay_payment_id: payment?.razorpay_payment_id,
+    razorpay_signature: payment?.razorpay_signature,
+  })
+
+  const completeSuccessfulOrder = async (orderId: string, paymentId?: string) => {
+    sessionStorage.setItem("lastOrder", JSON.stringify({
+      orderId,
+      items,
+      subtotal: total,
+      discount: discountAmount,
+      couponCode: appliedCoupon?.code || "",
+      shipping,
+      tax,
+      cgst,
+      sgst,
+      igst,
+      total: grandTotal,
+      address: formData,
+      paymentId,
+    }))
+    try {
+      sessionStorage.removeItem(FORM_KEY)
+      localStorage.removeItem(PENDING_PAYMENT_KEY)
+    } catch { /* ignore */ }
+    trackCheckout()
+    clearCart()
+    await refreshUser()
+    router.push(`/account/orders/${orderId}`)
+  }
+
+  useEffect(() => {
+    if (!isHydrated) return
+    let cancelled = false
+
+    const recoverPendingPayment = async () => {
+      let pending: any = null
+      try {
+        const raw = localStorage.getItem(PENDING_PAYMENT_KEY)
+        if (!raw) return
+        pending = JSON.parse(raw)
+      } catch {
+        return
+      }
+
+      if (!pending?.razorpay_order_id && !pending?.razorpay_payment_id) return
+      setIsProcessing(true)
+      setGlobalError("Checking your payment status...")
+
+      try {
+        const res = await apiFetch(API_BASE, "/api/payments/recover-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            razorpay_order_id: pending.razorpay_order_id,
+            razorpay_payment_id: pending.razorpay_payment_id,
+            checkoutPayload: pending.checkoutPayload,
+          }),
+        })
+        const data = await res.json()
+        if (cancelled) return
+
+        if (res.ok && data.order_found && (data.orderId || data.order?.order_number)) {
+          await completeSuccessfulOrder(data.orderId || data.order.order_number, pending.razorpay_payment_id || data.payment?.razorpay_payment_id)
+          return
+        }
+
+        if (data.payment_captured === false) {
+          setGlobalError("")
+          setIsProcessing(false)
+          return
+        }
+
+        setGlobalError(data.message || "We could not recover the pending payment yet. Please try again in a moment.")
+      } catch (err: any) {
+        if (!cancelled) setGlobalError(`Payment recovery check failed: ${err.message || "Unknown error"}`)
+      } finally {
+        if (!cancelled) setIsProcessing(false)
+      }
+    }
+
+    recoverPendingPayment()
+    return () => { cancelled = true }
+  }, [isHydrated])
 
   if (!isHydrated || items.length === 0) {
     return null
@@ -174,7 +285,7 @@ export default function CheckoutPage() {
         apiFetch(API_BASE, "/api/delivery/estimate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pincode, subtotal: total }),
+          body: JSON.stringify({ pincode, subtotal: discountedSubtotal }),
         }),
         apiFetch(API_BASE, "/api/delivery/pincode-lookup", {
           method: "POST",
@@ -210,6 +321,40 @@ export default function CheckoutPage() {
       setPincodeStatus("valid") // fail open
       setPincodeMessage("Delivery will be attempted")
     }
+  }
+
+  const applyCoupon = async () => {
+    const code = couponCode.trim().toUpperCase()
+    if (!code) {
+      setCouponMessage("Enter a coupon code")
+      return
+    }
+    setIsApplyingCoupon(true)
+    setCouponMessage("")
+    try {
+      const res = await apiFetch(API_BASE, "/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, subtotal: total }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Coupon could not be applied")
+      setAppliedCoupon({ ...data, code })
+      setShippingEstimate(null)
+      setCouponMessage(`Coupon applied. You saved ₹${Number(data.discount_amount || 0).toLocaleString("en-IN")}.`)
+    } catch (err: any) {
+      setAppliedCoupon(null)
+      setCouponMessage(err.message || "Coupon could not be applied")
+    } finally {
+      setIsApplyingCoupon(false)
+    }
+  }
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null)
+    setCouponCode("")
+    setCouponMessage("")
+    setShippingEstimate(null)
   }
 
   const validate = () => {
@@ -286,6 +431,14 @@ export default function CheckoutPage() {
       }
 
       const rzpOrder = await orderRes.json()
+      const pendingCheckoutPayload = buildCheckoutPayload({ razorpay_order_id: rzpOrder.id })
+      try {
+        localStorage.setItem(PENDING_PAYMENT_KEY, JSON.stringify({
+          razorpay_order_id: rzpOrder.id,
+          checkoutPayload: pendingCheckoutPayload,
+          createdAt: new Date().toISOString(),
+        }))
+      } catch { /* ignore */ }
 
       // Step 2: Open Razorpay checkout modal
       const options = {
@@ -296,56 +449,27 @@ export default function CheckoutPage() {
         description: `Order for ${items.length} item(s)`,
         order_id: rzpOrder.id,
         handler: async (response: any) => {
+          try {
+            const existing = JSON.parse(localStorage.getItem(PENDING_PAYMENT_KEY) || "{}")
+            localStorage.setItem(PENDING_PAYMENT_KEY, JSON.stringify({
+              ...existing,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              checkoutPayload: buildCheckoutPayload(response),
+              capturedAt: new Date().toISOString(),
+            }))
+          } catch { /* ignore */ }
           // Step 3: Payment successful — create order with payment verification
           try {
             const finalizeRes = await apiFetch(API_BASE, "/api/orders", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                email: formData.email,
-                phone: formData.phone,
-                total: grandTotal,
-                idempotencyKey: response.razorpay_order_id,
-                items: items.map((item) => ({
-                  id: item.id,
-                  name: item.name,
-                  size: item.size,
-                  quantity: item.quantity,
-                  price: item.price,
-                  image: item.image,
-                })),
-                shippingAddress: {
-                  ...formData,
-                  street: formData.address,
-                },
-                termsAccepted: checkoutTermsAccepted,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-              }),
+              body: JSON.stringify(buildCheckoutPayload(response)),
             })
 
             if (finalizeRes.ok) {
               const finalData = await finalizeRes.json()
-              sessionStorage.setItem("lastOrder", JSON.stringify({
-                orderId: finalData.orderId,
-                items,
-                subtotal: total,
-                shipping,
-                tax,
-                cgst,
-                sgst,
-                igst,
-                total: grandTotal,
-                address: formData,
-                paymentId: response.razorpay_payment_id,
-              }))
-              // Clear the form draft — order is confirmed
-              try { sessionStorage.removeItem(FORM_KEY) } catch { /* ignore */ }
-              trackCheckout()  // marks cart as converted for analytics
-              clearCart()
-              await refreshUser()
-              router.push(`/account/orders/${finalData.orderId}`)
+              await completeSuccessfulOrder(finalData.orderId, response.razorpay_payment_id)
             } else {
               const errorData = await finalizeRes.json()
               setGlobalError(errorData.error || "Order creation failed after payment. Contact support.")
@@ -750,6 +874,12 @@ export default function CheckoutPage() {
                   <span>Subtotal ({items.length} items)</span>
                   <span>₹{total.toLocaleString('en-IN')}</span>
                 </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-green-400">
+                    <span>Discount ({appliedCoupon?.code})</span>
+                    <span>-₹{discountAmount.toLocaleString('en-IN')}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span>Shipping</span>
                   <span className="text-green-400 text-xs uppercase tracking-widest">{shipping === 0 ? "Free" : `₹${shipping.toLocaleString('en-IN')}`}</span>
@@ -776,6 +906,54 @@ export default function CheckoutPage() {
                   <span>Total</span>
                   <span className="text-lg">₹{grandTotal.toLocaleString('en-IN')}</span>
                 </div>
+              </div>
+
+              <div className="pt-4 border-t border-white/10 space-y-3">
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-gray-500">
+                  <Tag size={12} />
+                  Coupon Code
+                </div>
+                {appliedCoupon ? (
+                  <div className="flex items-center justify-between gap-3 border border-green-500/30 bg-green-500/5 px-3 py-3">
+                    <div className="min-w-0">
+                      <p className="text-xs uppercase tracking-widest text-green-300 truncate">{appliedCoupon.code}</p>
+                      <p className="text-[10px] uppercase tracking-widest text-green-500 mt-1">₹{discountAmount.toLocaleString("en-IN")} saved</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={removeCoupon}
+                      className="text-green-400/70 hover:text-white transition-colors shrink-0"
+                      aria-label="Remove coupon"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      value={couponCode}
+                      onChange={(e) => {
+                        setCouponCode(e.target.value.toUpperCase())
+                        setCouponMessage("")
+                      }}
+                      placeholder="Enter code"
+                      className="bg-transparent border-white/20 text-white placeholder:text-gray-600 h-11 uppercase"
+                    />
+                    <Button
+                      type="button"
+                      onClick={applyCoupon}
+                      disabled={isApplyingCoupon}
+                      className="border border-white/30 bg-transparent px-4 uppercase tracking-widest text-[10px] hover:bg-white hover:text-black disabled:opacity-50"
+                    >
+                      {isApplyingCoupon ? "Checking" : "Apply"}
+                    </Button>
+                  </div>
+                )}
+                {couponMessage && (
+                  <p className={`text-[10px] uppercase tracking-widest ${appliedCoupon ? "text-green-400" : "text-amber-400"}`}>
+                    {couponMessage}
+                  </p>
+                )}
               </div>
 
               <div className="pt-4 border-t border-white/10 space-y-3">

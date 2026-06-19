@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Package, ShoppingBag, Users, CreditCard, Tag, ArrowLeft } from "lucide-react"
+import { LayoutDashboard, Package, ShoppingBag, Users, CreditCard, Tag, ArrowLeft, BadgePercent } from "lucide-react"
 
 const navItems = [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -10,6 +10,7 @@ const navItems = [
     { href: "/admin/products", label: "Products", icon: Package },
     { href: "/admin/customers", label: "Customers", icon: Users },
     { href: "/admin/payments", label: "Payments", icon: CreditCard },
+    { href: "/admin/coupons", label: "Coupons", icon: BadgePercent },
     { href: "/admin/categories", label: "Categories", icon: Tag },
 ]
 
