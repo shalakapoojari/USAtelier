@@ -2153,6 +2153,7 @@ def list_coupons():
 
 
 @app.route("/api/admin/coupons", methods=["POST"])
+@csrf.exempt
 @admin_required
 def create_coupon():
     data = request.get_json() or {}
@@ -2207,6 +2208,7 @@ def create_coupon():
 
 
 @app.route("/api/admin/coupons/<int:coupon_id>", methods=["DELETE"])
+@csrf.exempt
 @admin_required
 def delete_coupon(coupon_id):
     coupon = Coupon.query.get(coupon_id)

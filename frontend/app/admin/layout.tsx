@@ -13,6 +13,7 @@ import {
   CreditCard,
   Users,
   ArrowLeft,
+  BadgePercent,
   Paintbrush,
   BarChart3,
   ShoppingBag,
@@ -26,6 +27,7 @@ const navItems = [
   ["/admin/categories",     "Categories",     FolderOpen],
   ["/admin/homepage",       "Homepage Design",Paintbrush],
   ["/admin/payments",       "Payments",       CreditCard],
+  ["/admin/coupons",        "Coupons",        BadgePercent],
   ["/admin/customers",      "Customers",      Users],
   ["/admin/cart-analytics", "Cart Analytics", ShoppingBag],
 ] as const
