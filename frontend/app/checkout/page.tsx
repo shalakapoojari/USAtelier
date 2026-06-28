@@ -856,7 +856,7 @@ export default function CheckoutPage() {
                   <h3 className="uppercase tracking-widest text-xs text-gray-400">Payment Method</h3>
                   {[
                     { value: "razorpay" as const, label: "Pay Online (Razorpay)", description: "Credit / Debit card, UPI, Netbanking" },
-                    { value: "cod" as const, label: "Cash on Delivery", description: codFee > 0 ? `+₹${codFee} COD fee` : "No additional fee" },
+                    { value: "cod" as const, label: "Cash on Delivery", description: codFee > 0 ? `+₹${codFee} COD fee` : "+ ₹150 extra charges" },
                   ].map((option) => (
                     <label
                       key={option.value}

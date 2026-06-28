@@ -3274,7 +3274,7 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
     # ── COD fee: ₹50 if discounted subtotal < ₹2000, else free ──────────
     if is_cod:
         discounted_sub_for_cod = max(0.0, computed_subtotal - discount_amount)
-        cod_fee = 50.0 if discounted_sub_for_cod < 2000.0 else 0.0
+        cod_fee = 150.0 if discounted_sub_for_cod < 2000.0 else 0.0
     else:
         cod_fee = 0.0
 
