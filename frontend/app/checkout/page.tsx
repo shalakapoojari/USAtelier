@@ -127,7 +127,7 @@ export default function CheckoutPage() {
   const tax = shippingEstimate?.tax_total ?? (cgst + sgst + igst)
 
   const shipping = shippingEstimate?.shipping_cost ?? (discountedSubtotal >= 2000 ? 0 : 149)
-  const codFee = paymentMethod === "cod" ? (discountedSubtotal < 2000 ? 50 : 0) : 0
+  const codFee = paymentMethod === "cod" ? (discountedSubtotal < 2000 ? 150 : 0) : 0
   const grandTotal = discountedSubtotal + shipping + tax + codFee
 
   useEffect(() => {
