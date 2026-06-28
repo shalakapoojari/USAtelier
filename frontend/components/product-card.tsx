@@ -13,7 +13,7 @@ type ProductCardProps = {
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const [currentImage, setCurrentImage] = useState(0)
+  const [currentImage] = useState(0)
   const rootRef = useRef<HTMLAnchorElement | null>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
 
@@ -73,6 +73,8 @@ export function ProductCard({ product }: ProductCardProps) {
           src={resolveMediaUrl(images[currentImage])}
           alt={product.name}
           fill
+          sizes="(max-width: 767px) 50vw, (max-width: 1279px) 33vw, 25vw"
+          loading="lazy"
           ref={imgRef as any}
           className="object-cover transition-opacity duration-300"
         />
@@ -102,10 +104,7 @@ export function ProductCard({ product }: ProductCardProps) {
           )}
         </div>
 
-        {/* CTA */}
-        <div className="absolute inset-x-0 bottom-0 translate-y-0 transition-transform duration-300 bg-black/80 backdrop-blur-sm py-3 text-center">
-          <span className="text-xs uppercase tracking-widest text-white">View Details</span>
-        </div>
+        {/* CTA removed */}
       </div>
 
       {/* Text info */}

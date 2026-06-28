@@ -710,3 +710,26 @@ class CartSettings(db_mysql.Model):
             "discount_code":            self.discount_code,
             "updated_at":               self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+# ---------------------------------------------------------------------------
+# ProductView  — tracks product page views per session
+# ---------------------------------------------------------------------------
+
+class ProductView(db_mysql.Model):
+    __tablename__ = "product_views"
+
+    id         = db_mysql.Column(db_mysql.Integer, primary_key=True)
+    product_id = db_mysql.Column(db_mysql.Integer, db_mysql.ForeignKey("products.id"), nullable=False, index=True)
+    user_id    = db_mysql.Column(db_mysql.Integer, db_mysql.ForeignKey("users.id"), nullable=True)
+    session_id = db_mysql.Column(db_mysql.String(128), nullable=True, index=True)
+    timestamp  = db_mysql.Column(db_mysql.DateTime, default=datetime.utcnow, index=True)
+
+    def to_dict(self):
+        return {
+            "id":         self.id,
+            "product_id": self.product_id,
+            "user_id":    self.user_id,
+            "session_id": self.session_id,
+            "timestamp":  self.timestamp.isoformat() if self.timestamp else None,
+        }

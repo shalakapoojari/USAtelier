@@ -67,6 +67,7 @@ from models_mysql import (
     Review, HomepageConfig, Payment,
     DispatchJob, Coupon, PasswordResetToken, AuditLog,
     CartEvent, AbandonedCartEmail, CartSettings,
+    ProductView,
 )
 from delhivery_utils import create_shipment, calculate_shipping, validate_pincode
 
@@ -651,8 +652,8 @@ def _poll_dispatch_jobs():
                 app.logger.exception("scheduler_error job=%s err=%s", job.id, exc)
 
 
-def _enqueue_dispatch(order_id: int):
-    job = DispatchJob(order_id=order_id)
+def _enqueue_dispatch(order_id: int, max_attempts: int = 5):
+    job = DispatchJob(order_id=order_id, max_attempts=max_attempts)
     db_mysql.session.add(job)
     db_mysql.session.flush()
     return job
@@ -1481,26 +1482,90 @@ def upload_file():
     if not file or file.filename == "":
         return jsonify({"error": "No selected file"}), 400
 
+    # SECURITY: Check file size before reading (10 MB limit)
+    file.seek(0, 2)
+    file_size = file.tell()
+    file.seek(0)
+    if file_size > 10 * 1024 * 1024:
+        return jsonify({"error": "File size exceeds 10 MB limit"}), 400
+
     if not allowed_file(file.filename, file.stream):
         return jsonify({"error": "File type not allowed"}), 400
 
     try:
+        from PIL import Image as PilImage, UnidentifiedImageError
+        import io as _io
+
         products_dir = os.path.join(UPLOAD_FOLDER, "products")
         os.makedirs(products_dir, exist_ok=True)
-        # SECURITY: Use cryptographic random prefix — prevents filename collision attacks
-        rand_prefix = secrets.token_hex(8)
-        filename    = f"{rand_prefix}_{secure_filename(file.filename)}"
-        # SECURITY: Verify final path is inside the upload directory (path traversal guard)
-        final_path = os.path.realpath(os.path.join(products_dir, filename))
-        if not final_path.startswith(os.path.realpath(products_dir)):
-            return jsonify({"error": "Invalid file path"}), 400
-        file.save(final_path)
-        rel_url = f"/uploads/products/{filename}"
-        return jsonify({
-            "success": True,
-            "url":  f"{get_backend_base_url()}{rel_url}",
-            "path": rel_url,
-        }), 200
+
+        # Build safe stem from original filename
+        safe_name = secure_filename(file.filename)
+        stem = safe_name.rsplit(".", 1)[0] if "." in safe_name else safe_name
+        timestamp = int(time.time())
+
+        file_bytes = file.read()
+
+        # Attempt WebP conversion
+        try:
+            img = PilImage.open(_io.BytesIO(file_bytes))
+            original_format = img.format or ""
+
+            if original_format.upper() == "WEBP":
+                # Already WebP — save directly with timestamp naming
+                filename = f"{timestamp}_{stem}.webp"
+                final_path = os.path.realpath(os.path.join(products_dir, filename))
+                if not final_path.startswith(os.path.realpath(products_dir)):
+                    return jsonify({"error": "Invalid file path"}), 400
+                with open(final_path, "wb") as f_out:
+                    f_out.write(file_bytes)
+            else:
+                # Convert to WebP
+                # Handle transparency: RGBA/P modes need special treatment
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGBA")
+                else:
+                    img = img.convert("RGB")
+
+                output = _io.BytesIO()
+                img.save(output, format="WEBP", quality=85)
+                output.seek(0)
+                webp_bytes = output.read()
+
+                filename = f"{timestamp}_{stem}.webp"
+                final_path = os.path.realpath(os.path.join(products_dir, filename))
+                if not final_path.startswith(os.path.realpath(products_dir)):
+                    return jsonify({"error": "Invalid file path"}), 400
+                with open(final_path, "wb") as f_out:
+                    f_out.write(webp_bytes)
+
+            rel_url = f"/uploads/products/{filename}"
+            return jsonify({
+                "success": True,
+                "url":  f"{get_backend_base_url()}{rel_url}",
+                "path": rel_url,
+            }), 200
+
+        except UnidentifiedImageError:
+            return jsonify({"error": "Unsupported image format"}), 400
+        except Exception as conv_exc:
+            # Graceful fallback: save original file
+            app.logger.error("webp_conversion_failed err=%s", conv_exc)
+            original_ext = safe_name.rsplit(".", 1)[-1].lower() if "." in safe_name else "jpg"
+            fallback_filename = f"{timestamp}_{stem}.{original_ext}"
+            fallback_path = os.path.realpath(os.path.join(products_dir, fallback_filename))
+            if not fallback_path.startswith(os.path.realpath(products_dir)):
+                return jsonify({"error": "Invalid file path"}), 400
+            with open(fallback_path, "wb") as f_out:
+                f_out.write(file_bytes)
+            rel_url = f"/uploads/products/{fallback_filename}"
+            return jsonify({
+                "success": True,
+                "url":  f"{get_backend_base_url()}{rel_url}",
+                "path": rel_url,
+                "warning": "Image could not be converted to WebP; original format saved",
+            }), 200
+
     except Exception as exc:
         app.logger.error("upload_error err=%s", exc)
         return jsonify({"error": "Upload failed"}), 500
@@ -2959,7 +3024,7 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
     if payment_method not in ("prepaid", "cod"):
         return jsonify({"error": "Invalid payment method"}), 400
     is_cod = payment_method == "cod"
-    cod_fee = 150.0 if is_cod else 0.0
+    cod_fee = 0.0  # calculated after subtotal is known, placeholder for now
 
     idempotency_key = _sanitise_str(data.get("idempotencyKey", ""), 64) or None
     if idempotency_key:
@@ -2998,7 +3063,7 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
         return jsonify({"error": "Payment gateway not configured"}), 500
 
     if is_cod:
-        payment_status = "COD Pending"
+        payment_status = "COD - Pending"
     elif require_signature:
         try:
             razorpay_client.utility.verify_payment_signature({
@@ -3120,6 +3185,13 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
         else:
             coupon_code = None
 
+    # ── COD fee: ₹50 if discounted subtotal < ₹2000, else free ──────────
+    if is_cod:
+        discounted_sub_for_cod = max(0.0, computed_subtotal - discount_amount)
+        cod_fee = 50.0 if discounted_sub_for_cod < 2000.0 else 0.0
+    else:
+        cod_fee = 0.0
+
     try:
         client_total = float(data.get("total", 0))
     except (TypeError, ValueError):
@@ -3200,7 +3272,7 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
                 coupon_obj.uses += 1
 
         CartItem.query.filter_by(user_id=user.id).delete()
-        _enqueue_dispatch(new_order.id)
+        _enqueue_dispatch(new_order.id, max_attempts=3 if is_cod else 5)
         _audit("order_created", "order", new_order.id, {"order_number": order_number})
         db_mysql.session.commit()
         _poll_dispatch_jobs()
@@ -3741,6 +3813,70 @@ def get_analysis_data():
             for r in monthly_revenue_raw
         ]
 
+        # ---------------- TOTAL ORDERS & REVENUE ----------------
+        total_orders = OrderSQL.query.filter(OrderSQL.status != "Cancelled").count()
+        total_revenue_raw = db_mysql.session.query(
+            func.sum(OrderSQL.total)
+        ).filter(OrderSQL.status != "Cancelled").scalar()
+        total_revenue = round(float(total_revenue_raw or 0), 2)
+
+        # ---------------- TOP BY REVENUE ----------------
+        top_rev_raw = (
+            db_mysql.session.query(
+                OrderItem.product_id,
+                OrderItem.product_name,
+                func.sum(OrderItem.price * OrderItem.quantity).label("total_revenue"),
+            )
+            .join(OrderSQL, OrderSQL.id == OrderItem.order_id)
+            .filter(OrderSQL.status != "Cancelled")
+            .group_by(OrderItem.product_id, OrderItem.product_name)
+            .order_by(func.sum(OrderItem.price * OrderItem.quantity).desc())
+            .limit(10)
+            .all()
+        )
+        top_by_revenue = [
+            {
+                "product_id":   int(r[0]) if r[0] else None,
+                "product_name": r[1] or "Unknown Product",
+                "total_revenue": round(float(r[2] or 0), 2),
+            }
+            for r in top_rev_raw
+        ]
+
+        # ---------------- ABANDONED CART RATE ----------------
+        # Users who added to cart but had no Order within 24h of their first add event
+        from sqlalchemy import func as _func
+        add_events = (
+            db_mysql.session.query(
+                CartEvent.user_email,
+                func.min(CartEvent.timestamp).label("first_add"),
+            )
+            .filter(CartEvent.event_type == "add")
+            .group_by(CartEvent.user_email)
+            .all()
+        )
+
+        total_adders = len(add_events)
+        abandoned = 0
+        if total_adders > 0:
+            for ev in add_events:
+                user_email = ev[0]
+                first_add  = ev[1]
+                if first_add is None:
+                    continue
+                window_end = first_add + timedelta(hours=24)
+                order = OrderSQL.query.join(
+                    User, User.id == OrderSQL.user_id
+                ).filter(
+                    User.email == user_email,
+                    OrderSQL.created_at <= window_end,
+                    OrderSQL.created_at >= first_add,
+                ).first()
+                if order is None:
+                    abandoned += 1
+
+        abandoned_cart_rate = round((abandoned / total_adders) * 100, 1) if total_adders > 0 else None
+
         return jsonify({
             "most_sold": most_sold,
             "most_favorited": most_favorited,
@@ -3750,12 +3886,66 @@ def get_analysis_data():
             "category_stats": category_stats,
             "pie_data": pie_data,
             "monthly_revenue": monthly_revenue,
+            "total_orders": total_orders,
+            "total_revenue": total_revenue,
+            "top_by_revenue": top_by_revenue,
+            "abandoned_cart_rate": abandoned_cart_rate,
         }), 200
 
     except Exception as exc:
         db_mysql.session.rollback()
         app.logger.exception("analysis_error")
         return jsonify({"error": "Analysis data unavailable"}), 500
+
+
+@app.route("/api/admin/analytics/revenue-trend", methods=["GET"])
+@admin_required
+def get_revenue_trend():
+    """Return daily revenue for the last 30 calendar days (UTC), including zero-revenue days."""
+    try:
+        from sqlalchemy import func, cast
+        import sqlalchemy as sa
+
+        today_utc = datetime.utcnow().date()
+        # Generate all 30 dates
+        dates_30 = [(today_utc - timedelta(days=i)) for i in range(29, -1, -1)]
+
+        # Query daily revenue for non-cancelled orders
+        revenue_raw = (
+            db_mysql.session.query(
+                func.date(OrderSQL.created_at).label("day"),
+                func.sum(OrderSQL.total).label("revenue"),
+            )
+            .filter(
+                OrderSQL.status != "Cancelled",
+                OrderSQL.created_at >= datetime.utcnow() - timedelta(days=30),
+            )
+            .group_by(func.date(OrderSQL.created_at))
+            .all()
+        )
+
+        # Build lookup: date_str -> revenue
+        rev_map = {}
+        for row in revenue_raw:
+            if row[0] is not None:
+                day_str = str(row[0])[:10]  # ensure YYYY-MM-DD format
+                rev_map[day_str] = round(float(row[1] or 0), 2)
+
+        # Fill all 30 days
+        result = [
+            {
+                "date": d.strftime("%Y-%m-%d"),
+                "revenue": rev_map.get(d.strftime("%Y-%m-%d"), 0.0),
+            }
+            for d in dates_30
+        ]
+
+        return jsonify(result), 200
+
+    except Exception as exc:
+        db_mysql.session.rollback()
+        app.logger.exception("revenue_trend_error: %s", exc)
+        return jsonify({"error": "Revenue trend data unavailable"}), 500
 
 
 # ============================================================
@@ -4596,6 +4786,95 @@ def _run_abandoned_cart_emails() -> tuple:
             errors += 1
 
     return sent, skipped, errors
+
+
+# ============================================================
+# PRODUCT VIEW TRACKING
+# ============================================================
+
+@app.route("/api/products/<int:product_id>/view", methods=["POST"])
+@csrf.exempt
+def track_product_view(product_id):
+    """Record a product page view with 30-minute session deduplication."""
+    product = ProductSQL.query.get(product_id)
+    if not product:
+        return jsonify({"error": "Product not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    session_id = data.get("session_id")
+
+    if session_id is not None:
+        session_id = _sanitise_str(session_id, max_len=200)
+        if len(session_id) > 128:
+            return jsonify({"error": "session_id exceeds maximum length of 128 characters"}), 422
+
+        # Dedup: check for a view with same session_id + product_id within last 30 min
+        cutoff = datetime.utcnow() - timedelta(minutes=30)
+        existing = ProductView.query.filter(
+            ProductView.product_id == product_id,
+            ProductView.session_id == session_id,
+            ProductView.timestamp >= cutoff,
+        ).first()
+
+        if existing:
+            return jsonify({"deduplicated": True}), 200
+
+    user_id = int(session["user_id"]) if "user_id" in session else None
+
+    view = ProductView(
+        product_id=product_id,
+        user_id=user_id,
+        session_id=session_id if session_id else None,
+        timestamp=datetime.utcnow(),
+    )
+    db_mysql.session.add(view)
+    db_mysql.session.commit()
+
+    return jsonify({"recorded": True}), 201
+
+
+@app.route("/api/admin/analytics/product-views", methods=["GET"])
+@admin_required
+def get_product_view_analytics():
+    """Return view counts per product, filtered by time range."""
+    from sqlalchemy import func
+
+    range_param = request.args.get("range", "")
+    valid_ranges = {"today", "7d", "30d", "all"}
+    if range_param not in valid_ranges:
+        return jsonify({"error": "range must be one of: today, 7d, 30d, all"}), 422
+
+    now = datetime.utcnow()
+    if range_param == "today":
+        cutoff = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif range_param == "7d":
+        cutoff = now - timedelta(days=7)
+    elif range_param == "30d":
+        cutoff = now - timedelta(days=30)
+    else:
+        cutoff = None
+
+    query = db_mysql.session.query(
+        ProductView.product_id,
+        func.count(ProductView.id).label("view_count"),
+    ).group_by(ProductView.product_id)
+
+    if cutoff:
+        query = query.filter(ProductView.timestamp >= cutoff)
+
+    query = query.order_by(func.count(ProductView.id).desc())
+    rows = query.all()
+
+    result = []
+    for row in rows:
+        product = ProductSQL.query.get(row[0]) if row[0] else None
+        result.append({
+            "product_id": row[0],
+            "product_name": product.name if product else "[Deleted]",
+            "view_count": int(row[1] or 0),
+        })
+
+    return jsonify(result), 200
 
 
 # Import here to avoid circular dependency with mail instance
