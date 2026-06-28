@@ -5,10 +5,8 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { Shield, Truck, CheckCircle, MapPin, CreditCard, Package, ChevronRight, AlertTriangle, WifiOff, Tag, X } from "lucide-react"
+import { Shield, Truck, CheckCircle, MapPin, CreditCard, Package, ChevronRight, AlertTriangle, WifiOff, Tag, X, Banknote } from "lucide-react"
 
-import { SiteHeader } from "@/components/site-header"
-import { SiteFooter } from "@/components/site-footer"
 import { useCart } from "@/lib/cart-context"
 import { useAuth } from "@/lib/auth-context"
 import { getApiBase, apiFetch } from "@/lib/api-base"
@@ -31,7 +29,7 @@ declare global {
 
 export default function CheckoutPage() {
   const { items, total, clearCart, trackCheckout, isHydrated } = useCart()
-  const { user, isAuthenticated, isAuthLoading, refreshUser } = useAuth()
+  const { user, refreshUser } = useAuth()
   const router = useRouter()
 
   // Auth gate: removed to allow guest checkout
@@ -117,6 +115,7 @@ export default function CheckoutPage() {
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null)
   const [couponMessage, setCouponMessage] = useState("")
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState<"razorpay" | "cod">("razorpay")
 
   const isMumbai = formData.zip.startsWith("400") || formData.zip.startsWith("401")
   const isOut = formData.zip.length === 6 && !isMumbai
@@ -128,7 +127,8 @@ export default function CheckoutPage() {
   const tax = shippingEstimate?.tax_total ?? (cgst + sgst + igst)
 
   const shipping = shippingEstimate?.shipping_cost ?? (discountedSubtotal >= 2000 ? 0 : 149)
-  const grandTotal = discountedSubtotal + shipping + tax
+  const codFee = paymentMethod === "cod" ? (discountedSubtotal < 2000 ? 50 : 0) : 0
+  const grandTotal = discountedSubtotal + shipping + tax + codFee
 
   useEffect(() => {
     if (user) {
@@ -151,6 +151,8 @@ export default function CheckoutPage() {
     email: formData.email,
     phone: formData.phone,
     total: grandTotal,
+    paymentMethod,
+    codFee,
     idempotencyKey: payment?.razorpay_order_id,
     items: items.map((item) => ({
       id: item.id,
@@ -422,7 +424,10 @@ export default function CheckoutPage() {
       const orderRes = await apiFetch(API_BASE, "/api/payments/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: grandTotal }),
+        body: JSON.stringify({
+          amount: grandTotal,
+          checkoutPayload: buildCheckoutPayload(),
+        }),
       })
 
       if (!orderRes.ok) {
@@ -501,9 +506,53 @@ export default function CheckoutPage() {
       })
       razorpay.open()
     } catch (err: any) {
-      console.error(err)
       setGlobalError(`Something went wrong: ${err.message || "Unknown error"}`)
       setIsProcessing(false)
+    }
+  }
+
+  const handleCODOrder = async () => {
+    if (!checkoutTermsAccepted) {
+      setCheckoutTermsError("Please accept the Terms & Conditions before placing your order")
+      return
+    }
+
+    if (pincodeStatus === "invalid") {
+      setGlobalError("Delivery is not available to the entered pincode. Please update your address.")
+      return
+    }
+
+    setCheckoutTermsError("")
+    setGlobalError("")
+    setIsProcessing(true)
+
+    try {
+      const res = await apiFetch(API_BASE, "/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildCheckoutPayload()),
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        setGlobalError(err.error || "Failed to place order")
+        return
+      }
+
+      const data = await res.json()
+      await completeSuccessfulOrder(data.orderId)
+    } catch (err: any) {
+      setGlobalError(`Something went wrong: ${err.message || "Unknown error"}`)
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handlePlaceOrder = () => {
+    if (paymentMethod === "cod") {
+      handleCODOrder()
+    } else {
+      handlePayAndPlaceOrder()
     }
   }
 
@@ -513,7 +562,7 @@ export default function CheckoutPage() {
   ]
 
   return (
-    <div className="bg-[#030303] text-[#e8e8e3] min-h-screen">
+    <div className="bg-[#030303] text-[#e8e8e3] min-h-screen overflow-x-hidden">
       {/* ── Offline warning banner ── */}
       {showOfflineBanner && (
         <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-900/95 border-b border-amber-500/40 px-4 py-3 flex items-center justify-between gap-4 backdrop-blur-sm">
@@ -579,9 +628,9 @@ export default function CheckoutPage() {
           Checkout
         </h1>
 
-        <div className="grid lg:grid-cols-3 gap-10 md:gap-20 max-w-[1400px] mx-auto">
+        <div className="grid lg:grid-cols-3 gap-10 md:gap-20 max-w-[1400px] mx-auto min-w-0">
           {/* ================= FORM ================= */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 min-w-0">
             {step === "shipping" ? (
               <form
                 onSubmit={handleContinue}
@@ -803,6 +852,42 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
+                <div className="border border-white/10 p-6 md:p-8 bg-white/[0.01] space-y-4">
+                  <h3 className="uppercase tracking-widest text-xs text-gray-400">Payment Method</h3>
+                  {[
+                    { value: "razorpay" as const, label: "Pay Online (Razorpay)", description: "Credit / Debit card, UPI, Netbanking" },
+                    { value: "cod" as const, label: "Cash on Delivery", description: codFee > 0 ? `+₹${codFee} COD fee` : "No additional fee" },
+                  ].map((option) => (
+                    <label
+                      key={option.value}
+                      className={`flex items-start gap-4 p-4 border cursor-pointer transition-all ${
+                        paymentMethod === option.value
+                          ? "border-white/40 bg-white/[0.03]"
+                          : "border-white/10 hover:border-white/20"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value={option.value}
+                        checked={paymentMethod === option.value}
+                        onChange={() => setPaymentMethod(option.value)}
+                        className="sr-only"
+                        aria-label={option.label}
+                      />
+                      <div className={`mt-0.5 w-4 h-4 rounded-full border shrink-0 flex items-center justify-center ${
+                        paymentMethod === option.value ? "border-white" : "border-white/30"
+                      }`}>
+                        {paymentMethod === option.value && <div className="w-2 h-2 rounded-full bg-white" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-widest text-white">{option.label}</p>
+                        <p className="text-[10px] text-gray-500 mt-1">{option.description}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
                 <div className="border border-white/10 p-4 bg-white/[0.01]">
                   <label className="flex items-start gap-3 text-xs text-gray-400 leading-relaxed cursor-pointer">
                     <input
@@ -824,7 +909,7 @@ export default function CheckoutPage() {
                 </div>
 
                 <Button
-                  onClick={handlePayAndPlaceOrder}
+                  onClick={handlePlaceOrder}
                   disabled={isProcessing || !checkoutTermsAccepted || !isOnline}
                   className="w-full border border-white/40 bg-white/5 uppercase tracking-widest text-xs hover:bg-white hover:text-black transition-all py-6 md:py-8 disabled:opacity-40 group"
                 >
@@ -834,7 +919,12 @@ export default function CheckoutPage() {
                     ) : isProcessing ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin group-hover:border-black/30 group-hover:border-t-black" />
-                        Processing Payment...
+                        {paymentMethod === "cod" ? "Placing Order..." : "Processing Payment..."}
+                      </>
+                    ) : paymentMethod === "cod" ? (
+                      <>
+                        <Banknote size={14} />
+                        Place Order · ₹{grandTotal.toLocaleString("en-IN")}
                       </>
                     ) : (
                       <>
@@ -862,8 +952,8 @@ export default function CheckoutPage() {
           </div>
 
           {/* ================= SUMMARY ================= */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-32 border border-white/10 p-6 md:p-8 space-y-6 bg-white/[0.01] backdrop-blur-sm">
+          <div className="lg:col-span-1 min-w-0">
+            <div className="sticky top-32 border border-white/10 p-6 md:p-8 space-y-6 bg-white/[0.01] backdrop-blur-sm overflow-hidden">
               <h2 className="uppercase tracking-widest text-xs text-gray-400 flex items-center gap-3">
                 <Package size={14} />
                 Order Summary
@@ -900,6 +990,12 @@ export default function CheckoutPage() {
                   <div className="flex justify-between text-xs text-gray-400">
                     <span>IGST (5%)</span>
                     <span>₹{igst.toLocaleString('en-IN')}</span>
+                  </div>
+                )}
+                {codFee > 0 && (
+                  <div className="flex justify-between text-xs text-gray-400">
+                    <span>COD Fee</span>
+                    <span>₹{codFee.toLocaleString("en-IN")}</span>
                   </div>
                 )}
                 <div className="border-t border-white/10 pt-4 flex justify-between text-white font-medium">

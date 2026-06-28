@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef } from "react"
 import { use } from "react"
 import Image from "next/image"
 import Link from "next/link"
@@ -18,6 +18,21 @@ import { resolveMediaUrl } from "@/lib/media-url"
 import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ShoppingBag, Heart, Star, Check, Sparkles, Award, ArrowLeft, Loader2, Share2, MessageCircle, Twitter, Facebook, Link2 } from "lucide-react"
 
 const API_BASE = getApiBase()
+const SESSION_ID_KEY = "usa_session_id"
+
+function getOrCreateSessionId(): string {
+  if (typeof window === "undefined") return ""
+  try {
+    let sessionId = sessionStorage.getItem(SESSION_ID_KEY)
+    if (!sessionId) {
+      sessionId = crypto.randomUUID()
+      sessionStorage.setItem(SESSION_ID_KEY, sessionId)
+    }
+    return sessionId
+  } catch {
+    return crypto.randomUUID()
+  }
+}
 
 export default function ProductPage({
   params,
@@ -115,6 +130,17 @@ export default function ProductPage({
       }, ...filtered].slice(0, 6)
       localStorage.setItem(key, JSON.stringify(updated))
     } catch { /* ignore */ }
+  }, [product?.id])
+
+  // Track product page views
+  useEffect(() => {
+    if (!product?.id) return
+    const sessionId = getOrCreateSessionId()
+    apiFetch(API_BASE, `/api/products/${product.id}/view`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId }),
+    }).catch(() => { /* analytics — silent failure ok */ })
   }, [product?.id])
 
   // Handle Hash Nav
@@ -254,7 +280,6 @@ export default function ProductPage({
   const sizes = parseSizes(product.sizes)
   const totalStock = product.stock !== undefined ? product.stock : (product.inStock ? 99 : 0)
   const isInStock = totalStock > 0
-  const isLowStock = totalStock > 0 && totalStock < 5
 
   const isSizeAvailable = (size: string) => {
     return getStockForSize(size) > 0

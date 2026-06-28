@@ -8,18 +8,22 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const apiBase = getApiBase()
     Promise.all([
-      apiFetch(apiBase, "/api/admin/orders").then(r => r.ok ? r.json() : []),
-      apiFetch(apiBase, "/api/products").then(r => r.ok ? r.json() : []),
+      apiFetch(apiBase, "/api/admin/orders").then(r => r.ok ? r.json() : Promise.reject(new Error("Failed to load orders"))),
+      apiFetch(apiBase, "/api/products").then(r => r.ok ? r.json() : Promise.reject(new Error("Failed to load products"))),
     ])
       .then(([ordersData, productsData]) => {
         setOrders(Array.isArray(ordersData) ? ordersData : [])
         setProducts(Array.isArray(productsData) ? productsData : [])
+        setError(null)
       })
-      .catch(() => { })
+      .catch((err) => {
+        setError(err.message || "Failed to load dashboard data")
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -68,6 +72,9 @@ export default function AdminDashboard() {
         <p className="mt-4 text-sm tracking-widest text-gray-500">
           Store performance at a glance.
         </p>
+        {error && (
+          <p className="mt-4 text-xs uppercase tracking-widest text-red-400">{error}</p>
+        )}
       </div>
 
       {/* METRICS */}

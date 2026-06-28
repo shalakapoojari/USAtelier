@@ -44,23 +44,18 @@ export default function AdminPaymentsPage() {
   const fetchPayments = async () => {
     setRefreshing(true)
     try {
-      console.log(`[Payments] Fetching from: ${API_BASE}/api/admin/payments`)
       const res = await apiFetch(API_BASE, "/api/admin/payments")
-      console.log(`[Payments] Response status: ${res.status}`)
-      
+
       if (!res.ok) {
         const errorData = await res.json()
-        console.error(`[Payments] Error response:`, errorData)
-        setError(`Failed to load payments: ${res.status} ${res.statusText}`)
+        setError(`Failed to load payments: ${res.status} ${errorData.error || res.statusText}`)
         setPayments([])
       } else {
         const data = await res.json()
-        console.log(`[Payments] Received ${data.length} payments`)
         setPayments(data || [])
         setError(null)
       }
     } catch (err) {
-      console.error("[Payments] Fetch error:", err)
       setError(`Failed to fetch payments: ${err instanceof Error ? err.message : String(err)}`)
       setPayments([])
     } finally {
@@ -70,12 +65,10 @@ export default function AdminPaymentsPage() {
   }
 
   useEffect(() => {
-    // Don't fetch until authentication is complete
     if (isAuthLoading) {
-      console.log("[Payments] Waiting for authentication...")
       return
     }
-    
+
     fetchPayments()
   }, [isAuthLoading])
 

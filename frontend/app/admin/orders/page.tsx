@@ -15,30 +15,24 @@ export default function OrdersPage() {
   useEffect(() => {
     // Don't fetch until authentication is complete
     if (isAuthLoading) {
-      console.log("[Orders] Waiting for authentication...")
       return
     }
 
     const fetchOrders = async () => {
       const apiBase = getApiBase()
       try {
-        console.log(`[Orders] Fetching from: ${apiBase}/api/admin/orders`)
         const res = await apiFetch(apiBase, "/api/admin/orders")
-        console.log(`[Orders] Response status: ${res.status}`)
-        
+
         if (!res.ok) {
           const errorData = await res.json()
-          console.error(`[Orders] Error response:`, errorData)
-          setError(`Failed to load orders: ${res.status} ${res.statusText}`)
+          setError(`Failed to load orders: ${res.status} ${errorData.error || res.statusText}`)
           setOrders([])
         } else {
           const data = await res.json()
-          console.log(`[Orders] Received ${data.length} orders`)
           setOrders(data || [])
           setError(null)
         }
       } catch (err) {
-        console.error("[Orders] Fetch error:", err)
         setError(`Failed to fetch orders: ${err instanceof Error ? err.message : String(err)}`)
         setOrders([])
       } finally {

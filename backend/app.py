@@ -474,7 +474,7 @@ def admin_required(f):
             session.clear()
             return jsonify({"error": "Authentication required"}), 401
         if not user or not user.is_admin:
-            return jsonify({"error": "Forbidden"}), 403
+            return jsonify({"error": "Admin access required"}), 403
         if user.is_blocked:
             session.clear()
             return jsonify({"error": "Account suspended"}), 403
@@ -1510,6 +1510,7 @@ def upload_file():
         try:
             img = PilImage.open(_io.BytesIO(file_bytes))
             original_format = img.format or ""
+            original_size = img.size
 
             if original_format.upper() == "WEBP":
                 # Already WebP — save directly with timestamp naming
@@ -1531,6 +1532,15 @@ def upload_file():
                 img.save(output, format="WEBP", quality=85)
                 output.seek(0)
                 webp_bytes = output.read()
+
+                converted = PilImage.open(_io.BytesIO(webp_bytes))
+                if converted.size != original_size:
+                    app.logger.error(
+                        "webp_dimension_mismatch original=%s converted=%s",
+                        original_size,
+                        converted.size,
+                    )
+                    raise ValueError("WebP conversion changed image dimensions")
 
                 filename = f"{timestamp}_{stem}.webp"
                 final_path = os.path.realpath(os.path.join(products_dir, filename))
@@ -2328,34 +2338,89 @@ def create_razorpay_order():
     except (TypeError, ValueError):
         return jsonify({"error": "Valid amount required"}), 400
 
+    checkout_payload = data.get("checkoutPayload") if isinstance(data.get("checkoutPayload"), dict) else None
+    idempotency_key = _sanitise_str(
+        (checkout_payload or {}).get("idempotencyKey") or data.get("idempotencyKey", ""),
+        64,
+    ) or None
+
+    if idempotency_key:
+        existing = OrderSQL.query.filter_by(idempotency_key=idempotency_key).first()
+        if existing and existing.razorpay_order_id:
+            return jsonify({
+                "id":       existing.razorpay_order_id,
+                "amount":   int(existing.total * 100),
+                "currency": "INR",
+                "orderId":  existing.order_number,
+            }), 200
+
+    user_id = session.get("user_id")
+    suffix = str(user_id) if user_id else secrets.token_hex(2)
+    order_number = f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}-{suffix}"
+    shipping_addr = (checkout_payload or {}).get("shippingAddress") or {}
+
+    pending_order = None
+    payment = None
     try:
-        client    = get_razorpay_client()
+        pending_order = OrderSQL(
+            order_number      = order_number,
+            idempotency_key   = idempotency_key,
+            user_id           = int(user_id) if user_id else None,
+            total             = amount,
+            status            = "Pending",
+            payment_status    = "Pending",
+            payment_method    = "prepaid",
+            shipping_address  = shipping_addr if shipping_addr else {},
+        )
+        db_mysql.session.add(pending_order)
+        db_mysql.session.flush()
+
+        payment = Payment(
+            user_id               = int(user_id) if user_id else None,
+            order_id              = pending_order.id,
+            amount                = amount,
+            currency              = "INR",
+            status                = "pending",
+            checkout_payload_json = json.dumps(checkout_payload) if checkout_payload else None,
+        )
+        db_mysql.session.add(payment)
+        db_mysql.session.commit()
+    except Exception as exc:
+        db_mysql.session.rollback()
+        app.logger.error("pending_order_create_error err=%s", exc)
+        return jsonify({"error": "Failed to initialize order"}), 500
+
+    try:
+        client = get_razorpay_client()
         rzp_order = client.order.create({
             "amount":          int(amount * 100),
             "currency":        "INR",
             "payment_capture": "1",
         })
-        try:
-            user_id = session.get("user_id")
-            checkout_payload = data.get("checkoutPayload") if isinstance(data.get("checkoutPayload"), dict) else None
-            payment = Payment(
-                user_id=int(user_id) if user_id else None,
-                razorpay_order_id=rzp_order.get("id"),
-                amount=amount,
-                currency="INR",
-                status="pending",
-                checkout_payload_json=json.dumps(checkout_payload) if checkout_payload else None,
-            )
-            db_mysql.session.add(payment)
-            db_mysql.session.commit()
-        except Exception as exc:
-            db_mysql.session.rollback()
-            app.logger.warning("payment_log_error err=%s", exc)
-
-        return jsonify(rzp_order), 200
     except Exception as exc:
+        try:
+            pending_order.status = "Failed"
+            payment.status = "failed"
+            db_mysql.session.commit()
+        except Exception:
+            db_mysql.session.rollback()
         app.logger.error("razorpay_order_error err=%s", exc)
-        return jsonify({"error": "Failed to create payment order"}), 500
+        return jsonify({"error": "Failed to create payment order"}), 502
+
+    try:
+        rzp_id = rzp_order.get("id")
+        pending_order.razorpay_order_id = rzp_id
+        payment.razorpay_order_id = rzp_id
+        if checkout_payload:
+            checkout_payload["razorpay_order_id"] = rzp_id
+            checkout_payload["idempotencyKey"] = idempotency_key or rzp_id
+            payment.checkout_payload_json = json.dumps(checkout_payload)
+        db_mysql.session.commit()
+    except Exception as exc:
+        db_mysql.session.rollback()
+        app.logger.warning("payment_link_error err=%s", exc)
+
+    return jsonify({**rzp_order, "orderId": order_number}), 200
 
 
 @app.route("/api/payments/verify", methods=["POST"])
@@ -2719,8 +2784,10 @@ def razorpay_webhook():
 
             if order:
 
-                order.payment_status = "Paid"
-                order.razorpay_payment_id = rzp_payment_id
+                if order.payment_status != "Paid":
+                    order.payment_status = "Paid"
+                    order.razorpay_payment_id = rzp_payment_id
+                    order.status = "Processing"
 
                 payment.order_id = order.id
                 payment.user_id = order.user_id
@@ -2730,6 +2797,25 @@ def razorpay_webhook():
                     order.order_number,
                     rzp_payment_id
                 )
+
+                if not order.items and payment.checkout_payload_json:
+                    checkout_payload = json.loads(payment.checkout_payload_json)
+                    checkout_payload["razorpay_order_id"] = rzp_order_id
+                    checkout_payload["razorpay_payment_id"] = rzp_payment_id
+                    checkout_payload["idempotencyKey"] = checkout_payload.get("idempotencyKey") or rzp_order_id
+                    response, status = _finalize_order_from_payload(
+                        checkout_payload,
+                        require_signature=False,
+                        verified_payment=pp,
+                    )
+                    if 200 <= status < 300:
+                        app.logger.info("WEBHOOK_FINALIZED_PENDING_ORDER order=%s", order.order_number)
+                        return jsonify({"success": True}), 200
+                    app.logger.error(
+                        "WEBHOOK_FINALIZE_FAILED order=%s status=%s",
+                        order.order_number,
+                        status,
+                    )
 
             else:
 
@@ -3029,7 +3115,7 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
     idempotency_key = _sanitise_str(data.get("idempotencyKey", ""), 64) or None
     if idempotency_key:
         existing_order = OrderSQL.query.filter_by(idempotency_key=idempotency_key).first()
-        if existing_order:
+        if existing_order and existing_order.items:
             return jsonify({"success": True, "orderId": existing_order.order_number, "duplicate": True}), 200
 
     errors = _validate_order_payload(data)
@@ -3051,7 +3137,7 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
         existing_by_payment = OrderSQL.query.filter_by(razorpay_payment_id=rzp_payment_id).first()
     if not existing_by_payment and rzp_order_id:
         existing_by_payment = OrderSQL.query.filter_by(razorpay_order_id=rzp_order_id).first()
-    if existing_by_payment:
+    if existing_by_payment and existing_by_payment.items:
         return jsonify({"success": True, "orderId": existing_by_payment.order_number, "duplicate": True}), 200
 
     if not is_cod and (not rzp_order_id or not rzp_payment_id):
@@ -3220,28 +3306,51 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
         db_mysql.session.rollback()
         return jsonify({"error": "Payment amount is lower than order total"}), 400
 
-    order_number = f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}-{user.id}"
+    pending_order = None
+    if rzp_order_id and not is_cod:
+        candidate = OrderSQL.query.filter_by(razorpay_order_id=rzp_order_id).first()
+        if candidate and not candidate.items:
+            pending_order = candidate
+
+    order_number = pending_order.order_number if pending_order else f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}-{user.id}"
+    order_status = "Pending" if is_cod else "Pickup"
 
     try:
-        new_order = OrderSQL(
-            order_number      = order_number,
-            idempotency_key   = idempotency_key,
-            user_id           = user.id,
-            total             = client_total,
-            status            = "Pickup",
-            payment_status    = payment_status,
-            payment_method    = payment_method,
-            cod_fee           = cod_fee,
-            cod_collectable_amount = client_total if is_cod else 0.0,
-            shipping_address  = addr,
-            coupon_code       = coupon_code,
-            discount_amount   = discount_amount,
-            razorpay_order_id = rzp_order_id,
-            razorpay_payment_id = rzp_payment_id,
-        )
-
-        db_mysql.session.add(new_order)
-        db_mysql.session.flush()
+        if pending_order:
+            new_order = pending_order
+            new_order.user_id = user.id
+            new_order.total = client_total
+            new_order.status = order_status
+            new_order.payment_status = payment_status
+            new_order.payment_method = payment_method
+            new_order.cod_fee = cod_fee
+            new_order.cod_collectable_amount = client_total if is_cod else 0.0
+            new_order.shipping_address = addr
+            new_order.coupon_code = coupon_code
+            new_order.discount_amount = discount_amount
+            new_order.razorpay_order_id = rzp_order_id
+            new_order.razorpay_payment_id = rzp_payment_id
+            if idempotency_key and not new_order.idempotency_key:
+                new_order.idempotency_key = idempotency_key
+        else:
+            new_order = OrderSQL(
+                order_number      = order_number,
+                idempotency_key   = idempotency_key,
+                user_id           = user.id,
+                total             = client_total,
+                status            = order_status,
+                payment_status    = payment_status,
+                payment_method    = payment_method,
+                cod_fee           = cod_fee,
+                cod_collectable_amount = client_total if is_cod else 0.0,
+                shipping_address  = addr,
+                coupon_code       = coupon_code,
+                discount_amount   = discount_amount,
+                razorpay_order_id = rzp_order_id,
+                razorpay_payment_id = rzp_payment_id,
+            )
+            db_mysql.session.add(new_order)
+            db_mysql.session.flush()
 
         payment = Payment.query.filter_by(razorpay_order_id=rzp_order_id).first()
         if not payment and rzp_payment_id:
@@ -3282,11 +3391,14 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
         except Exception as exc:
             app.logger.error("order_email_failed err=%s", type(exc).__name__)
 
-        return jsonify({
+        response_body = {
             "success": True,
             "message": "Order placed successfully!",
             "orderId": order_number,
-        }), 201
+        }
+        if is_cod:
+            response_body["status"] = "COD - Pending"
+        return jsonify(response_body), 201
 
     except Exception as exc:
         db_mysql.session.rollback()
@@ -3826,6 +3938,7 @@ def get_analysis_data():
                 OrderItem.product_id,
                 OrderItem.product_name,
                 func.sum(OrderItem.price * OrderItem.quantity).label("total_revenue"),
+                func.count(func.distinct(OrderItem.order_id)).label("order_count"),
             )
             .join(OrderSQL, OrderSQL.id == OrderItem.order_id)
             .filter(OrderSQL.status != "Cancelled")
@@ -3839,6 +3952,7 @@ def get_analysis_data():
                 "product_id":   int(r[0]) if r[0] else None,
                 "product_name": r[1] or "Unknown Product",
                 "total_revenue": round(float(r[2] or 0), 2),
+                "order_count":  int(r[3] or 0),
             }
             for r in top_rev_raw
         ]
@@ -4238,80 +4352,6 @@ def get_audit_log():
         .offset((page - 1) * limit).limit(limit).all()
     )
     return jsonify([l.to_dict() for l in logs])
-
-# ============================================================
-# ADMIN — DELHIVERY TEST ENDPOINT
-# SECURITY: Only available in non-production
-# ============================================================
-
-@app.route("/api/admin/test/delhivery", methods=["POST"])
-@admin_required
-def test_delhivery_shipment():
-    # SECURITY: Never expose internal test endpoints in production
-    if is_production:
-        return jsonify({"error": "Not available in production"}), 403
-
-    data      = request.get_json() or {}
-    test_type = _sanitise_str(data.get("test_type", "all"), 20)
-    results   = {}
-
-    if test_type in ("all", "pincode"):
-        pincode = _sanitise_str(data.get("pincode", "110001"), 10)
-        if PINCODE_RE.match(pincode):
-            results["pincode_validation"] = {"pincode": pincode, "is_serviceable": validate_pincode(pincode)}
-
-    if test_type in ("all", "shipping"):
-        origin = _sanitise_str(data.get("origin_pincode", os.getenv("STORE_PINCODE", "110001")), 10)
-        dest   = _sanitise_str(data.get("destination_pincode", "400001"), 10)
-        weight = float(data.get("weight", 1.0))
-        results["shipping_calculation"] = {
-            "origin_pincode":      origin,
-            "destination_pincode": dest,
-            "weight_kg":           weight,
-            "estimated_cost":      calculate_shipping(origin, dest, weight),
-        }
-
-    if test_type == "create":
-        pickup_loc = {
-            "address": _sanitise_str(data.get("pickup_address", os.getenv("STORE_ADDRESS", "")), 300),
-            "city":    _sanitise_str(data.get("pickup_city",    os.getenv("STORE_CITY", "")),    100),
-            "state":   _sanitise_str(data.get("pickup_state",   os.getenv("STORE_STATE", "")),   100),
-            "pincode": _sanitise_str(data.get("pickup_pincode", os.getenv("STORE_PINCODE", "")), 10),
-        }
-        delivery_loc = {
-            "address": _sanitise_str(data.get("delivery_address", ""), 300),
-            "city":    _sanitise_str(data.get("delivery_city",    ""), 100),
-            "state":   _sanitise_str(data.get("delivery_state",   ""), 100),
-            "pincode": _sanitise_str(data.get("delivery_pincode", ""), 10),
-        }
-        results["shipment_creation"] = create_shipment(
-            order_id=f"TEST-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-            pickup_location=pickup_loc,
-            delivery_location=delivery_loc,
-            customer_phone=_sanitise_str(data.get("phone", "9876543210"), 20),
-            customer_name=_sanitise_str(data.get("name", "Test Customer"), 200),
-            weight_kg=float(data.get("weight", 1.0)),
-        )
-
-    return jsonify({
-        "success": True,
-        "results": results,
-        "environment": {
-            "delhivery_api_key_configured": bool(os.getenv("DELHIVERY_API_KEY")),
-            "delhivery_facility_code":      os.getenv("DELHIVERY_FACILITY_CODE", ""),
-            "store_pincode":                os.getenv("STORE_PINCODE"),
-        },
-    })
-
-
-# SECURITY: /run-dispatch is a debug route — disable in production
-@app.route("/run-dispatch")
-def run_dispatch():
-    if is_production:
-        return jsonify({"error": "Not available"}), 404
-    _poll_dispatch_jobs()
-    return "dispatch executed"
-
 
 # ============================================================
 # Generic error handlers — never leak stack traces to clients
