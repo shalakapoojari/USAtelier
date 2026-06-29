@@ -1,5 +1,5 @@
-import { SiteHeader } from "@/components/site-header";
 "use client";
+import { SiteHeader } from "@/components/site-header";
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 
@@ -72,7 +72,7 @@ function HeroMedia({ slide, fallbackImage, onImageLoad }: { slide: HeroSlide | n
   }, [imgSrc, onImageLoad]);
 
   // Always pass handlers — onError fires on broken images so preloader still resolves.
-  const handleLoad  = onImageLoad;
+  const handleLoad = onImageLoad;
   const handleError = onImageLoad;
 
   return (
@@ -81,9 +81,8 @@ function HeroMedia({ slide, fallbackImage, onImageLoad }: { slide: HeroSlide | n
         ref={imageRef}
         src={imgSrc || undefined}
         key="hero-img"
-        className={`w-full h-full object-cover scale-110 hero-bg transition-opacity duration-700 ${
-          imgSrc ? (hasVideo && videoLoaded ? "opacity-0" : "opacity-60") : "opacity-0"
-        }`}
+        className={`w-full h-full object-cover scale-110 hero-bg transition-opacity duration-700 ${imgSrc ? (hasVideo && videoLoaded ? "opacity-0" : "opacity-60") : "opacity-0"
+          }`}
         alt="U.S Atelier editorial hero"
         loading="eager"
         fetchPriority="high"
