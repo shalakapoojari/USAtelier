@@ -254,12 +254,12 @@ export default function OrderDetailPage({
                                 Size {item.size} · Qty {item.quantity}
                               </p>
                               <p className="text-xs text-gray-500 mt-1">
-                                ₹{item.price.toLocaleString("en-IN")} per unit
+                                ₹{item.sellingPrice.toLocaleString("en-IN")} per unit
                               </p>
                             </div>
                             <div className="flex flex-col items-end gap-2 shrink-0">
                               <p className="text-sm font-medium">
-                                ₹{(item.price * item.quantity).toLocaleString("en-IN")}
+                                ₹{(item.sellingPrice * item.quantity).toLocaleString("en-IN")}
                               </p>
                               {order.status === "Delivered" && (
                                 <Link

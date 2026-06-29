@@ -106,7 +106,8 @@ class Product(db_mysql.Model):
 
     id               = db_mysql.Column(db_mysql.Integer, primary_key=True)
     name             = db_mysql.Column(db_mysql.String(255), nullable=False)
-    price            = db_mysql.Column(db_mysql.Float, nullable=False)
+    selling_price    = db_mysql.Column(db_mysql.Float, nullable=False)
+    mrp              = db_mysql.Column(db_mysql.Float, nullable=True)
     category         = db_mysql.Column(db_mysql.String(100))
     subcategory      = db_mysql.Column(db_mysql.String(100))
     gender           = db_mysql.Column(db_mysql.String(50))
@@ -177,7 +178,9 @@ class Product(db_mysql.Model):
         return {
             "id":            self.id,
             "name":          self.name,
-            "price":         float(self.price or 0),
+            "sellingPrice":  float(self.selling_price or 0),
+            "mrp":           float(self.mrp) if self.mrp else None,
+            "discountPercent": round(((float(self.mrp) - float(self.selling_price)) / float(self.mrp)) * 100) if self.mrp and self.mrp > (self.selling_price or 0) else 0,
             "category":      self.category or "",
             "subcategory":   self.subcategory or "",
             "gender":        self.gender or "",
@@ -318,7 +321,7 @@ class OrderItem(db_mysql.Model):
     product_id      = db_mysql.Column(db_mysql.Integer, db_mysql.ForeignKey("products.id"))
     product_name    = db_mysql.Column(db_mysql.String(255))
     quantity        = db_mysql.Column(db_mysql.Integer, nullable=False)
-    price           = db_mysql.Column(db_mysql.Float, nullable=False)
+    selling_price   = db_mysql.Column(db_mysql.Float, nullable=False)
     size            = db_mysql.Column(db_mysql.String(20))
 
     def to_dict(self):
@@ -327,7 +330,7 @@ class OrderItem(db_mysql.Model):
             "product_id":   self.product_id,
             "product_name": self.product_name,
             "quantity":     self.quantity,
-            "price":        self.price,
+            "sellingPrice": self.selling_price,
             "size":         self.size,
         }
 
@@ -677,13 +680,29 @@ class AbandonedCartEmail(db_mysql.Model):
             "user_email":     self.user_email,
             "cart_snapshot":  items,
             "item_count":     sum(i.get("quantity", 1) for i in items),
-            "total_value":    sum(float(i.get("price", 0)) * int(i.get("quantity", 1)) for i in items),
+            "total_value":    sum(float(i.get("sellingPrice", 0)) * int(i.get("quantity", 1)) for i in items),
             "sent_at":        self.sent_at.isoformat() if self.sent_at else None,
             "reminder_count": self.reminder_count,
             "converted":      self.converted,
             "email_status":   self.email_status,
         }
 
+
+# ---------------------------------------------------------------------------
+# HomepageBanner
+# ---------------------------------------------------------------------------
+class HomepageBanner(db_mysql.Model):
+    __tablename__ = "homepage_banner"
+
+    id        = db_mysql.Column(db_mysql.Integer, primary_key=True)
+    text      = db_mysql.Column(db_mysql.String(255), default="")
+    is_active = db_mysql.Column(db_mysql.Boolean, default=False)
+
+    def to_dict(self):
+        return {
+            "text": self.text,
+            "isActive": self.is_active
+        }
 
 # ---------------------------------------------------------------------------
 # CartSettings  — singleton config (id always = 1)

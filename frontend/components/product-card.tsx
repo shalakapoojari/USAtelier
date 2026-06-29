@@ -113,7 +113,7 @@ export function ProductCard({ product }: ProductCardProps) {
         <h3 className="text-sm md:text-lg lg:text-xl font-serif text-balance group-hover:text-gray-300 transition-colors leading-snug">
           {product.name}
         </h3>
-        <p className="text-xs md:text-sm text-gray-400">₹{product.price.toLocaleString('en-IN')}</p>
+        <p className="text-xs md:text-sm text-gray-400">₹{product.sellingPrice.toLocaleString('en-IN')}</p>
       </div>
     </Link>
   )

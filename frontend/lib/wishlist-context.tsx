@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation"
 type WishlistItem = {
     id: string
     name: string
-    price: number
+    sellingPrice: number
     image: string
     category: string
     stock?: number

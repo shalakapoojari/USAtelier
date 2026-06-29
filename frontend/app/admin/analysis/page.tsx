@@ -104,8 +104,8 @@ export default function BusinessAnalysisPage() {
                 ...result,
                 most_sold: (result.most_sold || []).map((p: any) => ({
                     ...p,
-                    price: p.price || 0,
-                    revenue: p.total_sold * (p.price || 0),
+                    sellingPrice: p.sellingPrice || 0,
+                    revenue: p.total_sold * (p.sellingPrice || 0),
                     image: "/placeholder.jpg",
                     sku: `US-AT-${p.id || "N/A"}`,
                 })),

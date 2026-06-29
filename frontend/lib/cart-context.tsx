@@ -9,7 +9,7 @@ import { getApiBase } from "@/lib/api-base"
 export type CartItem = {
   id: string
   name: string
-  price: number
+  sellingPrice: number
   size: string
   quantity: number
   stock: number
@@ -70,7 +70,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         product_id,
         product_name,
         cart_snapshot: snapshot.map(i => ({
-          id: i.id, name: i.name, price: i.price,
+          id: i.id, name: i.name, sellingPrice: i.sellingPrice,
           size: i.size, quantity: i.quantity, image: i.image,
         })),
       }),
@@ -138,7 +138,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }
 
   const clearUnseen = () => setUnseenCount(0)
-  const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0)
+  const total = items.reduce((sum, i) => sum + i.sellingPrice * i.quantity, 0)
 
   return (
     <CartContext.Provider value={{ items, addItem, removeItem, updateQuantity, clearCart, trackCheckout, total, unseenCount, clearUnseen, isHydrated }}>

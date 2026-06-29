@@ -200,7 +200,7 @@ function ShopContent() {
 
   const absoluteMaxPrice = useMemo(() => {
     if (products.length === 0) return 0
-    return Math.max(...products.map((p) => p.price))
+    return Math.max(...products.map((p) => p.sellingPrice))
   }, [products])
 
   const categoryMaxPrice = useMemo(() => {
@@ -208,7 +208,7 @@ function ShopContent() {
       ? products.filter((p) => (p.category || "").toLowerCase() === urlCategory.toLowerCase())
       : products
     if (cp.length === 0) return absoluteMaxPrice
-    return Math.max(...cp.map((p) => p.price || 0))
+    return Math.max(...cp.map((p) => p.sellingPrice || 0))
   }, [products, urlCategory, absoluteMaxPrice])
 
   useEffect(() => {
@@ -236,7 +236,7 @@ function ShopContent() {
         selectedSizes.length === 0 ||
         productSizes.some((size: string) => selectedSizes.includes(size))
 
-      const priceMatch = (product.price || 0) >= priceRange[0] && (product.price || 0) <= priceRange[1]
+      const priceMatch = (product.sellingPrice || 0) >= priceRange[0] && (product.sellingPrice || 0) <= priceRange[1]
 
       const genderMatch =
         selectedGenders.length === 0 ||

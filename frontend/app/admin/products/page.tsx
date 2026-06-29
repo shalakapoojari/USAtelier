@@ -111,7 +111,7 @@ function SortableProductRow({ product, index, onEdit, onDelete, getImageUrl }: {
         {product.category}
         {product.subcategory && <span className="text-gray-600 block text-[9px] mt-1 italic">{product.subcategory}</span>}
       </td>
-      <td className="px-4 md:px-8 py-4 md:py-6 font-mono text-xs">₹{product.price?.toLocaleString('en-IN')}</td>
+      <td className="px-4 md:px-8 py-4 md:py-6 font-mono text-xs">₹{product.sellingPrice?.toLocaleString('en-IN')}</td>
       <td className="px-4 md:px-8 py-4 md:py-6 text-[10px] tracking-widest text-gray-500 uppercase">
         {[product.is_featured && "Featured", product.is_new && "New", product.is_bestseller && "Best"].filter(Boolean).join(" · ") || "—"}
       </td>
@@ -163,7 +163,7 @@ export default function ProductsPage() {
 
   const [formData, setFormData] = useState({
     name: "",
-    price: "",
+    sellingPrice: "",
     category: "",
     subcategory: "",
     description: "",
@@ -365,7 +365,7 @@ export default function ProductsPage() {
 
     setFormData({
       name: product.name || "",
-      price: product.price?.toString() || "",
+      sellingPrice: product.sellingPrice?.toString() || "",
       category: product.category || "",
       subcategory: product.subcategory || "",
       description: product.description || "",
@@ -427,7 +427,7 @@ export default function ProductsPage() {
 
         setFormData({
           name: "",
-          price: "",
+          sellingPrice: "",
           category: "",
           subcategory: "",
           description: "",
@@ -587,7 +587,7 @@ export default function ProductsPage() {
             setEditingProduct(null)
             setFormData({
               name: "",
-              price: "",
+              sellingPrice: "",
               category: "",
               subcategory: "",
               description: "",
@@ -643,7 +643,7 @@ export default function ProductsPage() {
                           <Input
                             name="price"
                             type="number"
-                            value={formData.price}
+                            value={formData.sellingPrice}
                             onChange={handleInputChange}
                             required
                             className="bg-transparent border-white/10 focus:border-white/30 rounded-none h-12"
@@ -1076,7 +1076,7 @@ export default function ProductsPage() {
                   {p.category}
                   {p.subcategory && <span className="text-gray-600 block text-[9px] mt-1 italic">{p.subcategory}</span>}
                 </td>
-                <td className="px-4 md:px-8 py-4 md:py-6 font-mono text-xs">₹{p.price.toLocaleString('en-IN')}</td>
+                <td className="px-4 md:px-8 py-4 md:py-6 font-mono text-xs">₹{p.sellingPrice.toLocaleString('en-IN')}</td>
                 <td className="px-4 md:px-8 py-4 md:py-6 text-[10px] tracking-widest text-gray-500 uppercase">
                   {[p.is_featured && "Featured", p.is_new && "New", p.is_bestseller && "Best"].filter(Boolean).join(" · ") || "—"}
                 </td>

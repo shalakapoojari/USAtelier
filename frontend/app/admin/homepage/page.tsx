@@ -486,7 +486,7 @@ function ProductPickerDialog({
                                 </div>
                                 <div className="px-2 pb-2">
                                     <p className="text-[8px] uppercase tracking-widest text-gray-300 truncate">{p.name}</p>
-                                    <p className="text-[7px] text-gray-500 tracking-widest">₹{p.price.toLocaleString()}</p>
+                                    <p className="text-[7px] text-gray-500 tracking-widest">₹{p.sellingPrice.toLocaleString()}</p>
                                 </div>
                             </div>
                         )
@@ -514,6 +514,9 @@ export default function HomepageDesignPage() {
     const [saving, setSaving] = useState(false)
     const { showToast } = useToast()
 
+    const [bannerText, setBannerText] = useState("")
+    const [bannerIsActive, setBannerIsActive] = useState(false)
+
     // Cropper state for hero slides
     const [cropperOpen, setCropperOpen] = useState(false)
     const [pendingCropFile, setPendingCropFile] = useState<File | null>(null)
@@ -525,10 +528,11 @@ export default function HomepageDesignPage() {
 
     const fetchData = async () => {
         try {
-            const [configRes, productsRes, catsRes] = await Promise.allSettled([
+            const [configRes, productsRes, catsRes, bannerRes] = await Promise.allSettled([
                 apiFetch(API_BASE, "/api/homepage"),
                 apiFetch(API_BASE, "/api/products"),
-                apiFetch(API_BASE, "/api/categories")
+                apiFetch(API_BASE, "/api/categories"),
+                apiFetch(API_BASE, "/api/settings/banner")
             ])
 
             let hasAnyFailure = false
@@ -557,6 +561,14 @@ export default function HomepageDesignPage() {
             if (catsRes.status === "fulfilled" && catsRes.value.ok) {
                 const data = await catsRes.value.json()
                 setCategories(data)
+            } else {
+                hasAnyFailure = true
+            }
+
+            if (bannerRes.status === "fulfilled" && bannerRes.value.ok) {
+                const data = await bannerRes.value.json()
+                setBannerText(data.text || "")
+                setBannerIsActive(data.isActive || false)
             } else {
                 hasAnyFailure = true
             }
@@ -674,10 +686,17 @@ export default function HomepageDesignPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(config)
             })
-            if (res.ok) {
+            
+            const bannerRes = await apiFetch(API_BASE, "/api/settings/banner", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: bannerText, isActive: bannerIsActive })
+            })
+
+            if (res.ok && bannerRes.ok) {
                 showToast("Homepage updated successfully", "info")
             } else {
-                showToast("Failed to update homepage", "info")
+                showToast("Failed to update homepage settings", "info")
             }
         } catch {
             showToast("Network error", "info")
@@ -736,6 +755,36 @@ export default function HomepageDesignPage() {
 
             <div className="max-w-275 pl-10 md:pl-32 pr-8 md:pr-12 pb-24">
                 <div className="space-y-16">
+                    {/* HOMEPAGE BANNER */}
+                    <div className="w-full">
+                        <section className="space-y-8 border border-white/10 p-8 bg-white/5 relative">
+                            <div>
+                                <h2 className="text-3xl font-serif mb-2 uppercase tracking-widest">Homepage Banner</h2>
+                                <p className="text-[10px] text-gray-500 uppercase tracking-widest">A short announcement displayed at the very top of the homepage</p>
+                            </div>
+                            <div className="flex flex-col gap-6 max-w-3xl">
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] uppercase tracking-widest text-gray-400">Banner Text</Label>
+                                    <Input
+                                        value={bannerText}
+                                        onChange={(e) => setBannerText(e.target.value)}
+                                        placeholder="e.g. Free shipping over Rs.999"
+                                        className="bg-[#111] border-white/10 focus:border-white/30 text-white rounded-none"
+                                    />
+                                </div>
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={bannerIsActive}
+                                        onChange={(e) => setBannerIsActive(e.target.checked)}
+                                        className="size-4 rounded-sm bg-[#111] border-white/20 checked:bg-white checked:text-black focus:ring-0 focus:ring-offset-0 transition-all appearance-none flex items-center justify-center after:content-['✓'] after:text-[10px] after:hidden checked:after:block"
+                                    />
+                                    <span className="text-sm font-serif uppercase tracking-widest text-gray-300">Enable Banner</span>
+                                </label>
+                            </div>
+                        </section>
+                    </div>
+
                     {/* HERO CAROUSEL */}
                     <div className="w-full">
                         <section className="space-y-12">

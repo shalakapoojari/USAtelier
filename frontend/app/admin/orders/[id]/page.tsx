@@ -9,7 +9,7 @@ import { useToast } from "@/lib/toast-context"
 interface OrderItem {
   productName: string
   quantity: number
-  price: number
+  sellingPrice: number
   size: string
 }
 
@@ -261,7 +261,7 @@ export default function OrderDetailPage({
                     </div>
                   </div>
                   <p className="text-sm font-light text-[#e8e8e3]">
-                    ₹{(item.price * item.quantity).toLocaleString('en-IN')}
+                    ₹{(item.sellingPrice * item.quantity).toLocaleString('en-IN')}
                   </p>
                 </div>
               ))}

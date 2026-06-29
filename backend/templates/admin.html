@@ -199,7 +199,7 @@
                         <td style="padding: 0.75rem;">${product.name}</td>
                         <td style="padding: 0.75rem;">${product.gender || 'N/A'}</td>
                         <td style="padding: 0.75rem;">${product.category}</td>
-                        <td style="padding: 0.75rem;">$${product.price}</td>
+                        <td style="padding: 0.75rem;">$${product.sellingPrice}</td>
                         <td style="padding: 0.75rem;">${product.inStock ? '✓ In Stock' : '✗ Out'}</td>
                         <td style="padding: 0.75rem;">${product.featured ? '✓ Yes' : '✗ No'}</td>
                         <td style="padding: 0.75rem;">
@@ -250,7 +250,7 @@
             document.getElementById('product-name').value = product.name;
             document.getElementById('product-gender').value = product.gender || 'Men';
             document.getElementById('product-category').value = product.category;
-            document.getElementById('product-price').value = product.price;
+            document.getElementById('product-price').value = product.sellingPrice;
             document.getElementById('product-description').value = product.description;
             document.getElementById('product-sizes').value = product.sizes.join(', ');
             document.getElementById('product-images').value = product.images.join(', ');
@@ -310,7 +310,7 @@
             name: name,
             gender: gender,
             category: category,
-            price: price,
+            sellingPrice: price,
             description: description,
             sizes: formData.get('sizes').split(',').map(s => s.trim()).filter(s => s),
             images: formData.get('images').split(',').map(i => i.trim()).filter(i => i),

@@ -124,7 +124,7 @@ export default function ProductPage({
       const updated = [{
         id: product.id,
         name: product.name,
-        price: product.price,
+        sellingPrice: product.sellingPrice,
         image: resolveMediaUrl(imagesList[0]),
         category: product.category,
       }, ...filtered].slice(0, 6)
@@ -329,7 +329,7 @@ export default function ProductPage({
     addItem({
       id: product.id,
       name: product.name,
-      price: product.price,
+      sellingPrice: product.sellingPrice,
       size: selectedSize,
       stock: availableStock,
       image: resolveMediaUrl(images[0]),
@@ -346,7 +346,7 @@ export default function ProductPage({
     toggleItem({
       id: product.id,
       name: product.name,
-      price: product.price,
+      sellingPrice: product.sellingPrice,
       image: resolveMediaUrl(images[0]),
       category: product.category,
       stock: product.stock,
@@ -428,7 +428,7 @@ export default function ProductPage({
       addItem({
         id: product.id,
         name: product.name,
-        price: product.price,
+        sellingPrice: product.sellingPrice,
         size: selectedSize,
         stock: availableStock,
         image: resolveMediaUrl(images[0]),
@@ -583,7 +583,7 @@ export default function ProductPage({
             )}
 
             {/* Price */}
-            <p className="text-3xl font-light mb-6">₹{product.price.toLocaleString('en-IN')}</p>
+            <p className="text-3xl font-light mb-6">₹{product.sellingPrice.toLocaleString('en-IN')}</p>
 
             {/* Details grid (fabric, category, stock) */}
             <div className="grid grid-cols-2 gap-3 mb-8 text-xs">
@@ -959,7 +959,7 @@ export default function ProductPage({
                     <p className="text-sm uppercase tracking-widest group-hover:text-gray-400 transition-colors">
                       {p.name}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">₹{p.price.toLocaleString('en-IN')}</p>
+                    <p className="text-xs text-gray-500 mt-1">₹{p.sellingPrice.toLocaleString('en-IN')}</p>
                   </Link>
                 )
               })}
@@ -975,7 +975,7 @@ export default function ProductPage({
         <div className="fixed bottom-0 inset-x-0 z-50 md:hidden bg-[#030303]/95 backdrop-blur-xl border-t border-white/10 px-4 py-3 flex items-center gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-xs uppercase tracking-widest truncate">{product.name}</p>
-            <p className="text-sm">₹{product.price.toLocaleString('en-IN')}</p>
+            <p className="text-sm">₹{product.sellingPrice.toLocaleString('en-IN')}</p>
           </div>
           <button
             onClick={handleAddToCart}

@@ -143,7 +143,7 @@ export default function CartPage() {
                     </p>
 
                     <p className="text-sm mt-4">
-                      ₹{item.price.toLocaleString('en-IN')}
+                      ₹{item.sellingPrice.toLocaleString('en-IN')}
                     </p>
 
                     <p className="text-[10px] text-gray-600 mt-2 uppercase tracking-widest">

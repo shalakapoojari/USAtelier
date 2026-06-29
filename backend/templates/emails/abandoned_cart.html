@@ -48,7 +48,7 @@
                       Size: {{ item.size }} &nbsp;·&nbsp; Qty: {{ item.quantity or 1 }}
                     </p>
                     {% endif %}
-                    <p style="margin:0;font-size:14px;color:#c8a45d;">₹{{ "{:,.0f}".format(item.price | float) }}</p>
+                    <p style="margin:0;font-size:14px;color:#c8a45d;">₹{{ "{:,.0f}".format(item.sellingPrice | float) }}</p>
                   </td>
                 </tr>
               </table>

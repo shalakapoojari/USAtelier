@@ -1,7 +1,7 @@
 export type Product = {
   id: string
   name: string
-  price: number
+  sellingPrice: number
   description: string
   category: string
   images: string[]
@@ -37,7 +37,7 @@ export type Order = {
     productName: string
     size: string
     quantity: number
-    price: number
+    sellingPrice: number
   }[]
   subtotal: number
   shipping: number
@@ -60,7 +60,7 @@ export const products: Product[] = [
   {
     id: "1",
     name: "Essential Cashmere Sweater",
-    price: 24485,
+    sellingPrice: 24485,
     description: "Luxuriously soft cashmere sweater with a relaxed fit. Perfect for layering or wearing alone.",
     category: "Knitwear",
     subcategory: "Sweaters",
@@ -75,7 +75,7 @@ export const products: Product[] = [
   {
     id: "2",
     name: "Tailored Wool Trousers",
-    price: 20335,
+    sellingPrice: 20335,
     description: "Classic tailored trousers crafted from premium wool. Timeless silhouette with a modern fit.",
     category: "Trousers",
     subcategory: "Tailored",
@@ -90,7 +90,7 @@ export const products: Product[] = [
   {
     id: "3",
     name: "Organic Cotton Tee",
-    price: 7055,
+    sellingPrice: 7055,
     description: "Essential crew neck tee made from premium organic cotton. Soft, breathable, and perfectly fitted.",
     category: "Basics",
     subcategory: "Tees",
@@ -104,7 +104,7 @@ export const products: Product[] = [
   {
     id: "4",
     name: "Silk Button-Down Shirt",
-    price: 26975,
+    sellingPrice: 26975,
     description: "Elegant silk shirt with mother-of-pearl buttons. Effortlessly sophisticated.",
     category: "Shirts",
     subcategory: "Formal",
@@ -118,7 +118,7 @@ export const products: Product[] = [
   {
     id: "5",
     name: "Merino Wool Cardigan",
-    price: 22825,
+    sellingPrice: 22825,
     description: "Lightweight merino wool cardigan. Versatile layering piece for any season.",
     category: "Knitwear",
     subcategory: "Cardigans",
@@ -132,7 +132,7 @@ export const products: Product[] = [
   {
     id: "6",
     name: "Linen Wide-Leg Pants",
-    price: 16185,
+    sellingPrice: 16185,
     description: "Flowing wide-leg pants in breathable linen. Relaxed yet refined.",
     category: "Trousers",
     subcategory: "Casual",
@@ -145,7 +145,7 @@ export const products: Product[] = [
   {
     id: "7",
     name: "Leather Minimal Tote",
-    price: 35275,
+    sellingPrice: 35275,
     description: "Handcrafted leather tote with clean lines. Spacious interior with magnetic closure.",
     category: "Accessories",
     subcategory: "Bags",
@@ -160,7 +160,7 @@ export const products: Product[] = [
   {
     id: "8",
     name: "Cashmere Scarf",
-    price: 13695,
+    sellingPrice: 13695,
     description: "Soft cashmere scarf in a versatile neutral tone. Essential cold-weather accessory.",
     category: "Accessories",
     subcategory: "Scarf",

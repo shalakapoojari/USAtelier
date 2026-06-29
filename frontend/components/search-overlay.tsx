@@ -208,7 +208,7 @@ export function SearchOverlay({ isOpen, onClose, categories = [] }: SearchOverla
                       {p.name}
                     </p>
                     <p className="text-[10px] text-white/30 mt-0.5 tracking-widest">
-                      ₹{Number(p.price).toLocaleString("en-IN")}
+                      ₹{Number(p.sellingPrice).toLocaleString("en-IN")}
                     </p>
                   </div>
                   {/* Arrow */}

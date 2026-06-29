@@ -15,7 +15,7 @@ type ConfirmedItem = {
   name: string
   size: string
   quantity: number
-  price: number
+  sellingPrice: number
   image: string
 }
 
@@ -131,7 +131,7 @@ export default function ConfirmationPage() {
 
                     {/* Price */}
                     <p className="text-sm shrink-0">
-                      ₹{(item.price * item.quantity).toLocaleString("en-IN")}
+                      ₹{(item.sellingPrice * item.quantity).toLocaleString("en-IN")}
                     </p>
                   </div>
                 ))}

@@ -1,3 +1,4 @@
+import { SiteHeader } from "@/components/site-header";
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
@@ -7,8 +8,10 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useCart } from "@/lib/cart-context";
 import { getApiBase, apiFetch } from "@/lib/api-base";
 import { resolveMediaUrl } from "@/lib/media-url";
-import { SiteHeader } from "@/components/site-header";
+
+
 import { SiteFooter } from "@/components/site-footer";
+import { HomepageBanner } from "@/components/homepage-banner";
 
 
 
@@ -142,7 +145,7 @@ function ProductCard({ product, isPlaceholder }: {
 
           <div className="flex items-center justify-between w-full mt-2">
             <p className="text-[10px] font-sans uppercase tracking-[0.3em] text-white/60">
-              ₹{Number(product.price).toLocaleString("en-IN")}
+              ₹{Number(product.sellingPrice).toLocaleString("en-IN")}
             </p>
             <span className="text-[9px] font-sans uppercase tracking-widest text-white border-b border-white/30 pb-0.5">
               View Details
@@ -422,7 +425,9 @@ export default function HomePage() {
   }
 
   return (
-    <div className="antialiased text-[#e8e8e3] bg-[#030303]">
+    <div className="bg-[#030303] text-white min-h-screen">
+      <HomepageBanner />
+      <SiteHeader />
       <style jsx global>{`
         :root { --gold: #d4af37; }
 
@@ -563,7 +568,7 @@ export default function HomePage() {
               <p className="text-[9px] font-sans uppercase tracking-[0.5em] text-gray-500 mb-1">Editorial View</p>
               <h3 className="text-3xl md:text-5xl font-serif italic text-white mb-4">{enlargedProduct.name}</h3>
               <div className="flex items-center justify-between">
-                <p className="text-sm font-sans uppercase tracking-widest text-[#d4af37]">₹{Number(enlargedProduct.price).toLocaleString("en-IN")}</p>
+                <p className="text-sm font-sans uppercase tracking-widest text-[#d4af37]">₹{Number(enlargedProduct.sellingPrice).toLocaleString("en-IN")}</p>
                 <Link
                   href={`/product/${encodeURIComponent(enlargedProduct.name)}`}
                   className="px-6 py-2 border border-white/20 text-[9px] font-sans uppercase tracking-widest hover:bg-white hover:text-black transition-all"

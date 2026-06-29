@@ -159,7 +159,7 @@ export default function CheckoutPage() {
       name: item.name,
       size: item.size,
       quantity: item.quantity,
-      price: item.price,
+      sellingPrice: item.sellingPrice,
       image: item.image,
     })),
     shippingAddress: {
@@ -830,7 +830,7 @@ export default function CheckoutPage() {
                         </div>
 
                         <p className="text-sm shrink-0">
-                          ₹{(item.price * item.quantity).toLocaleString('en-IN')}
+                          ₹{(item.sellingPrice * item.quantity).toLocaleString('en-IN')}
                         </p>
                       </div>
                     ))}

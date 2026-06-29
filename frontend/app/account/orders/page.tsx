@@ -103,7 +103,7 @@ export default function OrdersPage() {
                       {order.items && order.items.map((item: any, index: number) => (
                         <div key={index} className="flex items-start justify-between gap-4">
                           <span className="pr-2">{item.productName || item.product_name} · Size {item.size} × {item.quantity}</span>
-                          <span>₹{(item.price * item.quantity).toLocaleString("en-IN")}</span>
+                          <span>₹{(item.sellingPrice * item.quantity).toLocaleString("en-IN")}</span>
                         </div>
                       ))}
                     </div>

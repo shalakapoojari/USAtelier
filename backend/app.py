@@ -66,7 +66,7 @@ from models_mysql import (
     Order as OrderSQL, OrderItem, CartItem, WishlistItem,
     Review, HomepageConfig, Payment,
     DispatchJob, Coupon, PasswordResetToken, AuditLog,
-    CartEvent, AbandonedCartEmail, CartSettings,
+    CartEvent, AbandonedCartEmail, CartSettings, HomepageBanner,
     ProductView,
 )
 from delhivery_utils import create_shipment, calculate_shipping, validate_pincode
@@ -713,6 +713,9 @@ with app.app_context():
         ("orders", "cod_fee", "ALTER TABLE orders ADD COLUMN cod_fee FLOAT DEFAULT 0"),
         ("orders", "cod_collectable_amount", "ALTER TABLE orders ADD COLUMN cod_collectable_amount FLOAT DEFAULT 0"),
         ("payments", "checkout_payload_json", "ALTER TABLE payments ADD COLUMN checkout_payload_json TEXT"),
+        ("products", "selling_price", "ALTER TABLE products CHANGE price selling_price FLOAT NOT NULL"),
+        ("products", "mrp", "ALTER TABLE products ADD COLUMN mrp FLOAT DEFAULT NULL"),
+        ("order_items", "selling_price", "ALTER TABLE order_items CHANGE price selling_price FLOAT NOT NULL"),
     ]
     for table_name, column_name, alter_sql in migration_columns:
         try:
@@ -1696,16 +1699,16 @@ def get_products():
             (ProductSQL.description.ilike(f"%{search}%"))
         )
     if min_price:
-        try: q = q.filter(ProductSQL.price >= float(min_price))
+        try: q = q.filter(ProductSQL.selling_price >= float(min_price))
         except ValueError: pass
     if max_price:
-        try: q = q.filter(ProductSQL.price <= float(max_price))
+        try: q = q.filter(ProductSQL.selling_price <= float(max_price))
         except ValueError: pass
 
     if sort_raw == "price_asc":
-        q = q.order_by(ProductSQL.price.asc())
+        q = q.order_by(ProductSQL.selling_price.asc())
     elif sort_raw == "price_desc":
-        q = q.order_by(ProductSQL.price.desc())
+        q = q.order_by(ProductSQL.selling_price.desc())
     else:
         q = q.order_by(ProductSQL.display_order.asc(), ProductSQL.created_at.desc())
 
@@ -1761,11 +1764,18 @@ def add_product():
     care        = _sanitise_str(data.get("care", ""), 500)
 
     try:
-        price = float(data["price"])
-        if price < 0 or price > 1_000_000:
+        selling_price = float(data["sellingPrice"])
+        if selling_price < 0 or selling_price > 1_000_000:
             raise ValueError("Price out of range")
-    except (TypeError, ValueError):
+    except ValueError:
         return jsonify({"error": "Invalid price value"}), 400
+
+    mrp = None
+    if "mrp" in data and data["mrp"]:
+        try:
+            mrp = float(data["mrp"])
+        except ValueError:
+            return jsonify({"error": "Invalid mrp value"}), 400
 
     images = data.get("images", [])
     if not isinstance(images, list) or len(images) > 20:
@@ -1776,7 +1786,8 @@ def add_product():
     try:
         new_product = ProductSQL(
             name             = name,
-            price            = price,
+            selling_price    = selling_price,
+            mrp              = mrp,
             category         = category,
             subcategory      = subcategory,
             gender           = gender,
@@ -1799,6 +1810,12 @@ def add_product():
         db_mysql.session.add(new_product)
         db_mysql.session.flush()   # get new_product.id before audit
         _audit("product_created", "product", new_product.id, {"name": name})
+        
+        admin_email = session.get("user_email", "admin")
+        app.logger.info("Admin %s created product ID=%d, Name=%s, SellingPrice=%.2f",
+                        admin_email, new_product.id,
+                        new_product.name, new_product.selling_price)
+        
         db_mysql.session.commit()
 
         if new_product.is_new and data.get("notify_users"):
@@ -1807,7 +1824,7 @@ def add_product():
                     send_new_arrival_notification(
                         mail, u.email,
                         u.first_name or u.email.split("@")[0],
-                        new_product.name, new_product.price,
+                        new_product.name, new_product.selling_price,
                         new_product.category, new_product.description,
                         str(new_product.id),
                     )
@@ -1832,13 +1849,22 @@ def update_product(product_id):
     data = request.get_json() or {}
 
     if "name"          in data: product.name          = _sanitise_str(data["name"], 255)
-    if "price"         in data:
+    if "sellingPrice" in data:
         try:
-            p = float(data["price"])
-            if p < 0 or p > 1_000_000: raise ValueError
-            product.price = p
-        except (TypeError, ValueError):
-            return jsonify({"error": "Invalid price value"}), 400
+            p = float(data["sellingPrice"])
+            if p >= 0:
+                product.selling_price = p
+        except ValueError:
+            return jsonify({"error": "Invalid sellingPrice value"}), 400
+
+    if "mrp" in data:
+        if data["mrp"] is None or data["mrp"] == "":
+            product.mrp = None
+        else:
+            try:
+                product.mrp = float(data["mrp"])
+            except ValueError:
+                return jsonify({"error": "Invalid mrp value"}), 400
     if "category"      in data: product.category      = _sanitise_str(data["category"], 100)
     if "subcategory"   in data: product.subcategory   = _sanitise_str(data["subcategory"], 100)
     if "gender"        in data: product.gender        = _sanitise_str(data["gender"], 50)
@@ -2005,7 +2031,7 @@ def get_cart():
                     results.append({
                         "id":       str(product.id),
                         "name":     product.name,
-                        "price":    product.price,
+                        "sellingPrice": product.selling_price,
                         "image":    product.images[0] if product.images else "",
                         "quantity": item.quantity,
                         "size":     item.size,
@@ -2142,7 +2168,7 @@ def get_wishlist():
                 results.append({
                     "id":       str(product.id),
                     "name":     product.name,
-                    "price":    product.price,
+                    "sellingPrice": product.selling_price,
                     "image":    product.images[0] if product.images else "",
                     "category": product.category,
                 })
@@ -3248,14 +3274,14 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
                 return jsonify({"error": f"Insufficient stock for {product.name}"}), 400
             product.stock -= quantity
 
-        line_total = float(product.price) * quantity
+        line_total = float(product.selling_price) * quantity
         computed_subtotal += line_total
         validated_items.append({
             "id":         pid,
             "name":       product.name,
             "quantity":   quantity,
             "size":       size,
-            "unit_price": float(product.price),
+            "unit_price": float(product.selling_price),
         })
 
     coupon_code     = _sanitise_str(data.get("couponCode", ""), 50).upper() or None
@@ -3371,7 +3397,7 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
                 product_id = item["id"],
                 product_name   = item["name"],
                 quantity       = item["quantity"],
-                price          = item["unit_price"],
+                selling_price  = item["unit_price"],
                 size           = item.get("size"),
             ))
 
@@ -3497,11 +3523,11 @@ def get_admin_order_detail(order_id):
     d["date"]          = order.created_at.isoformat() if order.created_at else None
 
     frontend_items = [
-        {"productName": item.product_name, "quantity": item.quantity, "price": item.price, "size": item.size}
+        {"productName": item.product_name, "quantity": item.quantity, "sellingPrice": item.selling_price, "size": item.size}
         for item in order.items
     ]
     d["items"]    = frontend_items
-    d["subtotal"] = sum(i["price"] * i["quantity"] for i in frontend_items)
+    d["subtotal"] = sum(i["sellingPrice"] * i["quantity"] for i in frontend_items)
     d["shipping"] = round(order.total - d["subtotal"] + (order.discount_amount or 0), 2)
     return jsonify(d), 200
 
@@ -3727,7 +3753,7 @@ def get_analysis_data():
                 OrderItem.product_id,
                 OrderItem.product_name,
                 func.sum(OrderItem.quantity).label("total_sold"),
-                func.sum(OrderItem.price * OrderItem.quantity).label("total_revenue"),
+                func.sum(OrderItem.selling_price * OrderItem.quantity).label("total_revenue"),
             )
             .group_by(OrderItem.product_id, OrderItem.product_name)
             .order_by(func.sum(OrderItem.quantity).desc())
@@ -3937,13 +3963,13 @@ def get_analysis_data():
             db_mysql.session.query(
                 OrderItem.product_id,
                 OrderItem.product_name,
-                func.sum(OrderItem.price * OrderItem.quantity).label("total_revenue"),
+                func.sum(OrderItem.selling_price * OrderItem.quantity).label("total_revenue"),
                 func.count(func.distinct(OrderItem.order_id)).label("order_count"),
             )
             .join(OrderSQL, OrderSQL.id == OrderItem.order_id)
             .filter(OrderSQL.status != "Cancelled")
             .group_by(OrderItem.product_id, OrderItem.product_name)
-            .order_by(func.sum(OrderItem.price * OrderItem.quantity).desc())
+            .order_by(func.sum(OrderItem.selling_price * OrderItem.quantity).desc())
             .limit(10)
             .all()
         )
@@ -4570,7 +4596,7 @@ def get_cart_analytics_summary():
     """Summary cards: active carts, total value, avg abandonment, top abandoned."""
     # Get the most recent cart snapshot per user (latest "add" event with a non-empty snapshot)
     from sqlalchemy import func
-
+    
     subq = db_mysql.session.query(
         CartEvent.user_email,
         func.max(CartEvent.timestamp).label("latest")
@@ -4592,6 +4618,16 @@ def get_cart_analytics_summary():
     for ev in latest_events:
         snap = ev.cart_snapshot or []
         if not snap:
+            continue
+        active_carts += 1
+        
+        items = snap if isinstance(snap, list) else [snap]
+        total_items = 0
+        for item in items:
+            qty = int(item.get("quantity", 1))
+            selling_price = float(item.get("sellingPrice", 0))
+            total_items += qty
+            total_value += selling_price * qty
             continue
         # Check user hasn't completed a purchase since this event
         order_after = OrderSQL.query.filter(
@@ -4926,3 +4962,35 @@ from mail_utils import send_abandoned_cart_email  # noqa: E402
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=not is_production)
+
+# ============================================================
+# Homepage Banner Settings
+# ============================================================
+
+@app.route("/api/settings/banner", methods=["GET"])
+def get_homepage_banner():
+    """Public endpoint to get the homepage banner configuration"""
+    banner = HomepageBanner.query.get(1)
+    if not banner:
+        banner = HomepageBanner(id=1, text="", is_active=False)
+        db_mysql.session.add(banner)
+        db_mysql.session.commit()
+    return jsonify(banner.to_dict())
+
+@app.route("/api/settings/banner", methods=["POST"])
+@admin_required
+def update_homepage_banner():
+    """Admin endpoint to update the homepage banner configuration"""
+    data = request.get_json() or {}
+    banner = HomepageBanner.query.get(1)
+    if not banner:
+        banner = HomepageBanner(id=1, text="", is_active=False)
+        db_mysql.session.add(banner)
+        
+    if "text" in data:
+        banner.text = data["text"]
+    if "isActive" in data:
+        banner.is_active = bool(data["isActive"])
+        
+    db_mysql.session.commit()
+    return jsonify({"message": "Homepage banner updated successfully", "banner": banner.to_dict()})

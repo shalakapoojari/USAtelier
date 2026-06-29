@@ -26,7 +26,7 @@ export default function FavouritesPage() {
         addItem({
             id: item.id,
             name: item.name,
-            price: item.price,
+            sellingPrice: item.sellingPrice,
             image: item.image,
             size: "M",
             stock: item.stock ?? 50 // Use real stock or safe fallback
@@ -106,7 +106,7 @@ export default function FavouritesPage() {
                                             {item.name}
                                         </h3>
                                     </Link>
-                                    <p className="text-sm text-gray-400">₹{item.price.toLocaleString("en-IN")}</p>
+                                    <p className="text-sm text-gray-400">₹{item.sellingPrice.toLocaleString("en-IN")}</p>
                                 </div>
 
                                 {/* Quick add to cart */}

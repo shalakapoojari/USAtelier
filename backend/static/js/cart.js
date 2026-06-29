@@ -17,7 +17,7 @@ const CartModule = {
         const item = {
             id: product.id,
             name: product.name,
-            price: product.price,
+            sellingPrice: product.sellingPrice,
             size: product.size || 'One Size',
             quantity: product.quantity || 1,
             image: product.image || product.images?.[0] || 'placeholder.svg'
@@ -76,7 +76,7 @@ const CartModule = {
     },
 
     getTotal() {
-        return this.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        return this.items.reduce((sum, item) => sum + (item.sellingPrice * item.quantity), 0);
     },
 
     updateCartUI() {

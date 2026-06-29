@@ -96,7 +96,7 @@
                         </div>
                         
                         <div style="border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); padding: 1rem 0; margin-bottom: 1rem;">
-                            <div style="font-size: 1.5rem; font-weight: 500;">$${product.price}</div>
+                            <div style="font-size: 1.5rem; font-weight: 500;">$${product.sellingPrice}</div>
                             <div style="font-size: 0.85rem; color: #888;">Inclusive of all taxes</div>
                         </div>
 
@@ -121,7 +121,7 @@
 
                     <!-- Buy Box -->
                     <div class="buy-box">
-                        <div style="font-size: 1.5rem; font-weight: 500; margin-bottom: 1rem;">$${product.price}</div>
+                        <div style="font-size: 1.5rem; font-weight: 500; margin-bottom: 1rem;">$${product.sellingPrice}</div>
                         <div style="font-size: 0.9rem; color: #4ade80; margin-bottom: 1rem;">In Stock</div>
                         <div style="font-size: 0.85rem; color: #888; margin-bottom: 1.5rem;">
                             FREE delivery <strong>Wednesday, Feb 26</strong>.
@@ -216,7 +216,7 @@
         await CartModule.addToCart({
             id: productData.id,
             name: productData.name,
-            price: productData.price,
+            sellingPrice: productData.sellingPrice,
             size: size,
             quantity: quantity,
             image: productData.images?.[0]
