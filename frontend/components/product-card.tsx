@@ -1,21 +1,59 @@
 "use client"
 
-import { useState, useRef, useEffect, useMemo } from "react"
+import { useRef, useMemo } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import gsap from "gsap"
-import { Sparkles, Award } from "lucide-react"
 import type { Product } from "@/lib/data"
 import { resolveMediaUrl } from "@/lib/media-url"
+import { useWishlist } from "@/lib/wishlist-context"
+import { ProductPrice } from "@/components/product-price"
+import { Sparkles, Award } from "lucide-react"
 
 type ProductCardProps = {
-  product: Product
+  product: Product & {
+    mrp?: number | null
+    discountPercent?: number
+    is_new?: boolean
+    is_featured?: boolean
+    is_bestseller?: boolean
+    stock?: number
+  }
+}
+
+// Heart SVG — outline (default) / filled (wishlisted)
+function HeartIcon({ filled }: { filled: boolean }) {
+  return filled ? (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="white"
+      className="w-5 h-5 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]"
+      aria-hidden="true"
+    >
+      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+    </svg>
+  ) : (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="white"
+      strokeWidth={2}
+      className="w-5 h-5 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+      />
+    </svg>
+  )
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const [currentImage] = useState(0)
-  const rootRef = useRef<HTMLAnchorElement | null>(null)
-  const imgRef = useRef<HTMLImageElement | null>(null)
+  const { toggleItem, isWishlisted } = useWishlist()
+  const wishlisted = isWishlisted(String(product.id))
 
   // Robustly handle images which might be JSON strings or arrays
   const images = useMemo(() => {
@@ -28,92 +66,115 @@ export function ProductCard({ product }: ProductCardProps) {
     }
   }, [product.images])
 
-  const isInStock = (product as any).stock !== undefined ? (product as any).stock > 0 : product.inStock
+  const isInStock =
+    (product as any).stock !== undefined
+      ? (product as any).stock > 0
+      : product.inStock
 
-  useEffect(() => {
-    if (!rootRef.current) return
-    const ctx = gsap.context(() => {
-      gsap.from(rootRef.current, { y: 18, opacity: 0, duration: 0.8, ease: "power3.out" })
-    }, rootRef)
-    return () => ctx.revert()
-  }, [])
-
-  const handleHover = () => {
-    if (!imgRef.current) return
-    gsap.to(imgRef.current, { scale: 1.04, duration: 0.5, ease: "power2.out" })
-    gsap.to(rootRef.current, {
-      boxShadow: "0 8px 40px rgba(123,47,190,0.2), 0 0 0 1px rgba(123,47,190,0.35)",
-      duration: 0.3,
+  const handleWishlistClick = (e: React.MouseEvent) => {
+    // Stop propagation so the card link doesn't navigate
+    e.preventDefault()
+    e.stopPropagation()
+    toggleItem({
+      id: String(product.id),
+      name: product.name,
+      sellingPrice: product.sellingPrice,
+      image: resolveMediaUrl(images[0]),
+      category: product.category,
+      stock: (product as any).stock,
     })
-  }
-
-  const handleLeave = () => {
-    if (!imgRef.current) return
-    gsap.to(imgRef.current, { scale: 1, duration: 0.35, ease: "power2.out" })
-    gsap.to(rootRef.current, { boxShadow: "0 0 0 1px rgba(123,47,190,0.12)", duration: 0.35 })
   }
 
   return (
     <Link
       href={`/product/${encodeURIComponent(product.name)}`}
-      ref={rootRef}
-      className="product-card group block rounded-sm focus:outline-none focus:ring-1 focus:ring-[rgba(123,47,190,0.4)]"
-      style={{
-        boxShadow: "0 0 0 1px rgba(123,47,190,0.12)",
-        background: "rgba(10,10,20,0.6)",
-        backdropFilter: "blur(8px)",
-        transition: "box-shadow 0.3s ease",
-      }}
-      onMouseEnter={handleHover}
-      onMouseLeave={handleLeave}
+      className="product-card block focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+      style={{ borderRadius: 0, boxShadow: "none", border: "none", background: "none" }}
     >
-      {/* Image Container */}
-      <div className="relative aspect-3/4 overflow-hidden bg-[#111] rounded-sm">
+      {/* ── Image area ─────────────────────────────────────── */}
+      <div
+        className="relative overflow-hidden"
+        style={{ aspectRatio: "3 / 4" }}
+      >
         <Image
-          src={resolveMediaUrl(images[currentImage])}
+          src={resolveMediaUrl(images[0])}
           alt={product.name}
           fill
-          sizes="(max-width: 767px) 50vw, (max-width: 1279px) 33vw, 25vw"
+          sizes="(max-width: 639px) 50vw, (max-width: 1023px) 50vw, 25vw"
           loading="lazy"
-          ref={imgRef as any}
-          className="object-cover transition-opacity duration-300"
+          className="object-cover"
+          style={{ objectPosition: "center top", borderRadius: 0 }}
         />
 
         {/* Out of stock overlay */}
         {!isInStock && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <span className="text-xs uppercase tracking-widest border border-white/40 px-3 py-1.5 text-white/80">
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center pointer-events-none">
+            <span className="text-[10px] uppercase tracking-widest border border-white/40 px-3 py-1.5 text-white/80">
               Out of Stock
             </span>
           </div>
         )}
 
-        {/* Badges */}
-        <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+        {/* Badges — top left */}
+        <div className="absolute top-3 left-3 flex flex-col gap-1 pointer-events-none">
           {(product.newArrival || (product as any).is_new) && (
             <span className="bg-white text-black text-[9px] uppercase tracking-widest px-2 py-0.5 font-medium flex items-center gap-1">
-              <Sparkles size={8} />
+              <Sparkles size={7} />
               New
             </span>
           )}
           {(product.bestseller || (product as any).is_bestseller) && (
             <span className="bg-amber-500 text-black text-[9px] uppercase tracking-widest px-2 py-0.5 font-medium flex items-center gap-1">
-              <Award size={8} />
+              <Award size={7} />
               Best
             </span>
           )}
         </div>
 
-        {/* CTA removed */}
+        {/* Wishlist heart — bottom right, inside image, no circular bg */}
+        <button
+          type="button"
+          onClick={handleWishlistClick}
+          aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          className="absolute bottom-2 right-2 z-10 p-1 transition-transform active:scale-90"
+          style={{ background: "none", border: "none", cursor: "pointer" }}
+        >
+          <HeartIcon filled={wishlisted} />
+        </button>
       </div>
 
-      {/* Text info */}
-      <div className="mt-3 space-y-0.5">
-        <p className="text-[9px] md:text-[10px] uppercase tracking-widest text-gray-500">{product.category}</p>
-        <h3 className="text-sm md:text-lg lg:text-xl font-serif text-balance group-hover:text-gray-300 transition-colors leading-snug">
+      {/* ── Info bar ───────────────────────────────────────── */}
+      <div
+        style={{
+          background: "#111111",
+          padding: "12px 10px 10px 10px",
+          borderRadius: 0,
+        }}
+      >
+        {/* Product name */}
+        <p
+          className="uppercase text-white font-normal tracking-wide"
+          style={{
+            fontSize: "12px",
+            lineHeight: "1.3",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            fontWeight: 400,
+          }}
+        >
           {product.name}
-        </h3>
-        <p className="text-xs md:text-sm text-gray-400">₹{product.sellingPrice.toLocaleString('en-IN')}</p>
+        </p>
+
+        {/* Price row */}
+        <div className="mt-1.5">
+          <ProductPrice
+            sellingPrice={product.sellingPrice}
+            mrp={(product as any).mrp}
+            darkBg
+            className="text-xs"
+          />
+        </div>
       </div>
     </Link>
   )

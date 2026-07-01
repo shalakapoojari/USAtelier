@@ -16,6 +16,7 @@ import { getApiBase, apiFetch } from "@/lib/api-base"
 import { resolveMediaUrl } from "@/lib/media-url"
 
 import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ShoppingBag, Heart, Star, Check, Sparkles, Award, ArrowLeft, Loader2, Share2, MessageCircle, Twitter, Facebook, Link2 } from "lucide-react"
+import { ProductPrice } from "@/components/product-price"
 
 const API_BASE = getApiBase()
 const SESSION_ID_KEY = "usa_session_id"
@@ -583,7 +584,13 @@ export default function ProductPage({
             )}
 
             {/* Price */}
-            <p className="text-3xl font-light mb-6">₹{product.sellingPrice.toLocaleString('en-IN')}</p>
+            <div className="mb-6">
+              <ProductPrice
+                sellingPrice={product.sellingPrice}
+                mrp={product.mrp}
+                className="text-3xl font-light"
+              />
+            </div>
 
             {/* Details grid (fabric, category, stock) */}
             <div className="grid grid-cols-2 gap-3 mb-8 text-xs">

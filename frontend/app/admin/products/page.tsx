@@ -164,6 +164,7 @@ export default function ProductsPage() {
   const [formData, setFormData] = useState({
     name: "",
     sellingPrice: "",
+    mrp: "",
     category: "",
     subcategory: "",
     description: "",
@@ -179,6 +180,9 @@ export default function ProductsPage() {
     sizeGuideImage: "",
     notifyUsers: false,
   })
+
+  // Inline validation errors for price fields
+  const [priceErrors, setPriceErrors] = useState({ sellingPrice: "", mrp: "" })
 
   useEffect(() => {
     if (API_BASE) {
@@ -366,6 +370,7 @@ export default function ProductsPage() {
     setFormData({
       name: product.name || "",
       sellingPrice: product.sellingPrice?.toString() || "",
+      mrp: product.mrp != null ? product.mrp.toString() : "",
       category: product.category || "",
       subcategory: product.subcategory || "",
       description: product.description || "",
@@ -381,12 +386,33 @@ export default function ProductsPage() {
       sizeGuideImage: product.sizeGuideImage || product.size_guide_image || "",
       notifyUsers: false,
     })
+    setPriceErrors({ sellingPrice: "", mrp: "" })
     setEditingProduct(product)
     setDialogOpen(true)
   }
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Validate Selling Price
+    const sp = parseFloat(formData.sellingPrice)
+    const newPriceErrors = { sellingPrice: "", mrp: "" }
+    let hasError = false
+    if (!formData.sellingPrice || isNaN(sp) || sp <= 0) {
+      newPriceErrors.sellingPrice = "Selling price is required and must be greater than 0"
+      hasError = true
+    }
+    // Validate MRP if provided
+    if (formData.mrp.trim() !== "") {
+      const mrpVal = parseFloat(formData.mrp)
+      if (!isNaN(mrpVal) && !isNaN(sp) && mrpVal < sp) {
+        newPriceErrors.mrp = "MRP must be greater than or equal to the Selling Price."
+        hasError = true
+      }
+    }
+    setPriceErrors(newPriceErrors)
+    if (hasError) return
+
     setIsAdding(true)
 
     const filteredImages = formData.images.filter(img => img.trim() !== "")
@@ -395,6 +421,9 @@ export default function ProductsPage() {
       setIsAdding(false)
       return
     }
+
+    // Build payload — convert mrp to number or null
+    const mrpPayload = formData.mrp.trim() !== "" ? parseFloat(formData.mrp) : null
 
     try {
       const url = editingProduct
@@ -410,6 +439,7 @@ export default function ProductsPage() {
         },
         body: JSON.stringify({
           ...formData,
+          mrp: mrpPayload,
           notify_users: formData.notifyUsers,
           images: filteredImages,
         }),
@@ -428,6 +458,7 @@ export default function ProductsPage() {
         setFormData({
           name: "",
           sellingPrice: "",
+          mrp: "",
           category: "",
           subcategory: "",
           description: "",
@@ -443,6 +474,7 @@ export default function ProductsPage() {
           sizeGuideImage: "",
           notifyUsers: false,
         })
+        setPriceErrors({ sellingPrice: "", mrp: "" })
       } else {
         const data = await res.json()
         showToast(data.error || "Failed to save product", "info")
@@ -588,6 +620,7 @@ export default function ProductsPage() {
             setFormData({
               name: "",
               sellingPrice: "",
+              mrp: "",
               category: "",
               subcategory: "",
               description: "",
@@ -603,6 +636,7 @@ export default function ProductsPage() {
               sizeGuideImage: "",
               notifyUsers: false,
             })
+            setPriceErrors({ sellingPrice: "", mrp: "" })
           }
         }}>
           <DialogTrigger asChild>
@@ -637,18 +671,67 @@ export default function ProductsPage() {
                           className="bg-transparent border-white/10 focus:border-white/30 rounded-none h-12"
                         />
                       </div>
+                      {/* Price fields: 2-column — Selling Price + MRP */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Selling Price (required) */}
                         <div className="space-y-2">
-                          <Label className="text-[10px] uppercase tracking-widest text-gray-400">Price (INR)</Label>
+                          <Label className="text-[10px] uppercase tracking-widest text-gray-400">
+                            Selling Price (Rs.) <span className="text-red-400">*</span>
+                          </Label>
                           <Input
-                            name="price"
+                            id="sellingPrice"
+                            name="sellingPrice"
                             type="number"
+                            step="0.01"
+                            min="0"
                             value={formData.sellingPrice}
-                            onChange={handleInputChange}
-                            required
-                            className="bg-transparent border-white/10 focus:border-white/30 rounded-none h-12"
+                            onChange={(e) => {
+                              handleInputChange(e)
+                              if (priceErrors.sellingPrice) setPriceErrors(prev => ({ ...prev, sellingPrice: "" }))
+                            }}
+                            placeholder="e.g. 799"
+                            className={`bg-transparent border-white/10 focus:border-white/30 rounded-none h-12 ${
+                              priceErrors.sellingPrice ? "border-red-500/60" : ""
+                            }`}
                           />
+                          {priceErrors.sellingPrice && (
+                            <p className="text-[10px] text-red-400 tracking-wide">{priceErrors.sellingPrice}</p>
+                          )}
                         </div>
+
+                        {/* MRP (optional) */}
+                        <div className="space-y-2">
+                          <Label className="text-[10px] uppercase tracking-widest text-gray-400">
+                            MRP / Original Price (Rs.)
+                            <span className="text-gray-600 ml-1">(optional)</span>
+                          </Label>
+                          <Input
+                            id="mrp"
+                            name="mrp"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={formData.mrp}
+                            onChange={(e) => {
+                              handleInputChange(e)
+                              if (priceErrors.mrp) setPriceErrors(prev => ({ ...prev, mrp: "" }))
+                            }}
+                            placeholder="e.g. 999 (leave blank if no discount)"
+                            className={`bg-transparent border-white/10 focus:border-white/30 rounded-none h-12 ${
+                              priceErrors.mrp ? "border-red-500/60" : ""
+                            }`}
+                          />
+                          {priceErrors.mrp && (
+                            <p className="text-[10px] text-red-400 tracking-wide">{priceErrors.mrp}</p>
+                          )}
+                          {!priceErrors.mrp && formData.mrp.trim() !== "" && formData.sellingPrice.trim() !== "" && parseFloat(formData.mrp) > parseFloat(formData.sellingPrice) && (
+                            <p className="text-[10px] text-emerald-400 tracking-wide">
+                              {Math.round(((parseFloat(formData.mrp) - parseFloat(formData.sellingPrice)) / parseFloat(formData.mrp)) * 100)}% discount will be shown
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Total Stock (read-only) */}
                         <div className="space-y-2">
                           <Label className="text-[10px] uppercase tracking-widest text-gray-400">Total Stock</Label>
                           <Input
@@ -659,6 +742,8 @@ export default function ProductsPage() {
                             className="bg-white/5 border-white/10 focus:border-white/30 rounded-none h-12 opacity-80"
                           />
                         </div>
+
+                        {/* Gender */}
                         <div className="space-y-2">
                           <Label className="text-[10px] uppercase tracking-widest text-gray-400">Gender</Label>
                           <Select

@@ -268,15 +268,57 @@ function ShopContent() {
 
   return (
     <>
-      {/* ─── MAIN CONTENT ─────────────────────────────────────────────────── */}
-      <main className="px-6 md:px-12 pb-32 pt-44 md:pt-48">
+      {/* ─── MAIN CONTENT ────────────────────────────────────────── */}
+      <main className="px-0 pb-32 pt-44 md:pt-48">
 
         {/* ─── CATEGORIES & FILTERS BAR ───────────────────────────────────── */}
         {!loading && (
-          <div className="mb-8 flex items-center justify-between gap-4 border-b border-white/5 pb-4 md:pb-6 relative z-30">
-            {/* Category filter tabs */}
+          <div className="mb-8 px-4 md:px-12 flex items-center justify-between gap-4 border-b border-white/5 pb-4 md:pb-6 relative z-30">
+
+            {/* Mobile category <select> — shown only below md breakpoint */}
             {!urlSearch && categories.length > 0 && (
-              <div className="flex-1 overflow-x-auto no-scrollbar pr-4">
+              <div className="flex-1 md:hidden">
+                <select
+                  aria-label="Select category"
+                  value={urlCategory || ""}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (val === "") {
+                      window.location.href = "/view-all"
+                    } else {
+                      window.location.href = `/view-all?category=${encodeURIComponent(val)}`
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    background: "#0a0a0a",
+                    color: "#e8e8e3",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    padding: "8px 12px",
+                    fontSize: "10px",
+                    letterSpacing: "0.2em",
+                    textTransform: "uppercase",
+                    borderRadius: 0,
+                    appearance: "none",
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "right 12px center",
+                    paddingRight: "32px",
+                  }}
+                >
+                  <option value="">All</option>
+                  {categories.map((cat: any) => (
+                    <option key={cat.id || cat.name} value={cat.name}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Desktop category pills — hidden on mobile */}
+            {!urlSearch && categories.length > 0 && (
+              <div className="flex-1 overflow-x-auto no-scrollbar pr-4 hidden md:block">
                 <div className="flex items-center gap-3 min-w-max">
                   <a
                     href="/view-all"
@@ -478,7 +520,7 @@ function ShopContent() {
             <>
               {/* Grid — plain when no category or with search */}
               {(!urlCategory || urlSearch || urlSubcategory) ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8 lg:gap-10">
+                <div className="grid grid-cols-2 lg:grid-cols-4" style={{ gap: 0 }}>
                   {filteredProducts.map((product) => (
                     <ProductCard key={product.id || Math.random()} product={product} />
                   ))}
@@ -522,7 +564,7 @@ function ShopContent() {
 
                   if (subcategories.length === 0) {
                     return (
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8 lg:gap-10">
+                      <div className="grid grid-cols-2 lg:grid-cols-4" style={{ gap: 0 }}>
                         {filteredProducts.map((product) => (
                           <ProductCard key={product.id || Math.random()} product={product} />
                         ))}
@@ -558,7 +600,7 @@ function ShopContent() {
                               </h2>
                               <div className="h-px w-full bg-white/8" />
                             </div>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8 lg:gap-10">
+                            <div className="grid grid-cols-2 lg:grid-cols-4" style={{ gap: 0 }}>
                               {sectionProducts.map((product) => (
                                 <ProductCard key={product.id || Math.random()} product={product} />
                               ))}
@@ -581,7 +623,7 @@ function ShopContent() {
                               </h2>
                               <div className="h-px w-full bg-white/8" />
                             </div>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8 lg:gap-10">
+                            <div className="grid grid-cols-2 lg:grid-cols-4" style={{ gap: 0 }}>
                               {unmatched.map((product) => (
                                 <ProductCard key={product.id || Math.random()} product={product} />
                               ))}

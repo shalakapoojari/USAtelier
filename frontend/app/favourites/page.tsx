@@ -11,6 +11,7 @@ import { SiteFooter } from "@/components/site-footer"
 import { useWishlist } from "@/lib/wishlist-context"
 import { useCart } from "@/lib/cart-context"
 import { useToast } from "@/lib/toast-context"
+import { ProductPrice } from "@/components/product-price"
 
 export default function FavouritesPage() {
     const { items, removeItem, clearUnseen } = useWishlist()
@@ -106,7 +107,9 @@ export default function FavouritesPage() {
                                             {item.name}
                                         </h3>
                                     </Link>
-                                    <p className="text-sm text-gray-400">₹{item.sellingPrice.toLocaleString("en-IN")}</p>
+                                    <p className="text-sm text-gray-400">
+                                        <ProductPrice sellingPrice={item.sellingPrice} />
+                                    </p>
                                 </div>
 
                                 {/* Quick add to cart */}
