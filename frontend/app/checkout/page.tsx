@@ -1107,7 +1107,7 @@ export default function CheckoutPage() {
                   </div>
                 )}
                 {couponMessage && (
-                  <p className={`text-[10px] uppercase tracking-widest ${appliedCoupon ? "text-green-400" : "text-amber-400"}`}>
+                  <p className={`text-[10px] uppercase tracking-[0.25em] ${appliedCoupon ? "text-green-400" : "text-amber-400"}`}>
                     {couponMessage}
                   </p>
                 )}
