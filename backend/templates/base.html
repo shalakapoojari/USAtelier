@@ -13,19 +13,24 @@
     <header class="site-header">
         <div class="header-container">
             <div class="logo">
-                <a href="/"><img src="/logo/us-atelier-wordmark.svg" alt="U.S ATELIER" style="height: 40px; width: 220px; object-fit: contain; margin-left: 10px;" /></a>
+                <a href="/"><img src="/logo/us-atelier-wordmark.svg" alt="U.S ATELIER" /></a>
             </div>
-            <nav class="main-nav">
+            <nav class="main-nav" id="main-nav">
                 <a href="/shop">Shop</a>
                 <a href="/collections">Collections</a>
                 <a href="/account">Account</a>
                 <a href="/cart" class="cart-link">Cart <span class="cart-count">0</span></a>
             </nav>
-            <div class="auth-links">
+            <div class="auth-links" id="auth-links">
                 <span id="user-name" style="display: none;"></span>
                 <a href="/login" id="login-link">Login</a>
                 <button id="logout-btn" style="display: none;">Logout</button>
             </div>
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle navigation" aria-expanded="false">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
         </div>
     </header>
 
@@ -65,6 +70,60 @@
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <script src="/static/js/auth.js"></script>
     <script src="/static/js/cart.js"></script>
+    <script>
+        // Site visit tracking
+        (function() {
+            let sessionId = sessionStorage.getItem('_sid');
+            if (!sessionId) {
+                sessionId = Date.now() + '-' + Math.random().toString(36).slice(2);
+                sessionStorage.setItem('_sid', sessionId);
+            }
+            fetch('/api/track/pageview', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    page: window.location.pathname,
+                    referrer: document.referrer || null,
+                    session_id: sessionId,
+                    user_agent: navigator.userAgent
+                })
+            }).catch(() => {});
+        })();
+
+        // Mobile menu toggle
+        (function() {
+            var toggle = document.getElementById('mobile-menu-toggle');
+            var nav = document.getElementById('main-nav');
+            var authLinks = document.getElementById('auth-links');
+            if (toggle && nav) {
+                toggle.addEventListener('click', function() {
+                    var isOpen = nav.classList.toggle('open');
+                    if (authLinks) authLinks.classList.toggle('open', isOpen);
+                    toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                    // Animate burger to X
+                    var spans = toggle.querySelectorAll('span');
+                    if (isOpen) {
+                        spans[0].style.cssText = 'transform:rotate(45deg) translate(5px,5px)';
+                        spans[1].style.cssText = 'opacity:0';
+                        spans[2].style.cssText = 'transform:rotate(-45deg) translate(5px,-5px)';
+                    } else {
+                        spans[0].style.cssText = '';
+                        spans[1].style.cssText = '';
+                        spans[2].style.cssText = '';
+                    }
+                });
+                // Close menu on nav link click
+                nav.querySelectorAll('a').forEach(function(a) {
+                    a.addEventListener('click', function() {
+                        nav.classList.remove('open');
+                        if (authLinks) authLinks.classList.remove('open');
+                        toggle.setAttribute('aria-expanded', 'false');
+                        toggle.querySelectorAll('span').forEach(function(s) { s.style.cssText = ''; });
+                    });
+                });
+            }
+        })();
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 

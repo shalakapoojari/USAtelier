@@ -186,35 +186,35 @@ export function SiteHeader() {
       <header className="absolute top-0 left-0 w-full z-[50] bg-transparent text-white mix-blend-difference">
         <div className="w-full max-w-screen-2xl mx-auto flex justify-between items-center px-6 md:px-12 py-6 md:py-8">
 
-          <div className="flex items-center w-1/3">
+          <div className="flex items-center w-1/3 min-w-0">
             <button
               onClick={openMenu}
-              className="group flex items-center gap-3 hover:opacity-60 transition-opacity p-2 -ml-2"
+              className="group flex items-center gap-3 hover:opacity-60 transition-opacity p-2 -ml-2 flex-shrink-0"
               aria-label="Open menu"
             >
-              <div className="flex flex-col gap-[5px] justify-center w-6 h-6 relative">
-                <span className="w-full h-[1px] bg-white block absolute top-[8px] transition-transform duration-300 group-hover:-translate-x-1"></span>
-                <span className="w-full h-[1px] bg-white block absolute top-[16px] transition-transform duration-300 group-hover:translate-x-1"></span>
+              <div className="flex flex-col justify-center w-6 h-5 flex-shrink-0 relative overflow-visible">
+                <span className="w-full h-px bg-white block translate-y-[-4px] transition-transform duration-300 group-hover:-translate-x-1"></span>
+                <span className="w-full h-px bg-white block translate-y-[4px] transition-transform duration-300 group-hover:translate-x-1"></span>
               </div>
-              <span className="hidden sm:block text-[11px] font-sans tracking-[0.1em] mt-0.5">Menu</span>
+              <span className="hidden sm:block text-[11px] font-sans tracking-[0.1em] flex-shrink-0">Menu</span>
             </button>
           </div>
 
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex justify-center w-1/3 pointer-events-none">
-            <Link href="/" className="font-serif text-xl md:text-2xl tracking-wide text-white pointer-events-auto">
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex justify-center pointer-events-none">
+            <Link href="/" className="font-serif text-xl md:text-2xl tracking-wide text-white pointer-events-auto whitespace-nowrap">
               U.S Atelier
             </Link>
           </div>
 
-          <div className="flex items-center justify-end gap-5 md:gap-7 w-1/3">
-            <Link href={user ? "/account" : "/login"} className="hidden md:block text-white hover:text-white/60 transition-colors p-2">
+          <div className="flex items-center justify-end gap-4 md:gap-6 w-1/3 min-w-0">
+            <Link href={user ? "/account" : "/login"} className="hidden md:flex items-center justify-center text-white hover:text-white/60 transition-colors p-2 flex-shrink-0">
               <User size={19} strokeWidth={1} />
             </Link>
-            <button onClick={() => router.push('/cart')} className="relative flex items-center gap-2 text-white hover:text-white/60 transition-colors p-2 -mr-2">
-              <span className="hidden md:block text-[11px] font-sans tracking-[0.1em] mt-0.5">Cart</span>
-              <ShoppingBag size={20} strokeWidth={1} />
+            <button onClick={() => router.push('/cart')} className="relative flex items-center gap-2 text-white hover:text-white/60 transition-colors p-2 -mr-2 flex-shrink-0">
+              <span className="hidden md:block text-[11px] font-sans tracking-[0.1em]">Cart</span>
+              <ShoppingBag size={20} strokeWidth={1} className="flex-shrink-0" />
               {cartUnseen > 0 && (
-                <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-white text-black text-[8px] font-sans flex items-center justify-center rounded-full">
+                <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-white text-black text-[8px] font-sans flex items-center justify-center rounded-full leading-none">
                   {cartUnseen}
                 </span>
               )}

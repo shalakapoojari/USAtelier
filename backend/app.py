@@ -67,7 +67,7 @@ from models_mysql import (
     Review, HomepageConfig, Payment,
     DispatchJob, Coupon, PasswordResetToken, AuditLog,
     CartEvent, AbandonedCartEmail, CartSettings, HomepageBanner,
-    ProductView,
+    ProductView, SiteVisit,
 )
 from delhivery_utils import create_shipment, calculate_shipping, validate_pincode
 
@@ -731,6 +731,34 @@ with app.app_context():
                 db_mysql.session.rollback()
                 app.logger.warning("Migration %s.%s skipped: %s", table_name, column_name, mig_exc)
 
+    # Ensure site_visits table exists
+    try:
+        db_mysql.session.execute(text("SELECT id FROM site_visits LIMIT 1"))
+        db_mysql.session.commit()
+    except Exception:
+        db_mysql.session.rollback()
+        try:
+            db_mysql.session.execute(text("""
+                CREATE TABLE IF NOT EXISTS site_visits (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    session_id VARCHAR(128),
+                    user_id INT,
+                    page VARCHAR(500) NOT NULL,
+                    referrer VARCHAR(500),
+                    user_agent VARCHAR(500),
+                    ip_address VARCHAR(45),
+                    country VARCHAR(100),
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_sv_session (session_id),
+                    INDEX idx_sv_timestamp (timestamp)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """))
+            db_mysql.session.commit()
+            app.logger.info("Migration: site_visits table created")
+        except Exception as mig_exc:
+            db_mysql.session.rollback()
+            app.logger.warning("Migration site_visits skipped: %s", mig_exc)
+
 
 def seed_database():
     admin_email    = os.getenv("ADMIN_EMAIL")
@@ -774,6 +802,99 @@ with app.app_context():
     except Exception as exc:
         app.logger.error("Seeding failed: %s", exc)
 
+def _cleanup_stale_payments():
+    """
+    Priority 3 — Automatic cleanup of stale payment sessions.
+
+    Marks Payment rows with status='created' (initiated but never completed)
+    that are older than 45 minutes as 'expired'. Razorpay orders expire after
+    15 minutes by default; 45 min gives a generous grace period.
+
+    This prevents the payments table from accumulating ghost rows and keeps
+    admin dashboards accurate.
+    """
+    with app.app_context():
+        try:
+            cutoff = datetime.utcnow() - timedelta(minutes=45)
+            stale = Payment.query.filter(
+                Payment.status == "created",
+                Payment.created_at <= cutoff,
+            ).all()
+
+            if not stale:
+                return
+
+            for p in stale:
+                p.status = "expired"
+                app.logger.info(
+                    "payment_session_expired rzp_order=%s created=%s",
+                    p.razorpay_order_id, p.created_at
+                )
+
+            db_mysql.session.commit()
+            app.logger.info("stale_payment_cleanup expired=%d", len(stale))
+        except Exception as exc:
+            db_mysql.session.rollback()
+            app.logger.error("stale_payment_cleanup_error err=%s", exc)
+
+
+def _cleanup_failed_orders():
+    """
+    Priority 3 — Clean up orphaned pending orders after payment timeout.
+
+    Finds Order rows that:
+    - Have no OrderItems (never finalized)
+    - Have payment_status NOT in Paid / COD-Pending / Refunded
+    - Were created more than 1 hour ago
+    - Are not already Cancelled/Expired
+
+    Marks them as 'Expired' and removes any associated DispatchJobs so the
+    Delhivery scheduler doesn't waste cycles on them.
+    """
+    with app.app_context():
+        try:
+            cutoff = datetime.utcnow() - timedelta(hours=1)
+            stale_orders = (
+                OrderSQL.query
+                .filter(
+                    OrderSQL.created_at <= cutoff,
+                    OrderSQL.payment_status.notin_(["Paid", "COD - Pending", "Refunded"]),
+                    OrderSQL.status.notin_(["Cancelled", "Expired", "Delivered", "Shipped"]),
+                )
+                .all()
+            )
+
+            expired_count = 0
+            for order in stale_orders:
+                # Skip if it has items — it's a real order in a weird state
+                if order.items:
+                    continue
+
+                order.status         = "Expired"
+                order.payment_status = "Expired"
+
+                # Cancel any pending dispatch jobs for this order
+                DispatchJob.query.filter(
+                    DispatchJob.order_id == order.id,
+                    DispatchJob.status.in_(["pending", "retry"]),
+                ).update(
+                    {"status": "failed", "last_error": "Order expired — payment not completed"},
+                    synchronize_session=False,
+                )
+                expired_count += 1
+                app.logger.info(
+                    "order_expired order=%s created=%s payment_status=%s",
+                    order.order_number, order.created_at, order.payment_status
+                )
+
+            if expired_count:
+                db_mysql.session.commit()
+                app.logger.info("failed_order_cleanup expired=%d", expired_count)
+        except Exception as exc:
+            db_mysql.session.rollback()
+            app.logger.error("failed_order_cleanup_error err=%s", exc)
+
+
 # ============================================================
 # APScheduler
 # ============================================================
@@ -781,8 +902,10 @@ with app.app_context():
 if HAS_SCHEDULER:
     _scheduler = BackgroundScheduler(daemon=True)
     _scheduler.add_job(_poll_dispatch_jobs, "interval", seconds=60, id="delhivery_poll")
+    _scheduler.add_job(_cleanup_stale_payments, "interval", minutes=15, id="stale_payment_cleanup")
+    _scheduler.add_job(_cleanup_failed_orders, "interval", hours=1, id="failed_order_cleanup")
     _scheduler.start()
-    app.logger.info("APScheduler started — Delhivery shipment poller active")
+    app.logger.info("APScheduler started — Delhivery poller + payment cleanup active")
 else:
     app.logger.warning(
         "apscheduler not installed — Delhivery retries disabled. "
@@ -959,6 +1082,62 @@ def health():
         "delhivery_configured": bool(os.getenv("DELHIVERY_API_KEY")),
         "scheduler_running":    HAS_SCHEDULER,
     }), 200
+
+
+@app.route("/api/payment/razorpay-key", methods=["GET"])
+def get_razorpay_key():
+    """Return Razorpay public key ID for frontend use."""
+    return jsonify({
+        "key":        RAZORPAY_KEY_ID or "",
+        "configured": bool(RAZORPAY_KEY_ID),
+    }), 200
+
+
+@app.route("/api/track/pageview", methods=["POST"])
+@csrf.exempt
+def track_page_view():
+    """Record a site visit / page view for analytics."""
+    data = request.get_json(silent=True) or {}
+    raw_page = _sanitise_str(data.get("page", ""), 500)
+    if not raw_page:
+        return jsonify({"error": "page required"}), 400
+    session_id = _sanitise_str(data.get("session_id", ""), 128) or None
+    referrer   = _sanitise_str(data.get("referrer", ""), 500) or None
+    user_agent = _sanitise_str(
+        (data.get("user_agent") or request.headers.get("User-Agent", ""))[:500], 500
+    ) or None
+    ip_raw = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+    ip_address = ip_raw.split(",")[0].strip()[:45]
+
+    user_id = int(session["user_id"]) if "user_id" in session else None
+
+    # Dedup: skip if same session+page within last 30 min
+    if session_id:
+        cutoff = datetime.utcnow() - timedelta(minutes=30)
+        existing = SiteVisit.query.filter(
+            SiteVisit.session_id == session_id,
+            SiteVisit.page == raw_page,
+            SiteVisit.timestamp >= cutoff,
+        ).first()
+        if existing:
+            return jsonify({"deduplicated": True}), 200
+
+    try:
+        visit = SiteVisit(
+            session_id=session_id,
+            user_id=user_id,
+            page=raw_page,
+            referrer=referrer,
+            user_agent=user_agent,
+            ip_address=ip_address,
+        )
+        db_mysql.session.add(visit)
+        db_mysql.session.commit()
+        return jsonify({"recorded": True}), 201
+    except Exception as exc:
+        db_mysql.session.rollback()
+        app.logger.warning("track_page_view_error: %s", exc)
+        return jsonify({"error": "Failed to record"}), 500
 
 @app.route("/api/admin/payment-health", methods=["GET"])
 @admin_required
@@ -2240,6 +2419,7 @@ def remove_from_wishlist(product_id):
 def validate_coupon():
     data     = request.get_json() or {}
     code     = _sanitise_str(data.get("code", ""), 50).upper()
+    cart_items = data.get("items", []) or []
 
     try:
         subtotal = float(data.get("subtotal", 0))
@@ -2256,18 +2436,50 @@ def validate_coupon():
     if not coupon:
         return jsonify({"error": "Invalid coupon code"}), 404
 
-    valid, reason = coupon.is_valid(subtotal)
+    valid, reason = coupon.is_valid(subtotal, cart_items=cart_items)
     if not valid:
         return jsonify({"error": reason}), 400
 
-    discount = coupon.apply(subtotal)
+    discount = coupon.apply(subtotal, cart_items=cart_items)
     return jsonify({
         "success":         True,
+        "coupon_type":     coupon.coupon_type or "standard",
         "discount_type":   coupon.discount_type,
         "discount_value":  coupon.discount_value,
         "discount_amount": discount,
         "final_amount":    round(subtotal - discount, 2),
+        "buy_quantity":    coupon.buy_quantity,
+        "get_quantity":    coupon.get_quantity,
+        "visibility":      coupon.visibility or "hidden",
+        "influencer_name": coupon.influencer_name,
     })
+
+
+@app.route("/api/coupons/auto-apply", methods=["POST"])
+@csrf.exempt
+def auto_apply_coupons():
+    """Return all visible coupons that auto-qualify for the given cart."""
+    data       = request.get_json() or {}
+    cart_items = data.get("items", []) or []
+    try:
+        subtotal = float(data.get("subtotal", 0))
+    except (TypeError, ValueError):
+        subtotal = 0.0
+
+    visible_coupons = Coupon.query.filter(
+        Coupon.is_active == True,  # noqa: E712
+        Coupon.visibility == "visible"
+    ).all()
+
+    qualified = []
+    for c in visible_coupons:
+        if c.auto_qualifies(subtotal, cart_items=cart_items):
+            discount = c.apply(subtotal, cart_items=cart_items)
+            entry = c.to_dict()
+            entry["discount_amount"] = discount
+            qualified.append(entry)
+
+    return jsonify(qualified)
 
 
 @app.route("/api/admin/coupons", methods=["GET"])
@@ -2295,14 +2507,24 @@ def create_coupon():
             if expires_at.tzinfo is not None:
                 expires_at = expires_at.astimezone(timezone.utc).replace(tzinfo=None)
 
-        discount_value = float(data.get("discount_value", 0))
-        if discount_value < 0:
-            raise ValueError("Discount value cannot be negative")
-        discount_type = _sanitise_str(data.get("discount_type", "percent"), 20)
-        if discount_type not in ("percent", "fixed"):
-            return jsonify({"error": "Discount type must be percent or fixed"}), 400
-        if discount_type == "percent" and discount_value > 100:
-            return jsonify({"error": "Percent discount cannot exceed 100"}), 400
+        coupon_type = _sanitise_str(data.get("coupon_type", "standard"), 20)
+        if coupon_type not in ("standard", "buy_n_get_n", "influencer"):
+            return jsonify({"error": "Invalid coupon type"}), 400
+
+        # For buy_n_get_n, discount_type is implicitly "buy_n_get_n"
+        if coupon_type == "buy_n_get_n":
+            discount_type  = "buy_n_get_n"
+            discount_value = 0.0  # computed dynamically
+        else:
+            discount_value = float(data.get("discount_value", 0))
+            if discount_value < 0:
+                raise ValueError("Discount value cannot be negative")
+            discount_type = _sanitise_str(data.get("discount_type", "percent"), 20)
+            if discount_type not in ("percent", "fixed"):
+                return jsonify({"error": "Discount type must be percent or fixed"}), 400
+            if discount_type == "percent" and discount_value > 100:
+                return jsonify({"error": "Percent discount cannot exceed 100"}), 400
+
         min_order_amount = float(data.get("min_order_amount", 0) or 0)
         if min_order_amount < 0:
             return jsonify({"error": "Minimum order amount cannot be negative"}), 400
@@ -2313,22 +2535,83 @@ def create_coupon():
             if max_uses <= 0:
                 return jsonify({"error": "Max uses must be positive"}), 400
 
+        # Buy N Get N quantities
+        buy_qty_raw = data.get("buy_quantity")
+        get_qty_raw = data.get("get_quantity")
+        buy_quantity = int(buy_qty_raw) if buy_qty_raw not in (None, "") else None
+        get_quantity = int(get_qty_raw) if get_qty_raw not in (None, "") else None
+
+        visibility      = _sanitise_str(data.get("visibility", "hidden"), 20)
+        if visibility not in ("hidden", "visible"):
+            visibility = "hidden"
+        influencer_name = _sanitise_str(data.get("influencer_name", ""), 100) or None
+
         c = Coupon(
             code             = code,
+            coupon_type      = coupon_type,
             discount_type    = discount_type,
             discount_value   = discount_value,
             min_order_amount = min_order_amount,
             max_uses         = max_uses,
             expires_at       = expires_at,
             is_active        = bool(data.get("is_active", True)),
+            buy_quantity     = buy_quantity,
+            get_quantity     = get_quantity,
+            visibility       = visibility,
+            influencer_name  = influencer_name,
         )
         db_mysql.session.add(c)
-        _audit("coupon_created", "coupon", None, {"code": code})
+        _audit("coupon_created", "coupon", None, {"code": code, "type": coupon_type})
         db_mysql.session.commit()
         return jsonify({"success": True, "coupon": c.to_dict()}), 201
     except Exception as exc:
         db_mysql.session.rollback()
+        app.logger.error("create_coupon_failed err=%s", exc)
         return jsonify({"error": "Failed to create coupon"}), 500
+
+
+@app.route("/api/admin/coupons/<int:coupon_id>", methods=["PATCH"])
+@csrf.exempt
+@admin_required
+def update_coupon(coupon_id):
+    coupon = Coupon.query.get(coupon_id)
+    if not coupon:
+        return jsonify({"error": "Coupon not found"}), 404
+    data = request.get_json() or {}
+    try:
+        if "is_active" in data:
+            coupon.is_active = bool(data["is_active"])
+        if "min_order_amount" in data:
+            coupon.min_order_amount = float(data["min_order_amount"] or 0)
+        if "max_uses" in data:
+            raw = data["max_uses"]
+            coupon.max_uses = int(raw) if raw not in (None, "") else None
+        if "visibility" in data:
+            v = _sanitise_str(data["visibility"], 20)
+            coupon.visibility = v if v in ("hidden", "visible") else coupon.visibility
+        if "influencer_name" in data:
+            coupon.influencer_name = _sanitise_str(data["influencer_name"], 100) or None
+        if "buy_quantity" in data:
+            raw = data["buy_quantity"]
+            coupon.buy_quantity = int(raw) if raw not in (None, "") else None
+        if "get_quantity" in data:
+            raw = data["get_quantity"]
+            coupon.get_quantity = int(raw) if raw not in (None, "") else None
+        if "expires_at" in data:
+            if data["expires_at"]:
+                expires_raw = str(data["expires_at"]).strip()
+                expires_at = datetime.fromisoformat(expires_raw.replace("Z", "+00:00"))
+                if expires_at.tzinfo is not None:
+                    expires_at = expires_at.astimezone(timezone.utc).replace(tzinfo=None)
+                coupon.expires_at = expires_at
+            else:
+                coupon.expires_at = None
+        _audit("coupon_updated", "coupon", coupon_id, {"code": coupon.code})
+        db_mysql.session.commit()
+        return jsonify({"success": True, "coupon": coupon.to_dict()})
+    except Exception as exc:
+        db_mysql.session.rollback()
+        return jsonify({"error": "Update failed"}), 500
 
 
 @app.route("/api/admin/coupons/<int:coupon_id>", methods=["DELETE"])
@@ -2354,6 +2637,11 @@ def delete_coupon(coupon_id):
 @app.route("/api/payments/create-order", methods=["POST"])
 @csrf.exempt
 def create_razorpay_order():
+    """
+    SECURE PAYMENT INITIATION — Creates Razorpay order WITHOUT creating local Order.
+    Order is created ONLY after successful payment verification.
+    This prevents orphaned orders and ensures ACID compliance.
+    """
     if not razorpay_client:
         return jsonify({"error": "Payment gateway not configured"}), 500
     data = request.get_json() or {}
@@ -2370,83 +2658,66 @@ def create_razorpay_order():
         64,
     ) or None
 
+    # Check for existing COMPLETED order with this idempotency key
     if idempotency_key:
         existing = OrderSQL.query.filter_by(idempotency_key=idempotency_key).first()
-        if existing and existing.razorpay_order_id:
+        if existing and existing.items and existing.payment_status in ("Paid", "COD - Pending"):
             return jsonify({
                 "id":       existing.razorpay_order_id,
                 "amount":   int(existing.total * 100),
                 "currency": "INR",
                 "orderId":  existing.order_number,
+                "duplicate": True,
             }), 200
 
     user_id = session.get("user_id")
-    suffix = str(user_id) if user_id else secrets.token_hex(2)
-    order_number = f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}-{suffix}"
-    shipping_addr = (checkout_payload or {}).get("shippingAddress") or {}
 
-    pending_order = None
-    payment = None
-    try:
-        pending_order = OrderSQL(
-            order_number      = order_number,
-            idempotency_key   = idempotency_key,
-            user_id           = int(user_id) if user_id else None,
-            total             = amount,
-            status            = "Pending",
-            payment_status    = "Pending",
-            payment_method    = "prepaid",
-            shipping_address  = shipping_addr if shipping_addr else {},
-        )
-        db_mysql.session.add(pending_order)
-        db_mysql.session.flush()
-
-        payment = Payment(
-            user_id               = int(user_id) if user_id else None,
-            order_id              = pending_order.id,
-            amount                = amount,
-            currency              = "INR",
-            status                = "pending",
-            checkout_payload_json = json.dumps(checkout_payload) if checkout_payload else None,
-        )
-        db_mysql.session.add(payment)
-        db_mysql.session.commit()
-    except Exception as exc:
-        db_mysql.session.rollback()
-        app.logger.error("pending_order_create_error err=%s", exc)
-        return jsonify({"error": "Failed to initialize order"}), 500
-
+    # Create Razorpay order first
     try:
         client = get_razorpay_client()
         rzp_order = client.order.create({
             "amount":          int(amount * 100),
             "currency":        "INR",
             "payment_capture": "1",
+            "notes": {
+                "user_id": str(user_id) if user_id else "guest",
+                "idempotency_key": idempotency_key or "none",
+            }
         })
+        rzp_order_id = rzp_order.get("id")
     except Exception as exc:
-        try:
-            pending_order.status = "Failed"
-            payment.status = "failed"
-            db_mysql.session.commit()
-        except Exception:
-            db_mysql.session.rollback()
-        app.logger.error("razorpay_order_error err=%s", exc)
+        app.logger.error("razorpay_order_creation_failed err=%s", exc)
         return jsonify({"error": "Failed to create payment order"}), 502
 
+    # Store ONLY the payment session metadata (no Order yet)
     try:
-        rzp_id = rzp_order.get("id")
-        pending_order.razorpay_order_id = rzp_id
-        payment.razorpay_order_id = rzp_id
-        if checkout_payload:
-            checkout_payload["razorpay_order_id"] = rzp_id
-            checkout_payload["idempotencyKey"] = idempotency_key or rzp_id
-            payment.checkout_payload_json = json.dumps(checkout_payload)
-        db_mysql.session.commit()
+        # Check if payment record already exists for this rzp_order_id
+        payment = Payment.query.filter_by(razorpay_order_id=rzp_order_id).first()
+        if not payment:
+            payment = Payment(
+                user_id               = int(user_id) if user_id else None,
+                order_id              = None,  # Will be linked after successful payment
+                razorpay_order_id     = rzp_order_id,
+                amount                = amount,
+                currency              = "INR",
+                status                = "created",  # Not "pending" - indicates awaiting user action
+                checkout_payload_json = json.dumps(checkout_payload) if checkout_payload else None,
+            )
+            db_mysql.session.add(payment)
+            db_mysql.session.commit()
+            app.logger.info(
+                "payment_session_created rzp_order=%s amount=%.2f user=%s",
+                rzp_order_id, amount, user_id or "guest"
+            )
     except Exception as exc:
         db_mysql.session.rollback()
-        app.logger.warning("payment_link_error err=%s", exc)
+        app.logger.error("payment_session_save_failed rzp_order=%s err=%s", rzp_order_id, exc)
+        # Non-fatal - Razorpay order was created successfully
 
-    return jsonify({**rzp_order, "orderId": order_number}), 200
+    return jsonify({
+        **rzp_order,
+        "orderId": None,  # No order number yet - will be generated after payment
+    }), 200
 
 
 @app.route("/api/payments/verify", methods=["POST"])
@@ -2720,177 +2991,235 @@ def razorpay_webhook():
         event
     )
 
-    try:
+    # ── Deduplicate webhook via SELECT FOR UPDATE on the Payment row ──────────
+    # This is the primary race-condition guard between the frontend callback
+    # and Razorpay webhooks both trying to create the same order simultaneously.
+    # Only one of them can hold the row lock; the other will see status="captured"
+    # on re-read and bail out via the idempotency check in _finalize_order_from_payload.
 
+    try:
         if event in ("payment.captured", "order.paid"):
 
-            pp = data["payload"]["payment"]["entity"]
-
+            pp             = data["payload"]["payment"]["entity"]
             rzp_payment_id = str(pp["id"])
-            rzp_order_id = str(pp["order_id"])
-
-            amount = float(pp["amount"]) / 100
+            rzp_order_id   = str(pp["order_id"])
+            amount         = float(pp["amount"]) / 100
 
             app.logger.info(
-                "PAYMENT_CAPTURED order=%s payment=%s amount=%s",
-                rzp_order_id,
-                rzp_payment_id,
-                amount
+                "WEBHOOK_PAYMENT_CAPTURED rzp_order=%s payment=%s amount=%.2f",
+                rzp_order_id, rzp_payment_id, amount
             )
 
-            existing = Payment.query.filter_by(
-                razorpay_payment_id=rzp_payment_id
-            ).first()
+            # ── Step 1: Lock the Payment row for this payment_id ─────────────
+            # WITH FOR UPDATE prevents concurrent webhook/frontend from
+            # processing the same payment simultaneously.
+            existing = (
+                Payment.query
+                .filter_by(razorpay_payment_id=rzp_payment_id)
+                .with_for_update()
+                .first()
+            )
 
             if existing and existing.status == "captured":
-                linked_order = OrderSQL.query.filter_by(razorpay_payment_id=rzp_payment_id).first()
+                # Already fully processed — check whether the order was also created.
+                linked_order = OrderSQL.query.filter_by(
+                    razorpay_payment_id=rzp_payment_id
+                ).first()
                 if not linked_order and existing.checkout_payload_json:
                     try:
                         checkout_payload = json.loads(existing.checkout_payload_json)
-                        checkout_payload["razorpay_order_id"] = rzp_order_id
+                        checkout_payload["razorpay_order_id"]   = rzp_order_id
                         checkout_payload["razorpay_payment_id"] = rzp_payment_id
-                        checkout_payload["idempotencyKey"] = checkout_payload.get("idempotencyKey") or rzp_order_id
+                        checkout_payload["idempotencyKey"]      = (
+                            checkout_payload.get("idempotencyKey") or rzp_order_id
+                        )
                         response, status = _finalize_order_from_payload(
                             checkout_payload,
                             require_signature=False,
                             verified_payment=pp,
                         )
                         if 200 <= status < 300:
-                            app.logger.info("PAYMENT_RECOVERED_FROM_EXISTING_ROW payment=%s", rzp_payment_id)
-                            return jsonify({"success": True}), 200
+                            app.logger.info(
+                                "WEBHOOK_RECOVERED_MISSING_ORDER payment=%s", rzp_payment_id
+                            )
                     except Exception as recover_exc:
                         app.logger.exception(
-                            "PAYMENT_EXISTING_ROW_RECOVERY_FAILED payment=%s err=%s",
-                            rzp_payment_id,
-                            recover_exc,
+                            "WEBHOOK_RECOVERY_FAILED payment=%s err=%s",
+                            rzp_payment_id, recover_exc,
                         )
-
-                app.logger.info(
-                    "PAYMENT_ALREADY_CAPTURED payment=%s",
-                    rzp_payment_id
-                )
-
+                else:
+                    app.logger.info(
+                        "WEBHOOK_DEDUPLICATED payment=%s order_exists=%s",
+                        rzp_payment_id, bool(linked_order)
+                    )
                 return jsonify({"success": True}), 200
 
-            payment = Payment.query.filter_by(
-                razorpay_order_id=rzp_order_id
-            ).first()
+            # ── Step 2: Upsert the Payment row (mark captured) ───────────────
+            payment = (
+                Payment.query
+                .filter_by(razorpay_order_id=rzp_order_id)
+                .with_for_update()
+                .first()
+            )
 
             if not payment:
-
                 payment = Payment(
-                    razorpay_order_id=rzp_order_id,
-                    razorpay_payment_id=rzp_payment_id,
-                    amount=amount,
-                    status="captured",
-                    method=pp.get("method"),
-                    email=pp.get("email"),
-                    phone=pp.get("contact"),
+                    razorpay_order_id   = rzp_order_id,
+                    razorpay_payment_id = rzp_payment_id,
+                    amount              = amount,
+                    status              = "captured",
+                    method              = pp.get("method"),
+                    email               = pp.get("email"),
+                    phone               = pp.get("contact"),
                 )
-
                 db_mysql.session.add(payment)
-
                 app.logger.warning(
-                    "PAYMENT_ROW_CREATED_FROM_WEBHOOK order=%s payment=%s",
-                    rzp_order_id,
-                    rzp_payment_id
+                    "WEBHOOK_PAYMENT_ROW_CREATED rzp_order=%s payment=%s",
+                    rzp_order_id, rzp_payment_id
                 )
-
             else:
-
                 payment.razorpay_payment_id = rzp_payment_id
-                payment.status = "captured"
-                payment.method = pp.get("method")
-                payment.email = pp.get("email")
-                payment.phone = pp.get("contact")
+                payment.status              = "captured"
+                payment.method              = pp.get("method")
+                payment.email               = pp.get("email")
+                payment.phone               = pp.get("contact")
 
-            order = OrderSQL.query.filter_by(
-                razorpay_order_id=rzp_order_id
-            ).first()
+            # Flush so the captured status is visible within this transaction
+            db_mysql.session.flush()
+
+            # ── Step 3: Find or finalise the linked Order ────────────────────
+            order = OrderSQL.query.filter_by(razorpay_order_id=rzp_order_id).first()
 
             if order:
-
-                if order.payment_status != "Paid":
-                    order.payment_status = "Paid"
+                if order.payment_status not in ("Paid",):
+                    order.payment_status      = "Paid"
                     order.razorpay_payment_id = rzp_payment_id
-                    order.status = "Processing"
-
+                    order.status              = "Pickup" if order.status == "Pending" else order.status
                 payment.order_id = order.id
-                payment.user_id = order.user_id
-
+                payment.user_id  = order.user_id
                 app.logger.info(
-                    "PAYMENT_LINKED_TO_ORDER order=%s payment=%s",
-                    order.order_number,
-                    rzp_payment_id
+                    "WEBHOOK_ORDER_UPDATED order=%s payment=%s",
+                    order.order_number, rzp_payment_id
                 )
-
+                # If the pending order has no items yet, finalize it now
                 if not order.items and payment.checkout_payload_json:
-                    checkout_payload = json.loads(payment.checkout_payload_json)
-                    checkout_payload["razorpay_order_id"] = rzp_order_id
-                    checkout_payload["razorpay_payment_id"] = rzp_payment_id
-                    checkout_payload["idempotencyKey"] = checkout_payload.get("idempotencyKey") or rzp_order_id
-                    response, status = _finalize_order_from_payload(
-                        checkout_payload,
-                        require_signature=False,
-                        verified_payment=pp,
-                    )
-                    if 200 <= status < 300:
-                        app.logger.info("WEBHOOK_FINALIZED_PENDING_ORDER order=%s", order.order_number)
-                        return jsonify({"success": True}), 200
-                    app.logger.error(
-                        "WEBHOOK_FINALIZE_FAILED order=%s status=%s",
-                        order.order_number,
-                        status,
-                    )
-
+                    try:
+                        checkout_payload = json.loads(payment.checkout_payload_json)
+                        checkout_payload["razorpay_order_id"]   = rzp_order_id
+                        checkout_payload["razorpay_payment_id"] = rzp_payment_id
+                        checkout_payload["idempotencyKey"]      = (
+                            checkout_payload.get("idempotencyKey") or rzp_order_id
+                        )
+                        response, status = _finalize_order_from_payload(
+                            checkout_payload,
+                            require_signature=False,
+                            verified_payment=pp,
+                        )
+                        if 200 <= status < 300:
+                            app.logger.info(
+                                "WEBHOOK_FINALIZED_ITEMLESS_ORDER order=%s", order.order_number
+                            )
+                            return jsonify({"success": True}), 200
+                        app.logger.error(
+                            "WEBHOOK_FINALIZE_ITEMLESS_FAILED order=%s status=%s",
+                            order.order_number, status,
+                        )
+                    except Exception as fin_exc:
+                        app.logger.exception(
+                            "WEBHOOK_FINALIZE_ITEMLESS_EXCEPTION order=%s err=%s",
+                            order.order_number, fin_exc,
+                        )
             else:
-
+                # No local order yet — recover from checkout_payload if available
                 app.logger.critical(
-                    "ORPHAN_PAYMENT_DETECTED "
-                    "rzp_order=%s "
-                    "rzp_payment=%s "
-                    "amount=%s",
-                    rzp_order_id,
-                    rzp_payment_id,
-                    amount
+                    "WEBHOOK_ORPHAN_PAYMENT rzp_order=%s payment=%s amount=%.2f",
+                    rzp_order_id, rzp_payment_id, amount
                 )
                 if payment.checkout_payload_json:
-                    checkout_payload = json.loads(payment.checkout_payload_json)
-                    checkout_payload["razorpay_order_id"] = rzp_order_id
-                    checkout_payload["razorpay_payment_id"] = rzp_payment_id
-                    checkout_payload["idempotencyKey"] = checkout_payload.get("idempotencyKey") or rzp_order_id
-                    response, status = _finalize_order_from_payload(
-                        checkout_payload,
-                        require_signature=False,
-                        verified_payment=pp,
-                    )
-                    if 200 <= status < 300:
-                        app.logger.info("ORPHAN_PAYMENT_RECOVERED payment=%s", rzp_payment_id)
-                        return jsonify({"success": True}), 200
-                    app.logger.error(
-                        "ORPHAN_PAYMENT_RECOVERY_FAILED payment=%s status=%s body=%s",
+                    try:
+                        checkout_payload = json.loads(payment.checkout_payload_json)
+                        checkout_payload["razorpay_order_id"]   = rzp_order_id
+                        checkout_payload["razorpay_payment_id"] = rzp_payment_id
+                        checkout_payload["idempotencyKey"]      = (
+                            checkout_payload.get("idempotencyKey") or rzp_order_id
+                        )
+                        response, status = _finalize_order_from_payload(
+                            checkout_payload,
+                            require_signature=False,
+                            verified_payment=pp,
+                        )
+                        if 200 <= status < 300:
+                            app.logger.info(
+                                "WEBHOOK_ORPHAN_RECOVERED payment=%s", rzp_payment_id
+                            )
+                            return jsonify({"success": True}), 200
+                        app.logger.error(
+                            "WEBHOOK_ORPHAN_RECOVERY_FAILED payment=%s status=%s body=%s",
+                            rzp_payment_id, status,
+                            response.get_data(as_text=True)[:500],
+                        )
+                    except Exception as orphan_exc:
+                        app.logger.exception(
+                            "WEBHOOK_ORPHAN_EXCEPTION payment=%s err=%s",
+                            rzp_payment_id, orphan_exc,
+                        )
+                else:
+                    app.logger.critical(
+                        "WEBHOOK_ORPHAN_NO_PAYLOAD payment=%s — manual recovery required",
                         rzp_payment_id,
-                        status,
-                        response.get_data(as_text=True)[:500],
                     )
 
             db_mysql.session.commit()
+            app.logger.info("WEBHOOK_COMMITTED payment=%s", rzp_payment_id)
 
-            app.logger.info(
-                "WEBHOOK_COMMIT_SUCCESS payment=%s",
-                rzp_payment_id
-            )
+        elif event == "payment.failed":
+            # ── Payment.failed — mark Payment row as failed ──────────────────
+            try:
+                pp             = data["payload"]["payment"]["entity"]
+                rzp_payment_id = str(pp.get("id", ""))
+                rzp_order_id   = str(pp.get("order_id", ""))
+                error_code     = pp.get("error_code", "")
+                error_desc     = pp.get("error_description", "")
+
+                if rzp_payment_id:
+                    failed_payment = Payment.query.filter_by(
+                        razorpay_payment_id=rzp_payment_id
+                    ).first()
+                elif rzp_order_id:
+                    failed_payment = Payment.query.filter_by(
+                        razorpay_order_id=rzp_order_id
+                    ).first()
+                else:
+                    failed_payment = None
+
+                if failed_payment and failed_payment.status not in ("captured", "refunded"):
+                    failed_payment.status            = "failed"
+                    failed_payment.error_code        = _sanitise_str(error_code, 100)
+                    failed_payment.error_description = _sanitise_str(error_desc, 500)
+
+                # Mark any associated pending order as payment_failed
+                if rzp_order_id:
+                    failed_order = OrderSQL.query.filter_by(
+                        razorpay_order_id=rzp_order_id
+                    ).first()
+                    if failed_order and failed_order.payment_status not in ("Paid", "Refunded"):
+                        failed_order.payment_status = "Failed"
+                        failed_order.status         = "Payment Failed"
+
+                db_mysql.session.commit()
+                app.logger.info(
+                    "WEBHOOK_PAYMENT_FAILED rzp_order=%s payment=%s code=%s",
+                    rzp_order_id, rzp_payment_id, error_code
+                )
+            except Exception as fail_exc:
+                db_mysql.session.rollback()
+                app.logger.exception(
+                    "WEBHOOK_PAYMENT_FAILED_HANDLER_ERROR err=%s", fail_exc
+                )
 
     except Exception as exc:
-
         db_mysql.session.rollback()
-
-        app.logger.exception(
-            "WEBHOOK_PROCESSING_FAILED event=%s err=%s",
-            event,
-            str(exc)
-        )
-
+        app.logger.exception("WEBHOOK_PROCESSING_FAILED event=%s err=%s", event, str(exc))
         return jsonify({"error": "processing failed"}), 500
 
     return jsonify({"success": True}), 200
@@ -3289,15 +3618,16 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
     if coupon_code:
         coupon = Coupon.query.filter_by(code=coupon_code).first()
         if coupon:
-            valid, _ = coupon.is_valid(computed_subtotal)
+            valid, _ = coupon.is_valid(computed_subtotal, cart_items=incoming_items)
             if valid:
-                discount_amount = coupon.apply(computed_subtotal)
+                discount_amount = coupon.apply(computed_subtotal, cart_items=incoming_items)
             else:
                 coupon_code = None
         else:
             coupon_code = None
 
-    # ── COD fee: ₹50 if discounted subtotal < ₹2000, else free ──────────
+    # ── COD advance fee: ₹150 charged online upfront, deducted from cash payable ──
+    # The cod_fee is NOT an extra charge — it is part of the grand total paid online.
     if is_cod:
         discounted_sub_for_cod = max(0.0, computed_subtotal - discount_amount)
         cod_fee = 150.0 if discounted_sub_for_cod < 2000.0 else 0.0
@@ -3318,7 +3648,7 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
             verified_amount = None
 
     discounted_subtotal = max(0.0, computed_subtotal - discount_amount)
-    expected_shipping = 0 if discounted_subtotal >= 2000 else 149
+    expected_shipping = 0 if discounted_subtotal >= 2000 else 99
     if delivery_pincode.startswith("400") or delivery_pincode.startswith("401"):
         expected_tax = discounted_subtotal * 0.05
     else:
@@ -3456,7 +3786,10 @@ def get_orders():
 @app.route("/api/orders/<order_number>/cancel", methods=["POST"])
 @login_required
 def cancel_order(order_number):
-    # SECURITY: Validate order_number format before querying
+    """
+    User-facing order cancellation with automatic refund.
+    COD Policy: ₹150 advance fee is non-refundable as per T&C.
+    """
     order_number = _sanitise_str(str(order_number), 100)
 
     try:
@@ -3476,17 +3809,62 @@ def cancel_order(order_number):
     if datetime.now(timezone.utc) > cutoff:
         return jsonify({"error": "30-minute cancellation window has closed"}), 400
 
+    is_cod = order.payment_method == "cod"
+    rzp_payment_id = order.razorpay_payment_id
+
     try:
-        order.status = "Cancelled"
+        # Restore stock
         for item in order.items:
             prod = ProductSQL.query.get(item.product_id)
             if prod:
-                prod.stock += item.quantity
-        _audit("order_cancelled", "order", order.id, {"order_number": order_number})
+                size = item.size
+                if size:
+                    prod.update_stock_for_size(size, item.quantity)
+                else:
+                    prod.stock += item.quantity
+
+        order.status = "Cancelled"
+        refund_issued = False
+        refund_amount = 0.0
+
+        # Handle refund logic
+        if is_cod:
+            # COD: ₹150 advance is non-refundable per policy
+            order.payment_status = "COD Advance Non-Refundable"
+            refund_message = "Order cancelled. As per our COD policy, the ₹150 advance fee is non-refundable."
+        elif rzp_payment_id and razorpay_client:
+            # Prepaid: issue full refund
+            try:
+                client = get_razorpay_client()
+                payment = Payment.query.filter_by(razorpay_payment_id=rzp_payment_id).first()
+                refund = client.payment.refund(rzp_payment_id, {"amount": int(order.total * 100)})
+                if payment:
+                    payment.status = "refunded"
+                order.payment_status = "Refunded"
+                refund_issued = True
+                refund_amount = order.total
+                refund_message = f"Order cancelled. Refund of ₹{refund_amount:.2f} initiated to your original payment method."
+            except Exception as refund_exc:
+                app.logger.error("user_cancel_refund_error order=%s err=%s", order_number, refund_exc)
+                refund_message = "Order cancelled. Refund processing failed. Contact support for assistance."
+        else:
+            order.payment_status = "Cancelled"
+            refund_message = "Order cancelled."
+
+        _audit("order_cancelled_user", "order", order.id, {"order_number": order_number, "is_cod": is_cod})
         db_mysql.session.commit()
-        return jsonify({"success": True, "message": "Order cancelled and stock restored"})
+
+        return jsonify({
+            "success": True,
+            "message": refund_message,
+            "refund_issued": refund_issued,
+            "refund_amount": refund_amount,
+            "is_cod": is_cod
+        }), 200
+
     except Exception as exc:
         db_mysql.session.rollback()
+        app.logger.error("cancel_order_error order=%s err=%s", order_number, exc)
         return jsonify({"error": "Cancellation failed"}), 500
 
 # ============================================================
@@ -4955,6 +5333,173 @@ def get_product_view_analytics():
 
 # Import here to avoid circular dependency with mail instance
 from mail_utils import send_abandoned_cart_email  # noqa: E402
+
+
+# ============================================================
+# ADMIN — SITE VISIT ANALYTICS
+# ============================================================
+
+@app.route("/api/admin/analytics/site-visits", methods=["GET"])
+@admin_required
+def get_site_visit_analytics():
+    """Return site visit stats: total visits, unique sessions, top pages, daily trend."""
+    from sqlalchemy import func
+
+    range_param = request.args.get("range", "7d")
+    valid_ranges = {"today", "7d", "30d", "all"}
+    if range_param not in valid_ranges:
+        range_param = "7d"
+
+    now = datetime.utcnow()
+    if range_param == "today":
+        cutoff = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif range_param == "7d":
+        cutoff = now - timedelta(days=7)
+    elif range_param == "30d":
+        cutoff = now - timedelta(days=30)
+    else:
+        cutoff = None
+
+    base_q = SiteVisit.query
+    if cutoff:
+        base_q = base_q.filter(SiteVisit.timestamp >= cutoff)
+
+    total_visits    = base_q.count()
+    unique_sessions = db_mysql.session.query(func.count(func.distinct(SiteVisit.session_id))).filter(
+        *([SiteVisit.timestamp >= cutoff] if cutoff else [])
+    ).scalar() or 0
+    unique_users    = db_mysql.session.query(func.count(func.distinct(SiteVisit.user_id))).filter(
+        SiteVisit.user_id != None,
+        *([SiteVisit.timestamp >= cutoff] if cutoff else [])
+    ).scalar() or 0
+
+    # Top pages
+    top_pages_q = db_mysql.session.query(
+        SiteVisit.page,
+        func.count(SiteVisit.id).label("visits")
+    ).group_by(SiteVisit.page).order_by(func.count(SiteVisit.id).desc())
+    if cutoff:
+        top_pages_q = top_pages_q.filter(SiteVisit.timestamp >= cutoff)
+    top_pages = [{"page": r[0], "visits": int(r[1])} for r in top_pages_q.limit(10).all()]
+
+    # Daily trend (last 30 days)
+    days = 30 if range_param in ("30d", "all") else 7
+    trend_cutoff = now - timedelta(days=days)
+    daily_q = db_mysql.session.query(
+        func.date(SiteVisit.timestamp).label("day"),
+        func.count(SiteVisit.id).label("visits"),
+        func.count(func.distinct(SiteVisit.session_id)).label("unique_visitors"),
+    ).filter(SiteVisit.timestamp >= trend_cutoff).group_by(
+        func.date(SiteVisit.timestamp)
+    ).order_by(func.date(SiteVisit.timestamp))
+
+    rev_map = {str(r[0])[:10]: {"visits": int(r[1]), "unique": int(r[2])} for r in daily_q.all()}
+    date_range = [(now - timedelta(days=i)).date() for i in range(days - 1, -1, -1)]
+    daily_trend = [
+        {
+            "date": d.strftime("%Y-%m-%d"),
+            "visits": rev_map.get(d.strftime("%Y-%m-%d"), {}).get("visits", 0),
+            "unique_visitors": rev_map.get(d.strftime("%Y-%m-%d"), {}).get("unique", 0),
+        }
+        for d in date_range
+    ]
+
+    # Top referrers
+    referrer_q = db_mysql.session.query(
+        SiteVisit.referrer,
+        func.count(SiteVisit.id).label("visits")
+    ).filter(SiteVisit.referrer != None)
+    if cutoff:
+        referrer_q = referrer_q.filter(SiteVisit.timestamp >= cutoff)
+    referrer_q = referrer_q.group_by(SiteVisit.referrer).order_by(func.count(SiteVisit.id).desc())
+    top_referrers = [{"referrer": r[0] or "Direct", "visits": int(r[1])} for r in referrer_q.limit(10).all()]
+
+    return jsonify({
+        "summary": {
+            "total_visits":    total_visits,
+            "unique_sessions": unique_sessions,
+            "unique_users":    unique_users,
+        },
+        "top_pages":     top_pages,
+        "daily_trend":   daily_trend,
+        "top_referrers": top_referrers,
+    }), 200
+
+
+@app.route("/api/admin/analytics/product-detail/<int:product_id>", methods=["GET"])
+@admin_required
+def get_product_detail_analytics(product_id):
+    """In-depth analytics for a single product: views over time, add-to-cart events, conversion."""
+    from sqlalchemy import func
+
+    product = ProductSQL.query.get(product_id)
+    if not product:
+        return jsonify({"error": "Product not found"}), 404
+
+    range_param = request.args.get("range", "30d")
+    now = datetime.utcnow()
+    cutoff_map = {
+        "today": now.replace(hour=0, minute=0, second=0, microsecond=0),
+        "7d": now - timedelta(days=7),
+        "30d": now - timedelta(days=30),
+    }
+    cutoff = cutoff_map.get(range_param)
+
+    # Views
+    view_q = ProductView.query.filter(ProductView.product_id == product_id)
+    if cutoff:
+        view_q = view_q.filter(ProductView.timestamp >= cutoff)
+    total_views    = view_q.count()
+    unique_views   = db_mysql.session.query(func.count(func.distinct(ProductView.session_id))).filter(
+        ProductView.product_id == product_id,
+        *([ProductView.timestamp >= cutoff] if cutoff else [])
+    ).scalar() or 0
+
+    # Daily views trend
+    daily_view_q = db_mysql.session.query(
+        func.date(ProductView.timestamp).label("day"),
+        func.count(ProductView.id).label("views"),
+    ).filter(ProductView.product_id == product_id)
+    if cutoff:
+        daily_view_q = daily_view_q.filter(ProductView.timestamp >= cutoff)
+    daily_view_q = daily_view_q.group_by(func.date(ProductView.timestamp)).order_by(func.date(ProductView.timestamp))
+    view_trend = [{"date": str(r[0])[:10], "views": int(r[1])} for r in daily_view_q.all()]
+
+    # Cart adds from CartEvent
+    cart_add_q = CartEvent.query.filter(
+        CartEvent.product_id == product_id,
+        CartEvent.event_type == "add"
+    )
+    if cutoff:
+        cart_add_q = cart_add_q.filter(CartEvent.timestamp >= cutoff)
+    total_cart_adds = cart_add_q.count()
+
+    # Orders containing this product
+    order_count = db_mysql.session.query(func.count(func.distinct(OrderItem.order_id))).filter(
+        OrderItem.product_id == product_id
+    ).scalar() or 0
+    units_sold = db_mysql.session.query(func.sum(OrderItem.quantity)).filter(
+        OrderItem.product_id == product_id
+    ).scalar() or 0
+    revenue = db_mysql.session.query(
+        func.sum(OrderItem.selling_price * OrderItem.quantity)
+    ).filter(OrderItem.product_id == product_id).scalar() or 0
+
+    conversion_rate = round((order_count / total_views * 100), 2) if total_views > 0 else 0
+
+    return jsonify({
+        "product": product.to_dict(),
+        "analytics": {
+            "total_views":      total_views,
+            "unique_views":     unique_views,
+            "total_cart_adds":  total_cart_adds,
+            "total_orders":     order_count,
+            "units_sold":       int(units_sold),
+            "revenue":          round(float(revenue), 2),
+            "conversion_rate":  conversion_rate,
+            "view_trend":       view_trend,
+        }
+    }), 200
 
 # ============================================================
 # Error handlers

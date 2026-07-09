@@ -39,7 +39,7 @@
                         <div class="cart-item-details">
                             <h3>${item.name}</h3>
                             <div class="cart-item-meta">Size: ${item.size}</div>
-                            <div class="cart-item-meta">$${item.sellingPrice}</div>
+                            <div class="cart-item-meta">₹${item.sellingPrice}</div>
                         </div>
                         <div style="text-align: right;">
                             <div style="margin-bottom: 1rem;">
@@ -49,7 +49,7 @@
                             </div>
                             <button onclick="CartModule.removeFromCart('${item.id}')" style="background: none; border: none; color: #888; cursor: pointer; text-decoration: underline; font-size: 0.85rem;">Remove</button>
                             <div style="margin-top: 0.5rem; font-weight: 600;">
-                                $${(item.sellingPrice * item.quantity).toFixed(2)}
+                                ₹${(item.sellingPrice * item.quantity).toFixed(2)}
                             </div>
                         </div>
                     </div>
@@ -59,16 +59,21 @@
             <div class="cart-summary">
                 <div class="summary-row">
                     <span>Subtotal</span>
-                    <span>$${CartModule.getTotal().toFixed(2)}</span>
+                    <span>₹${CartModule.getTotal().toFixed(2)}</span>
                 </div>
                 <div class="summary-row">
                     <span>Shipping</span>
-                    <span>$15.00</span>
+                    <span>${CartModule.getTotal() >= 2000 ? 'FREE' : '₹99'}</span>
+                </div>
+                <div class="summary-row" style="font-size:.8rem;color:var(--accent-gray);">
+                    <span>GST (5%)</span>
+                    <span>₹${(CartModule.getTotal() * 0.05).toFixed(2)}</span>
                 </div>
                 <div class="summary-row total">
                     <span>Total</span>
-                    <span>$${(CartModule.getTotal() + 15).toFixed(2)}</span>
+                    <span>₹${(CartModule.getTotal() + (CartModule.getTotal() >= 2000 ? 0 : 99) + CartModule.getTotal() * 0.05).toFixed(2)}</span>
                 </div>
+                <p style="font-size:.75rem;color:var(--accent-gray);text-align:center;margin-top:.5rem;">Free shipping on orders above ₹2000</p>
                 <a href="/checkout" class="btn checkout-btn">Proceed to Checkout</a>
                 <a href="/shop" class="btn checkout-btn secondary-btn">Continue Shopping</a>
             </div>

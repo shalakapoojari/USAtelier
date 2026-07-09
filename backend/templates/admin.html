@@ -14,9 +14,11 @@
     <div id="admin-content" style="display: none;">
         <div id="admin-message" style="display: none; margin-bottom: 1.5rem;"></div>
 
-        <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+        <div style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;">
             <button onclick="showTab('orders')" class="btn" id="orders-tab">Orders</button>
             <button onclick="showTab('products')" class="btn" id="products-tab">Products</button>
+            <button onclick="showTab('coupons')" class="btn" id="coupons-tab">Coupons</button>
+            <button onclick="showTab('analytics')" class="btn" id="analytics-tab">Analytics</button>
         </div>
 
         <div id="orders-section" class="admin-section">
@@ -120,6 +122,125 @@
                 <!-- Products loaded by JavaScript -->
             </div>
         </div>
+
+        <!-- COUPONS SECTION -->
+        <div id="coupons-section" class="admin-section" style="display: none;">
+            <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Coupons</h2>
+            <button onclick="toggleCouponForm()" class="btn" style="margin-bottom: 1rem;">Add New Coupon</button>
+
+            <div id="coupon-form" style="display:none;border:1px solid var(--border-color);padding:1.5rem;margin-bottom:2rem;background:var(--hover-dark);border-radius:4px;">
+                <h3 style="margin-bottom:1.25rem;font-size:1.1rem;font-weight:400;">Add Coupon</h3>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                    <div class="form-group">
+                        <label>Code</label>
+                        <input type="text" id="c-code" placeholder="SUMMER20" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
+                    </div>
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select id="c-type" onchange="updateCouponTypeUI()" style="width:100%;padding:0.875rem;background:var(--hover-dark);color:var(--primary-light);border:1px solid var(--border-color);">
+                            <option value="standard">Standard (% or Fixed)</option>
+                            <option value="buy_n_get_n">Buy N Get N Free</option>
+                            <option value="influencer">Influencer Code</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="c-standard-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                    <div class="form-group">
+                        <label>Discount Type</label>
+                        <select id="c-discount-type" style="width:100%;padding:0.875rem;background:var(--hover-dark);color:var(--primary-light);border:1px solid var(--border-color);">
+                            <option value="percent">Percent (%)</option>
+                            <option value="fixed">Fixed Amount (₹)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Discount Value</label>
+                        <input type="number" id="c-discount-value" placeholder="20" min="0">
+                    </div>
+                </div>
+                <div id="c-bogo-fields" style="display:none;grid-template-columns:1fr 1fr;gap:1rem;">
+                    <div class="form-group">
+                        <label>Buy Quantity (N)</label>
+                        <input type="number" id="c-buy-qty" placeholder="2" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Get Quantity (Free)</label>
+                        <input type="number" id="c-get-qty" placeholder="1" min="1">
+                    </div>
+                </div>
+                <div id="c-influencer-fields" style="display:none;">
+                    <div class="form-group">
+                        <label>Influencer Name</label>
+                        <input type="text" id="c-influencer-name" placeholder="@influencername">
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                    <div class="form-group">
+                        <label>Min Order Amount (₹)</label>
+                        <input type="number" id="c-min-amount" placeholder="0" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Max Uses</label>
+                        <input type="number" id="c-max-uses" placeholder="Unlimited" min="1">
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                    <div class="form-group">
+                        <label>Expires At</label>
+                        <input type="datetime-local" id="c-expires-at">
+                    </div>
+                    <div class="form-group">
+                        <label>Visibility</label>
+                        <select id="c-visibility" style="width:100%;padding:0.875rem;background:var(--hover-dark);color:var(--primary-light);border:1px solid var(--border-color);">
+                            <option value="hidden">Hidden (manual entry only)</option>
+                            <option value="visible">Visible (auto-suggest at checkout)</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display:flex;gap:1rem;margin-top:1rem;">
+                    <button type="button" class="btn" onclick="createCoupon()">Save Coupon</button>
+                    <button type="button" onclick="toggleCouponForm()" style="padding:0.75rem 1.5rem;background:transparent;border:1px solid var(--border-color);color:var(--accent-gray);cursor:pointer;border-radius:3px;">Cancel</button>
+                </div>
+            </div>
+
+            <div id="coupons-list"></div>
+        </div>
+
+        <!-- ANALYTICS SECTION -->
+        <div id="analytics-section" class="admin-section" style="display: none;">
+            <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Analytics</h2>
+            <div style="display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;">
+                <button onclick="loadAnalytics('7d')" class="btn analytics-range-btn" data-range="7d">7 Days</button>
+                <button onclick="loadAnalytics('30d')" class="btn analytics-range-btn" data-range="30d">30 Days</button>
+                <button onclick="loadAnalytics('today')" class="btn analytics-range-btn" data-range="today">Today</button>
+            </div>
+
+            <!-- Summary Cards -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1.5rem;margin-bottom:2.5rem;" id="analytics-summary-cards"></div>
+
+            <!-- Site Visits Trend -->
+            <div style="background:var(--hover-dark);padding:1.5rem;border-radius:4px;margin-bottom:2rem;">
+                <h3 style="font-size:1rem;margin-bottom:1.25rem;font-weight:400;text-transform:uppercase;letter-spacing:0.05em;">Site Visits Trend</h3>
+                <div id="visits-chart" style="height:150px;"></div>
+            </div>
+
+            <!-- Top Pages -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-bottom:2rem;">
+                <div style="background:var(--hover-dark);padding:1.5rem;border-radius:4px;">
+                    <h3 style="font-size:1rem;margin-bottom:1.25rem;font-weight:400;text-transform:uppercase;letter-spacing:0.05em;">Top Pages</h3>
+                    <div id="top-pages"></div>
+                </div>
+                <div style="background:var(--hover-dark);padding:1.5rem;border-radius:4px;">
+                    <h3 style="font-size:1rem;margin-bottom:1.25rem;font-weight:400;text-transform:uppercase;letter-spacing:0.05em;">Top Referrers</h3>
+                    <div id="top-referrers"></div>
+                </div>
+            </div>
+
+            <!-- Product Analytics -->
+            <div style="background:var(--hover-dark);padding:1.5rem;border-radius:4px;">
+                <h3 style="font-size:1rem;margin-bottom:1.25rem;font-weight:400;text-transform:uppercase;letter-spacing:0.05em;">Product Views</h3>
+                <div id="product-views-list"></div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -217,19 +338,30 @@
     function showTab(tab) {
         const ordersSection = document.getElementById('orders-section');
         const productsSection = document.getElementById('products-section');
+        const couponsSection = document.getElementById('coupons-section');
+        const analyticsSection = document.getElementById('analytics-section');
         const ordersTab = document.getElementById('orders-tab');
         const productsTab = document.getElementById('products-tab');
+        const couponsTab = document.getElementById('coupons-tab');
+        const analyticsTab = document.getElementById('analytics-tab');
+
+        [ordersSection, productsSection, couponsSection, analyticsSection].forEach(s => s.style.display = 'none');
+        [ordersTab, productsTab, couponsTab, analyticsTab].forEach(t => t.style.borderBottom = 'none');
 
         if (tab === 'orders') {
             ordersSection.style.display = 'block';
-            productsSection.style.display = 'none';
             ordersTab.style.borderBottom = '2px solid var(--primary-light)';
-            productsTab.style.borderBottom = 'none';
-        } else {
-            ordersSection.style.display = 'none';
+        } else if (tab === 'products') {
             productsSection.style.display = 'block';
-            ordersTab.style.borderBottom = 'none';
             productsTab.style.borderBottom = '2px solid var(--primary-light)';
+        } else if (tab === 'coupons') {
+            couponsSection.style.display = 'block';
+            couponsTab.style.borderBottom = '2px solid var(--primary-light)';
+            loadCoupons();
+        } else if (tab === 'analytics') {
+            analyticsSection.style.display = 'block';
+            analyticsTab.style.borderBottom = '2px solid var(--primary-light)';
+            loadAnalytics('7d');
         }
     }
 
@@ -365,6 +497,209 @@
         } catch (error) {
             console.log("[v0] Error deleting product:", error);
             showAdminMessage('Error deleting product: ' + error.message, 'error');
+        }
+    }
+
+    // ─── COUPONS ──────────────────────────────────────────────────────────────
+    function toggleCouponForm() {
+        const form = document.getElementById('coupon-form');
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function updateCouponTypeUI() {
+        const type = document.getElementById('c-type').value;
+        document.getElementById('c-standard-fields').style.display = type === 'standard' ? 'grid' : 'none';
+        document.getElementById('c-bogo-fields').style.display = type === 'buy_n_get_n' ? 'grid' : 'none';
+        document.getElementById('c-influencer-fields').style.display = type === 'influencer' ? 'block' : 'none';
+    }
+
+    async function loadCoupons() {
+        try {
+            const res = await fetch('/api/admin/coupons');
+            const coupons = await res.json();
+            const list = document.getElementById('coupons-list');
+            if (!coupons.length) {
+                list.innerHTML = '<p style="color:var(--accent-gray);text-align:center;padding:2rem;">No coupons yet.</p>';
+                return;
+            }
+            list.innerHTML = '<table style="width:100%;border-collapse:collapse;"><thead><tr style="border-bottom:2px solid var(--border-color);">' +
+                '<th style="text-align:left;padding:0.75rem;">Code</th>' +
+                '<th style="text-align:left;padding:0.75rem;">Type</th>' +
+                '<th style="text-align:left;padding:0.75rem;">Discount</th>' +
+                '<th style="text-align:left;padding:0.75rem;">Min Order</th>' +
+                '<th style="text-align:left;padding:0.75rem;">Uses</th>' +
+                '<th style="text-align:left;padding:0.75rem;">Visibility</th>' +
+                '<th style="text-align:left;padding:0.75rem;">Active</th>' +
+                '<th style="text-align:left;padding:0.75rem;">Actions</th>' +
+                '</tr></thead><tbody>' +
+                coupons.map(c => `
+                    <tr style="border-bottom:1px solid var(--border-color);">
+                        <td style="padding:0.75rem;font-weight:600;">${c.code}</td>
+                        <td style="padding:0.75rem;font-size:0.85rem;">${c.coupon_type}</td>
+                        <td style="padding:0.75rem;">${c.coupon_type === 'buy_n_get_n' ? `Buy ${c.buy_quantity} Get ${c.get_quantity}` : (c.discount_type === 'percent' ? `${c.discount_value}%` : `₹${c.discount_value}`)}</td>
+                        <td style="padding:0.75rem;">₹${c.min_order_amount}</td>
+                        <td style="padding:0.75rem;font-size:0.85rem;">${c.uses}/${c.max_uses || '∞'}</td>
+                        <td style="padding:0.75rem;"><span style="padding:0.25rem 0.5rem;background:${c.visibility === 'visible' ? 'rgba(74,222,128,0.15)' : 'rgba(232,232,227,0.1)'};color:${c.visibility === 'visible' ? '#86efac' : 'var(--accent-gray)'};border-radius:3px;font-size:0.75rem;">${c.visibility}</span></td>
+                        <td style="padding:0.75rem;">${c.is_active ? '✓' : '✗'}</td>
+                        <td style="padding:0.75rem;">
+                            <button onclick="toggleCouponActive(${c.id}, ${!c.is_active})" style="background:none;border:none;color:var(--primary-light);cursor:pointer;text-decoration:underline;margin-right:1rem;font-size:0.85rem;">${c.is_active ? 'Disable' : 'Enable'}</button>
+                            <button onclick="deleteCoupon(${c.id})" style="background:none;border:none;color:#ff6b6b;cursor:pointer;text-decoration:underline;font-size:0.85rem;">Delete</button>
+                        </td>
+                    </tr>
+                `).join('') + '</tbody></table>';
+        } catch(e) {
+            console.error('Load coupons error:', e);
+        }
+    }
+
+    async function createCoupon() {
+        const code = document.getElementById('c-code').value.trim().toUpperCase();
+        const type = document.getElementById('c-type').value;
+        if (!code) { alert('Code required'); return; }
+
+        const payload = {
+            code,
+            coupon_type: type,
+            min_order_amount: parseFloat(document.getElementById('c-min-amount').value) || 0,
+            max_uses: document.getElementById('c-max-uses').value ? parseInt(document.getElementById('c-max-uses').value) : null,
+            expires_at: document.getElementById('c-expires-at').value || null,
+            visibility: document.getElementById('c-visibility').value,
+            is_active: true,
+        };
+
+        if (type === 'standard') {
+            payload.discount_type = document.getElementById('c-discount-type').value;
+            payload.discount_value = parseFloat(document.getElementById('c-discount-value').value) || 0;
+        } else if (type === 'buy_n_get_n') {
+            payload.buy_quantity = parseInt(document.getElementById('c-buy-qty').value) || 0;
+            payload.get_quantity = parseInt(document.getElementById('c-get-qty').value) || 0;
+            payload.discount_type = 'buy_n_get_n';
+            payload.discount_value = 0;
+        } else if (type === 'influencer') {
+            payload.influencer_name = document.getElementById('c-influencer-name').value.trim();
+            payload.discount_type = document.getElementById('c-discount-type').value;
+            payload.discount_value = parseFloat(document.getElementById('c-discount-value').value) || 0;
+        }
+
+        try {
+            const res = await fetch('/api/admin/coupons', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                showAdminMessage('Coupon created', 'success');
+                toggleCouponForm();
+                loadCoupons();
+            } else {
+                const err = await res.json();
+                showAdminMessage(err.error || 'Failed', 'error');
+            }
+        } catch(e) {
+            showAdminMessage('Network error', 'error');
+        }
+    }
+
+    async function toggleCouponActive(id, active) {
+        try {
+            const res = await fetch(`/api/admin/coupons/${id}`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({is_active: active})
+            });
+            if (res.ok) {
+                showAdminMessage(active ? 'Coupon enabled' : 'Coupon disabled', 'success');
+                loadCoupons();
+            }
+        } catch(e) { showAdminMessage('Error', 'error'); }
+    }
+
+    async function deleteCoupon(id) {
+        if (!confirm('Delete this coupon?')) return;
+        try {
+            const res = await fetch(`/api/admin/coupons/${id}`, {method: 'DELETE'});
+            if (res.ok) {
+                showAdminMessage('Coupon deleted', 'success');
+                loadCoupons();
+            }
+        } catch(e) { showAdminMessage('Error', 'error'); }
+    }
+
+    // ─── ANALYTICS ────────────────────────────────────────────────────────────
+    async function loadAnalytics(range) {
+        document.querySelectorAll('.analytics-range-btn').forEach(b => b.style.borderBottom = 'none');
+        document.querySelector(`[data-range="${range}"]`).style.borderBottom = '2px solid var(--primary-light)';
+
+        try {
+            const [siteRes, productRes] = await Promise.all([
+                fetch(`/api/admin/analytics/site-visits?range=${range}`),
+                fetch(`/api/admin/analytics/product-views?range=${range}`)
+            ]);
+            const siteData = await siteRes.json();
+            const productData = await productRes.json();
+
+            // Summary cards
+            const cards = document.getElementById('analytics-summary-cards');
+            cards.innerHTML = `
+                <div style="background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);padding:1.5rem;border-radius:4px;">
+                    <div style="font-size:2rem;font-weight:600;color:#86efac;">${siteData.summary.total_visits}</div>
+                    <div style="font-size:0.8rem;color:var(--accent-gray);text-transform:uppercase;letter-spacing:0.05em;margin-top:0.5rem;">Total Visits</div>
+                </div>
+                <div style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);padding:1.5rem;border-radius:4px;">
+                    <div style="font-size:2rem;font-weight:600;color:#93c5fd;">${siteData.summary.unique_sessions}</div>
+                    <div style="font-size:0.8rem;color:var(--accent-gray);text-transform:uppercase;letter-spacing:0.05em;margin-top:0.5rem;">Unique Visitors</div>
+                </div>
+                <div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);padding:1.5rem;border-radius:4px;">
+                    <div style="font-size:2rem;font-weight:600;color:#fcd34d;">${siteData.summary.unique_users}</div>
+                    <div style="font-size:0.8rem;color:var(--accent-gray);text-transform:uppercase;letter-spacing:0.05em;margin-top:0.5rem;">Logged-in Users</div>
+                </div>
+            `;
+
+            // Visits chart (simple bar representation)
+            const chart = document.getElementById('visits-chart');
+            const maxVisits = Math.max(...siteData.daily_trend.map(d => d.visits), 1);
+            chart.innerHTML = siteData.daily_trend.slice(-7).map(d => {
+                const height = (d.visits / maxVisits * 100) || 5;
+                return `<div style="display:inline-block;width:${100 / 7}%;text-align:center;vertical-align:bottom;">
+                    <div style="background:rgba(74,222,128,0.4);height:${height}px;margin:0 2px;border-radius:2px 2px 0 0;"></div>
+                    <div style="font-size:0.65rem;color:var(--accent-gray);margin-top:0.5rem;">${new Date(d.date).toLocaleDateString('en', {month:'short',day:'numeric'})}</div>
+                    <div style="font-size:0.7rem;font-weight:600;color:#86efac;">${d.visits}</div>
+                </div>`;
+            }).join('');
+
+            // Top pages
+            const pages = document.getElementById('top-pages');
+            pages.innerHTML = siteData.top_pages.slice(0, 5).map(p => `
+                <div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--border-color);font-size:0.85rem;">
+                    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.page}</span>
+                    <span style="font-weight:600;color:#86efac;">${p.visits}</span>
+                </div>
+            `).join('') || '<p style="color:var(--accent-gray);font-size:0.85rem;">No data</p>';
+
+            // Top referrers
+            const refs = document.getElementById('top-referrers');
+            refs.innerHTML = siteData.top_referrers.slice(0, 5).map(r => `
+                <div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--border-color);font-size:0.85rem;">
+                    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.referrer || 'Direct'}</span>
+                    <span style="font-weight:600;color:#93c5fd;">${r.visits}</span>
+                </div>
+            `).join('') || '<p style="color:var(--accent-gray);font-size:0.85rem;">No data</p>';
+
+            // Product views
+            const prodList = document.getElementById('product-views-list');
+            prodList.innerHTML = '<table style="width:100%;border-collapse:collapse;"><thead><tr style="border-bottom:2px solid var(--border-color);">' +
+                '<th style="text-align:left;padding:0.75rem;font-size:0.85rem;">Product</th>' +
+                '<th style="text-align:right;padding:0.75rem;font-size:0.85rem;">Views</th>' +
+                '</tr></thead><tbody>' +
+                productData.slice(0, 10).map(p => `
+                    <tr style="border-bottom:1px solid var(--border-color);">
+                        <td style="padding:0.75rem;font-size:0.9rem;">${p.product_name}</td>
+                        <td style="padding:0.75rem;text-align:right;font-weight:600;color:#86efac;">${p.view_count}</td>
+                    </tr>
+                `).join('') + '</tbody></table>';
+
+        } catch(e) {
+            console.error('Analytics error:', e);
         }
     }
 

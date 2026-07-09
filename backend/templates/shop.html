@@ -1,144 +1,262 @@
 {% extends "base.html" %}
-
 {% block title %}Shop - U.S ATELIER{% endblock %}
-
 {% block content %}
-<div class="products-section">
-    <div class="products-header">
-        <h2>Shop</h2>
-        <p>Discover our complete collection</p>
+<div class="products-section" style="padding-top:2rem;">
+    <!-- SEARCH BAR (Always on top) -->
+    <div style="max-width:1400px;margin:0 auto 1.5rem;padding:0 2rem;">
+        <div style="position:relative;max-width:600px;">
+            <input type="text" id="search-input" placeholder="Search products..." 
+                style="width:100%;padding:0.875rem 3rem 0.875rem 1rem;background:rgba(26,26,24,0.6);border:1px solid var(--border-color);color:var(--primary-light);font-family:inherit;border-radius:4px;font-size:0.95rem;"
+                autocomplete="off">
+            <svg style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);width:20px;height:20px;opacity:0.5;pointer-events:none;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+        </div>
+        <div id="search-results" style="display:none;position:absolute;z-index:100;background:rgba(3,3,3,0.98);border:1px solid var(--border-color);border-radius:4px;max-width:600px;width:calc(100% - 4rem);max-height:400px;overflow-y:auto;margin-top:0.5rem;box-shadow:0 8px 24px rgba(0,0,0,0.6);"></div>
     </div>
 
-    <div style="margin-bottom: 2rem; display: flex; flex-direction: column; gap: 1rem;">
-        <div style="display: flex; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
-            <button onclick="setGender('all')" class="filter-tab active" id="gender-all"
-                style="background: none; border: none; color: inherit; cursor: pointer; padding: 0.5rem 1rem; font-size: 0.9rem; text-transform: uppercase;">All</button>
-            <button onclick="setGender('Men')" class="filter-tab" id="gender-Men"
-                style="background: none; border: none; color: inherit; cursor: pointer; padding: 0.5rem 1rem; font-size: 0.9rem; text-transform: uppercase;">Men</button>
-            <button onclick="setGender('Women')" class="filter-tab" id="gender-Women"
-                style="background: none; border: none; color: inherit; cursor: pointer; padding: 0.5rem 1rem; font-size: 0.9rem; text-transform: uppercase;">Women</button>
-        </div>
-
-        <div style="display: flex; align-items: center;">
-            <label style="margin-right: 1rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">
-                Filter by category:
-            </label>
-            <select id="category-filter"
-                style="padding: 0.5rem; background-color: var(--hover-dark); color: var(--primary-light); border: 1px solid var(--border-color);">
-                <option value="">All Categories</option>
-                <option value="T-shirt">T-shirt</option>
-                <option value="Trouser">Trouser</option>
-                <option value="Jeans">Jeans</option>
-                <option value="Shirt">Shirt</option>
-                <option value="Knitwear">Knitwear</option>
-                <option value="Basics">Basics</option>
-                <option value="Accessories">Accessories</option>
-            </select>
+    <!-- CATEGORIES (Horizontal scroll) -->
+    <div style="max-width:1400px;margin:0 auto 1rem;padding:0 2rem;">
+        <div id="category-scroll" style="display:flex;gap:0.5rem;overflow-x:auto;padding-bottom:0.75rem;scrollbar-width:thin;-webkit-overflow-scrolling:touch;">
+            <button onclick="setCategory('')" class="cat-btn active" data-cat="" 
+                style="flex-shrink:0;padding:0.5rem 1.25rem;background:rgba(232,232,227,0.1);border:1px solid var(--border-color);color:var(--primary-light);cursor:pointer;border-radius:20px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;transition:all .2s;white-space:nowrap;">
+                All
+            </button>
+            <button onclick="setCategory('T-shirt')" class="cat-btn" data-cat="T-shirt" style="flex-shrink:0;padding:0.5rem 1.25rem;background:transparent;border:1px solid var(--border-color);color:var(--accent-gray);cursor:pointer;border-radius:20px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;transition:all .2s;white-space:nowrap;">T-Shirts</button>
+            <button onclick="setCategory('Trouser')" class="cat-btn" data-cat="Trouser" style="flex-shrink:0;padding:0.5rem 1.25rem;background:transparent;border:1px solid var(--border-color);color:var(--accent-gray);cursor:pointer;border-radius:20px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;transition:all .2s;white-space:nowrap;">Trousers</button>
+            <button onclick="setCategory('Jeans')" class="cat-btn" data-cat="Jeans" style="flex-shrink:0;padding:0.5rem 1.25rem;background:transparent;border:1px solid var(--border-color);color:var(--accent-gray);cursor:pointer;border-radius:20px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;transition:all .2s;white-space:nowrap;">Jeans</button>
+            <button onclick="setCategory('Shirt')" class="cat-btn" data-cat="Shirt" style="flex-shrink:0;padding:0.5rem 1.25rem;background:transparent;border:1px solid var(--border-color);color:var(--accent-gray);cursor:pointer;border-radius:20px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;transition:all .2s;white-space:nowrap;">Shirts</button>
+            <button onclick="setCategory('Knitwear')" class="cat-btn" data-cat="Knitwear" style="flex-shrink:0;padding:0.5rem 1.25rem;background:transparent;border:1px solid var(--border-color);color:var(--accent-gray);cursor:pointer;border-radius:20px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;transition:all .2s;white-space:nowrap;">Knitwear</button>
+            <button onclick="setCategory('Basics')" class="cat-btn" data-cat="Basics" style="flex-shrink:0;padding:0.5rem 1.25rem;background:transparent;border:1px solid var(--border-color);color:var(--accent-gray);cursor:pointer;border-radius:20px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;transition:all .2s;white-space:nowrap;">Basics</button>
+            <button onclick="setCategory('Accessories')" class="cat-btn" data-cat="Accessories" style="flex-shrink:0;padding:0.5rem 1.25rem;background:transparent;border:1px solid var(--border-color);color:var(--accent-gray);cursor:pointer;border-radius:20px;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;transition:all .2s;white-space:nowrap;">Accessories</button>
         </div>
     </div>
 
-    <div class="products-grid" id="products-grid">
-        <!-- Products loaded by JavaScript -->
+    <!-- FILTER DROPDOWN (Below categories) -->
+    <div style="max-width:1400px;margin:0 auto 2rem;padding:0 2rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <div style="position:relative;">
+            <button id="filter-toggle" onclick="toggleFilters()" 
+                style="padding:0.625rem 1.25rem;background:transparent;border:1px solid var(--border-color);color:var(--primary-light);cursor:pointer;border-radius:4px;font-size:0.875rem;text-transform:uppercase;letter-spacing:0.05em;display:flex;align-items:center;gap:0.5rem;transition:all .2s;">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                </svg>
+                Filters
+            </button>
+            <div id="filter-dropdown" style="display:none;position:absolute;top:calc(100% + 0.5rem);left:0;background:rgba(3,3,3,0.98);border:1px solid var(--border-color);border-radius:4px;padding:1.5rem;min-width:280px;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,0.6);">
+                <div style="margin-bottom:1.25rem;">
+                    <label style="display:block;margin-bottom:0.75rem;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--accent-gray);">Gender</label>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                        <button onclick="setGender('all')" class="gender-btn active" data-gender="all" style="padding:0.4rem 0.875rem;background:rgba(232,232,227,0.1);border:1px solid var(--border-color);color:var(--primary-light);cursor:pointer;border-radius:16px;font-size:0.8rem;transition:all .2s;">All</button>
+                        <button onclick="setGender('Men')" class="gender-btn" data-gender="Men" style="padding:0.4rem 0.875rem;background:transparent;border:1px solid var(--border-color);color:var(--accent-gray);cursor:pointer;border-radius:16px;font-size:0.8rem;transition:all .2s;">Men</button>
+                        <button onclick="setGender('Women')" class="gender-btn" data-gender="Women" style="padding:0.4rem 0.875rem;background:transparent;border:1px solid var(--border-color);color:var(--accent-gray);cursor:pointer;border-radius:16px;font-size:0.8rem;transition:all .2s;">Women</button>
+                    </div>
+                </div>
+                <div style="margin-bottom:1.25rem;">
+                    <label style="display:block;margin-bottom:0.75rem;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--accent-gray);">Price Range</label>
+                    <div style="display:flex;gap:0.5rem;">
+                        <input type="number" id="price-min" placeholder="Min" style="flex:1;padding:0.5rem;background:rgba(26,26,24,0.6);border:1px solid var(--border-color);color:var(--primary-light);border-radius:4px;font-size:0.85rem;">
+                        <input type="number" id="price-max" placeholder="Max" style="flex:1;padding:0.5rem;background:rgba(26,26,24,0.6);border:1px solid var(--border-color);color:var(--primary-light);border-radius:4px;font-size:0.85rem;">
+                    </div>
+                </div>
+                <div style="display:flex;gap:0.5rem;">
+                    <button onclick="applyFilters()" class="btn" style="flex:1;padding:0.6rem;font-size:0.8rem;">Apply</button>
+                    <button onclick="resetFilters()" style="flex:1;padding:0.6rem;background:transparent;border:1px solid var(--border-color);color:var(--accent-gray);cursor:pointer;border-radius:4px;font-size:0.8rem;transition:all .2s;">Reset</button>
+                </div>
+            </div>
+        </div>
+        <div id="active-filters" style="display:flex;gap:0.5rem;flex-wrap:wrap;"></div>
+    </div>
+
+    <!-- PRODUCTS GRID -->
+    <div style="max-width:1400px;margin:0 auto;padding:0 2rem;">
+        <div class="products-grid" id="products-grid">
+            <!-- Products loaded by JavaScript -->
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <style>
-    .filter-tab.active {
-        color: var(--primary-light) !important;
-        border-bottom: 2px solid var(--primary-light) !important;
-    }
-
-    .filter-tab {
-        opacity: 0.6;
-        transition: opacity 0.2s, color 0.2s;
-    }
-
-    .filter-tab:hover {
-        opacity: 1;
-    }
+#category-scroll::-webkit-scrollbar{height:6px;}
+#category-scroll::-webkit-scrollbar-track{background:rgba(232,232,227,0.05);}
+#category-scroll::-webkit-scrollbar-thumb{background:rgba(232,232,227,0.2);border-radius:3px;}
+.cat-btn:hover,.gender-btn:hover{border-color:var(--primary-light)!important;color:var(--primary-light)!important;}
+.cat-btn.active,.gender-btn.active{background:rgba(232,232,227,0.1)!important;border-color:var(--primary-light)!important;color:var(--primary-light)!important;}
+#search-results::-webkit-scrollbar{width:8px;}
+#search-results::-webkit-scrollbar-track{background:rgba(232,232,227,0.05);}
+#search-results::-webkit-scrollbar-thumb{background:rgba(232,232,227,0.2);border-radius:4px;}
 </style>
 <script>
-    let allProducts = [];
-    let currentGender = 'all';
-    let currentCategory = '';
+let allProducts = [];
+let currentGender = 'all';
+let currentCategory = '';
+let priceMin = null;
+let priceMax = null;
+let searchTimeout = null;
 
-    async function loadProducts() {
-        try {
-            const res = await fetch('/api/products');
-            allProducts = await res.json();
-
-            // Check for gender in URL
-            const urlParams = new URLSearchParams(window.location.search);
-            const genderParam = urlParams.get('gender');
-            if (genderParam) {
-                setGender(genderParam);
-            } else {
-                applyFilters();
-            }
-        } catch (error) {
-            console.log("[v0] Error loading products:", error);
-        }
+async function loadProducts() {
+    try {
+        const res = await fetch('/api/products');
+        allProducts = await res.json();
+        const urlParams = new URLSearchParams(window.location.search);
+        const genderParam = urlParams.get('gender');
+        if (genderParam) setGender(genderParam);
+        else applyFilters();
+    } catch (error) {
+        console.error('Error loading products:', error);
     }
+}
 
-    function setGender(gender) {
-        currentGender = gender;
+function setCategory(cat) {
+    currentCategory = cat;
+    document.querySelectorAll('.cat-btn').forEach(btn => {
+        if (btn.getAttribute('data-cat') === cat) btn.classList.add('active');
+        else btn.classList.remove('active');
+    });
+    applyFilters();
+}
 
-        // Update UI
-        document.querySelectorAll('.filter-tab').forEach(tab => tab.classList.remove('active'));
-        document.getElementById(`gender-${gender}`).classList.add('active');
+function setGender(gender) {
+    currentGender = gender;
+    document.querySelectorAll('.gender-btn').forEach(btn => {
+        if (btn.getAttribute('data-gender') === gender) btn.classList.add('active');
+        else btn.classList.remove('active');
+    });
+    applyFilters();
+}
 
-        applyFilters();
+function toggleFilters() {
+    const dropdown = document.getElementById('filter-dropdown');
+    dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+}
+
+function applyFilters() {
+    const minInput = document.getElementById('price-min');
+    const maxInput = document.getElementById('price-max');
+    priceMin = minInput && minInput.value ? parseFloat(minInput.value) : null;
+    priceMax = maxInput && maxInput.value ? parseFloat(maxInput.value) : null;
+    
+    let filtered = allProducts;
+    if (currentGender !== 'all') filtered = filtered.filter(p => p.gender === currentGender);
+    if (currentCategory) filtered = filtered.filter(p => p.category === currentCategory);
+    if (priceMin !== null) filtered = filtered.filter(p => p.sellingPrice >= priceMin);
+    if (priceMax !== null) filtered = filtered.filter(p => p.sellingPrice <= priceMax);
+    
+    displayProducts(filtered);
+    updateActiveFilters();
+    document.getElementById('filter-dropdown').style.display = 'none';
+}
+
+function resetFilters() {
+    currentGender = 'all';
+    currentCategory = '';
+    priceMin = null;
+    priceMax = null;
+    document.getElementById('price-min').value = '';
+    document.getElementById('price-max').value = '';
+    document.querySelectorAll('.gender-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector('.gender-btn[data-gender="all"]').classList.add('active');
+    document.querySelectorAll('.cat-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector('.cat-btn[data-cat=""]').classList.add('active');
+    applyFilters();
+}
+
+function updateActiveFilters() {
+    const container = document.getElementById('active-filters');
+    const filters = [];
+    if (currentGender !== 'all') filters.push({label: currentGender, action: () => setGender('all')});
+    if (currentCategory) filters.push({label: currentCategory, action: () => setCategory('')});
+    if (priceMin !== null || priceMax !== null) {
+        const priceLabel = priceMin && priceMax ? `₹${priceMin}-₹${priceMax}` : priceMin ? `₹${priceMin}+` : `Up to ₹${priceMax}`;
+        filters.push({label: priceLabel, action: () => { priceMin = null; priceMax = null; applyFilters(); }});
     }
+    container.innerHTML = filters.map(f => `
+        <button onclick="this.remove();arguments[0].stopPropagation();" style="padding:0.4rem 0.875rem;background:rgba(232,232,227,0.08);border:1px solid var(--border-color);color:var(--primary-light);cursor:pointer;border-radius:16px;font-size:0.8rem;display:flex;align-items:center;gap:0.5rem;">
+            ${f.label}
+            <span style="opacity:0.6;">×</span>
+        </button>
+    `).join('');
+}
 
-    function applyFilters() {
-        let filtered = allProducts;
-
-        if (currentGender !== 'all') {
-            filtered = filtered.filter(p => p.gender === currentGender);
-        }
-
-        if (currentCategory) {
-            filtered = filtered.filter(p => p.category === currentCategory);
-        }
-
-        displayProducts(filtered);
+function displayProducts(products) {
+    const grid = document.getElementById('products-grid');
+    if (!products.length) {
+        grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:4rem;opacity:0.5;">No products found.</p>';
+        return;
     }
+    grid.innerHTML = products.map(p => `
+        <div class="product-card" onclick="window.location.href='/product/${p.id}'">
+            <div class="product-image">
+                <img src="${p.images?.[0] || '/static/images/placeholder.svg'}" alt="${p.name}" onerror="this.src='/static/images/placeholder.svg'">
+            </div>
+            <div class="product-info">
+                <h3>${p.name}</h3>
+                <div class="product-price">₹${p.sellingPrice}</div>
+                ${p.bestseller ? '<span class="product-badge">Bestseller</span>' : ''}
+                ${p.newArrival || p.is_new ? '<span class="product-badge">New</span>' : ''}
+                <div class="product-category">${p.gender || ''} ${p.category}</div>
+            </div>
+        </div>
+    `).join('');
+}
 
-    function displayProducts(products) {
-        const grid = document.getElementById('products-grid');
-        if (products.length === 0) {
-            grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 4rem; opacity: 0.5;">No products available in this category.</p>';
+// ─── SEARCH FUNCTIONALITY ───────────────────────────────────────────────────
+const searchInput = document.getElementById('search-input');
+const searchResults = document.getElementById('search-results');
+
+searchInput.addEventListener('input', (e) => {
+    const query = e.target.value.trim().toLowerCase();
+    if (searchTimeout) clearTimeout(searchTimeout);
+    
+    if (!query) {
+        searchResults.style.display = 'none';
+        return;
+    }
+    
+    searchTimeout = setTimeout(() => {
+        const matches = allProducts.filter(p => 
+            p.name.toLowerCase().includes(query) || 
+            p.category.toLowerCase().includes(query) ||
+            (p.description && p.description.toLowerCase().includes(query))
+        ).slice(0, 8);
+        
+        if (!matches.length) {
+            searchResults.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--accent-gray);font-size:0.875rem;">No products found</div>';
+            searchResults.style.display = 'block';
             return;
         }
-
-        grid.innerHTML = products.map(product => `
-            <div class="product-card" onclick="window.location.href='/product/${product.id}'">
-                <div class="product-image">
-                    <img src="/static/images/${product.images?.[0] || 'placeholder.svg'}" 
-                         alt="${product.name}"
-                         onerror="this.src='/static/images/placeholder.svg'">
-                </div>
-                <div class="product-info">
-                    <h3>${product.name}</h3>
-                    <div class="product-price">$${product.sellingPrice}</div>
-                    ${product.bestseller ? '<span class="product-badge">Bestseller</span>' : ''}
-                    ${product.newArrival ? '<span class="product-badge">New</span>' : ''}
-                    <div class="product-category">${product.gender || ''} ${product.category}</div>
+        
+        searchResults.innerHTML = matches.map(p => `
+            <div onclick="window.location.href='/product/${p.id}'" style="display:flex;gap:1rem;padding:1rem;border-bottom:1px solid var(--border-color);cursor:pointer;transition:background .2s;" onmouseover="this.style.background='rgba(232,232,227,0.05)'" onmouseout="this.style.background='transparent'">
+                <img src="${p.images?.[0] || '/static/images/placeholder.svg'}" alt="${p.name}" style="width:60px;height:75px;object-fit:cover;border-radius:4px;" onerror="this.src='/static/images/placeholder.svg'">
+                <div style="flex:1;">
+                    <div style="font-size:0.9rem;margin-bottom:0.25rem;">${p.name}</div>
+                    <div style="font-size:0.8rem;color:var(--accent-gray);margin-bottom:0.25rem;">${p.category}</div>
+                    <div style="font-size:0.875rem;font-weight:600;">₹${p.sellingPrice}</div>
                 </div>
             </div>
         `).join('');
+        searchResults.style.display = 'block';
+    }, 300);
+});
+
+// Close search results when clicking outside
+document.addEventListener('click', (e) => {
+    if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+        searchResults.style.display = 'none';
     }
+});
 
-    document.addEventListener('DOMContentLoaded', () => {
-        loadProducts();
+// Close filter dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    const filterToggle = document.getElementById('filter-toggle');
+    const filterDropdown = document.getElementById('filter-dropdown');
+    if (!filterToggle.contains(e.target) && !filterDropdown.contains(e.target)) {
+        filterDropdown.style.display = 'none';
+    }
+});
 
-        const categoryFilter = document.getElementById('category-filter');
-        categoryFilter.addEventListener('change', (e) => {
-            currentCategory = e.target.value;
-            applyFilters();
-        });
-    });
+document.addEventListener('DOMContentLoaded', loadProducts);
 </script>
 {% endblock %}

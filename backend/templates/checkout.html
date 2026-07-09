@@ -1,345 +1,503 @@
 {% extends "base.html" %}
-
 {% block title %}Checkout - U.S ATELIER{% endblock %}
-
 {% block content %}
-    <div class="cart-container" style="max-width: 900px;">
-        <h1 style="font-size: 2rem; margin-bottom: 2rem; font-weight: 400;">Checkout</h1>
+<div class="cart-container" style="max-width: 960px;">
+    <h1 style="font-size: 2rem; margin-bottom: 2rem; font-weight: 400;">Checkout</h1>
+    <div id="checkout-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 3rem;">
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 3rem;">
-            <div>
-                <h2 style="font-size: 1.2rem; margin-bottom: 1.5rem;">Shipping Address</h2>
-
-                <form id="checkout-form" onsubmit="handleCheckout(event)">
+        <!-- LEFT: Shipping + Payment -->
+        <div>
+            <h2 style="font-size: 1.2rem; margin-bottom: 1.5rem;">Shipping Address</h2>
+            <form id="checkout-form" onsubmit="handleCheckout(event)">
+                <div class="form-group">
+                    <label for="name">Full Name</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="phone">Phone Number</label>
+                    <input type="tel" id="phone" name="phone" placeholder="10-digit mobile number" required>
+                </div>
+                <div class="form-group">
+                    <label for="street">Street Address</label>
+                    <input type="text" id="street" name="street" required>
+                </div>
+                <div style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;">
                     <div class="form-group">
-                        <label for="name">Full Name</label>
-                        <input type="text" id="name" name="name" required>
+                        <label for="city">City</label>
+                        <input type="text" id="city" name="city" required>
                     </div>
-
                     <div class="form-group">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" name="email" required>
+                        <label for="state">State</label>
+                        <input type="text" id="state" name="state" required>
                     </div>
-
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
                     <div class="form-group">
-                        <label for="street">Street Address</label>
-                        <input type="text" id="street" name="street" required>
+                        <label for="zip">PIN Code</label>
+                        <input type="text" id="zip" name="zip" required pattern="[0-9]{6}" placeholder="6-digit PIN">
                     </div>
-
-                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem;">
-                        <div class="form-group">
-                            <label for="city">City</label>
-                            <input type="text" id="city" name="city" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="state">State</label>
-                            <input type="text" id="state" name="state" required>
-                        </div>
+                    <div class="form-group">
+                        <label for="country">Country</label>
+                        <input type="text" id="country" name="country" required value="India">
                     </div>
+                </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                        <div class="form-group">
-                            <label for="zip">ZIP Code</label>
-                            <input type="text" id="zip" name="zip" required>
+                <!-- Payment Method -->
+                <h2 style="font-size:1.2rem;margin:2rem 0 1rem;">Payment Method</h2>
+                <div style="display:flex;gap:1rem;margin-bottom:1.5rem;">
+                    <label id="pm-prepaid-label" style="flex:1;padding:1rem;border:1px solid var(--border-color);cursor:pointer;border-radius:4px;display:flex;align-items:center;gap:0.75rem;transition:border-color .2s;">
+                        <input type="radio" name="paymentMethod" value="prepaid" id="pm-prepaid" checked style="accent-color:var(--primary-light);">
+                        <div>
+                            <div style="font-size:.9rem;font-weight:500;">Online Payment</div>
+                            <div style="font-size:.75rem;color:var(--accent-gray);">UPI / Card / Net Banking</div>
                         </div>
-                        <div class="form-group">
-                            <label for="country">Country</label>
-                            <input type="text" id="country" name="country" required value="USA">
+                    </label>
+                    <label id="pm-cod-label" style="flex:1;padding:1rem;border:1px solid var(--border-color);cursor:pointer;border-radius:4px;display:flex;align-items:center;gap:0.75rem;transition:border-color .2s;">
+                        <input type="radio" name="paymentMethod" value="cod" id="pm-cod" style="accent-color:var(--primary-light);">
+                        <div>
+                            <div style="font-size:.9rem;font-weight:500;">Cash on Delivery</div>
+                            <div style="font-size:.75rem;color:var(--accent-gray);">₹150 advance online</div>
                         </div>
+                    </label>
+                </div>
+
+                <!-- COD Info Box -->
+                <div id="cod-info-box" style="display:none;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.3);padding:1rem;border-radius:4px;margin-bottom:1.5rem;font-size:.875rem;">
+                    <p style="color:#fcd34d;font-weight:600;margin-bottom:.5rem;">📦 Cash on Delivery — How it works</p>
+                    <p style="color:#e8e8e3;line-height:1.6;">Pay <strong>₹150 advance online now</strong> via Razorpay to confirm your order. The remaining balance is paid in cash when your order arrives.</p>
+                </div>
+
+                <!-- Payment gateway status -->
+                <div id="payment-status-configured" style="display:none;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.3);padding:.875rem 1rem;border-radius:4px;margin-bottom:1.5rem;font-size:.85rem;color:#86efac;">
+                    ✓ Secure payment enabled — Powered by Razorpay
+                </div>
+                <div id="payment-status-unconfigured" style="display:none;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);padding:.875rem 1rem;border-radius:4px;margin-bottom:1.5rem;font-size:.85rem;color:#fcd34d;">
+                    ⚠ Payment gateway not configured. Your order will be created and admin will contact you.
+                </div>
+
+                <input type="hidden" id="razorpay-order-id">
+                <input type="hidden" id="razorpay-payment-id">
+                <input type="hidden" id="razorpay-signature">
+
+                <div style="margin-bottom:1rem;">
+                    <label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer;font-size:.85rem;color:var(--accent-gray);">
+                        <input type="checkbox" id="terms-checkbox" style="margin-top:2px;accent-color:var(--primary-light);" required>
+                        I agree to the Terms &amp; Conditions and Privacy Policy
+                    </label>
+                </div>
+
+                <button type="submit" class="btn" id="submit-button" style="width:100%;padding:1rem;font-weight:600;">
+                    <span id="button-text">Complete Purchase</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- RIGHT: Order Summary -->
+        <div>
+            <h2 style="font-size:1.2rem;margin-bottom:1.5rem;">Order Summary</h2>
+            <div class="cart-summary">
+                <div id="checkout-items"></div>
+
+                <!-- Coupon Section -->
+                <div style="margin:1.25rem 0;border-top:1px solid var(--border-color);padding-top:1.25rem;">
+                    <div id="auto-coupons" style="margin-bottom:.75rem;"></div>
+                    <div style="display:flex;gap:.5rem;">
+                        <input type="text" id="coupon-input" placeholder="Coupon code" style="flex:1;padding:.6rem .75rem;background:rgba(26,26,24,.8);border:1px solid rgba(232,232,227,.2);color:var(--primary-light);font-family:inherit;border-radius:3px;font-size:.875rem;">
+                        <button type="button" onclick="applyCoupon()" class="btn" style="padding:.6rem 1rem;font-size:.8rem;">Apply</button>
                     </div>
+                    <div id="coupon-status" style="margin-top:.5rem;font-size:.8rem;"></div>
+                </div>
 
-                    <h2 style="font-size: 1.2rem; margin: 2rem 0 1.5rem;">Payment Method</h2>
-
-                    <div id="payment-method-info" style="background: rgba(232, 232, 227, 0.1); border: 1px solid rgba(232, 232, 227, 0.2); padding: 1.5rem; border-radius: 4px; margin-bottom: 1.5rem;">
-                        <div id="payment-status-configured" style="display: none;">
-                            <p style="font-size: 0.95rem; color: #4ade80; margin-bottom: 0.5rem;">✓ Secure payment enabled</p>
-                            <p style="font-size: 0.85rem; color: var(--accent-gray);">Powered by Razorpay - PCI DSS Level 1 compliant</p>
-                        </div>
-                        <div id="payment-status-unconfigured" style="display: none;">
-                            <p style="font-size: 0.95rem; color: #fbbf24; margin-bottom: 0.5rem;">⚠ Payment gateway not configured</p>
-                            <p style="font-size: 0.85rem; color: var(--accent-gray);">Your order will be created. Admin will contact you for payment details.</p>
-                        </div>
-                    </div>
-
-                    <input type="hidden" id="razorpay-order-id">
-                    <input type="hidden" id="razorpay-payment-id">
-                    <input type="hidden" id="razorpay-signature">
-
-                    <button type="submit" class="btn" id="submit-button" style="width: 100%; padding: 1rem; margin-top: 2rem; font-weight: 600;">
-                        <span id="button-text">Complete Purchase</span>
-                    </button>
-                </form>
-            </div>
-
-            <div>
-                <h2 style="font-size: 1.2rem; margin-bottom: 1.5rem;">Order Summary</h2>
-
-                <div class="cart-summary">
-                    <div id="checkout-items">
-                        <!-- Items loaded by JavaScript -->
-                    </div>
-
-                    <div class="summary-row" style="margin-top: 2rem;">
+                <!-- Price Breakdown -->
+                <div id="price-breakdown">
+                    <div class="summary-row">
                         <span>Subtotal</span>
-                        <span id="subtotal">$0</span>
+                        <span id="subtotal-display">₹0</span>
+                    </div>
+                    <div class="summary-row" id="discount-row" style="display:none;color:#86efac;">
+                        <span id="discount-label">Discount</span>
+                        <span id="discount-display">-₹0</span>
                     </div>
                     <div class="summary-row">
                         <span>Shipping</span>
-                        <span>$15.00</span>
+                        <span id="shipping-display">₹99</span>
+                    </div>
+                    <div class="summary-row" id="tax-row">
+                        <span>GST (5%)</span>
+                        <span id="tax-display">₹0</span>
+                    </div>
+                    <!-- COD breakdown rows (hidden unless COD selected) -->
+                    <div id="cod-breakdown" style="display:none;">
+                        <div class="summary-row" style="color:#fcd34d;">
+                            <span>Advance Paid Online</span>
+                            <span>₹150</span>
+                        </div>
+                        <div class="summary-row" style="color:#86efac;">
+                            <span>Amount Payable in Cash</span>
+                            <span id="cod-cash-display">₹0</span>
+                        </div>
                     </div>
                     <div class="summary-row total">
-                        <span>Total</span>
-                        <span id="total">$0</span>
+                        <span id="total-label">Total</span>
+                        <span id="total-display">₹0</span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    async function loadCheckoutSummary() {
-        const items = CartModule.items;
-        const itemsContainer = document.getElementById('checkout-items');
+const SHIPPING_THRESHOLD = 2000;
+const SHIPPING_COST = 99;
+const COD_FEE = 150;
+const TAX_RATE = 0.05;
 
-        if (items.length === 0) {
-            itemsContainer.innerHTML = '<p>Your cart is empty</p>';
-            return;
+let razorpayKey = null;
+let paymentConfigured = false;
+let appliedCoupon = null;
+let currentSubtotal = 0;
+
+// ─── Payment method toggle ───────────────────────────────────────────────────
+document.querySelectorAll('input[name="paymentMethod"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+        const isCOD = document.getElementById('pm-cod').checked;
+        document.getElementById('cod-info-box').style.display = isCOD ? 'block' : 'none';
+        document.getElementById('cod-breakdown').style.display = isCOD ? 'block' : 'none';
+        document.getElementById('pm-cod-label').style.borderColor = isCOD ? 'rgba(232,232,227,.6)' : 'var(--border-color)';
+        document.getElementById('pm-prepaid-label').style.borderColor = !isCOD ? 'rgba(232,232,227,.6)' : 'var(--border-color)';
+        if (isCOD) {
+            document.getElementById('button-text').textContent = 'Pay ₹150 Advance & Confirm Order';
+        } else {
+            document.getElementById('button-text').textContent = paymentConfigured ? 'Complete Purchase — Secure Payment' : 'Complete Purchase';
         }
-
-        itemsContainer.innerHTML = items.map(item => `
-            <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                    <span>${item.name}</span>
-                    <span>$${(item.sellingPrice * item.quantity).toFixed(2)}</span>
-                </div>
-                <div style="font-size: 0.85rem; color: var(--accent-gray);">
-                    Size: ${item.size} × ${item.quantity}
-                </div>
-            </div>
-        `).join('');
-
         updateTotals();
+    });
+});
+
+// ─── Load summary ────────────────────────────────────────────────────────────
+function loadCheckoutSummary() {
+    const items = CartModule.items;
+    const container = document.getElementById('checkout-items');
+    if (!items.length) { container.innerHTML = '<p>Your cart is empty</p>'; return; }
+    container.innerHTML = items.map(item => `
+        <div style="margin-bottom:.875rem;padding-bottom:.875rem;border-bottom:1px solid var(--border-color);">
+            <div style="display:flex;justify-content:space-between;margin-bottom:.25rem;">
+                <span style="font-size:.9rem;">${item.name}</span>
+                <span style="font-size:.9rem;">₹${(item.sellingPrice * item.quantity).toFixed(2)}</span>
+            </div>
+            <div style="font-size:.78rem;color:var(--accent-gray);">Size: ${item.size} × ${item.quantity}</div>
+        </div>`).join('');
+    currentSubtotal = CartModule.getTotal();
+    updateTotals();
+    loadAutoCoupons();
+}
+
+function updateTotals() {
+    const sub = currentSubtotal;
+    const discount = appliedCoupon ? appliedCoupon.discount_amount : 0;
+    const discountedSub = Math.max(0, sub - discount);
+    const shipping = discountedSub >= SHIPPING_THRESHOLD ? 0 : SHIPPING_COST;
+    const tax = Math.round(discountedSub * TAX_RATE * 100) / 100;
+    const isCOD = document.getElementById('pm-cod').checked;
+    const total = discountedSub + shipping + tax + (isCOD ? COD_FEE : 0);
+    const cashOnDelivery = Math.max(0, total - COD_FEE);
+
+    document.getElementById('subtotal-display').textContent = `₹${sub.toFixed(2)}`;
+    document.getElementById('shipping-display').textContent = shipping === 0 ? 'FREE' : `₹${shipping}`;
+    document.getElementById('tax-display').textContent = `₹${tax.toFixed(2)}`;
+    document.getElementById('total-display').textContent = `₹${total.toFixed(2)}`;
+
+    if (discount > 0) {
+        document.getElementById('discount-row').style.display = 'flex';
+        document.getElementById('discount-label').textContent = appliedCoupon.code ? `Discount (${appliedCoupon.code})` : 'Discount';
+        document.getElementById('discount-display').textContent = `-₹${discount.toFixed(2)}`;
+    } else {
+        document.getElementById('discount-row').style.display = 'none';
     }
 
-    function updateTotals() {
-        const subtotal = CartModule.getTotal();
-        const total = subtotal + 15;
-
-        document.getElementById('subtotal').textContent = `$${subtotal.toFixed(2)}`;
-        document.getElementById('total').textContent = `$${total.toFixed(2)}`;
+    if (isCOD) {
+        document.getElementById('cod-cash-display').textContent = `₹${cashOnDelivery.toFixed(2)}`;
+        document.getElementById('total-label').textContent = 'Advance (Online Now)';
+        document.getElementById('total-display').textContent = `₹${COD_FEE}`;
+    } else {
+        document.getElementById('total-label').textContent = 'Total';
+        document.getElementById('total-display').textContent = `₹${total.toFixed(2)}`;
     }
+    return { sub, discount, discountedSub, shipping, tax, total, isCOD, cashOnDelivery };
+}
 
-    let razorpayKey = null;
-    let paymentConfigured = false;
+// ─── Coupon logic ─────────────────────────────────────────────────────────────
+async function loadAutoCoupons() {
+    try {
+        const res = await fetch('/api/coupons/auto-apply', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({items: CartModule.items, subtotal: currentSubtotal})
+        });
+        if (!res.ok) return;
+        const coupons = await res.json();
+        const container = document.getElementById('auto-coupons');
+        if (!coupons.length) { container.innerHTML = ''; return; }
+        container.innerHTML = '<p style="font-size:.78rem;color:var(--accent-gray);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em;">Available Offers</p>' +
+            coupons.map(c => {
+                let desc = c.coupon_type === 'buy_n_get_n'
+                    ? `Buy ${c.buy_quantity} Get ${c.get_quantity} Free`
+                    : (c.discount_type === 'percent' ? `${c.discount_value}% OFF` : `₹${c.discount_value} OFF`);
+                return `<div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.25);border-radius:3px;margin-bottom:.4rem;">
+                    <div><span style="font-size:.8rem;font-weight:600;color:#86efac;">${c.code}</span>
+                    <span style="font-size:.75rem;color:var(--accent-gray);margin-left:.5rem;">${desc}</span></div>
+                    <button type="button" onclick="applyAutoCoupon('${c.code}')" class="btn" style="padding:.3rem .7rem;font-size:.7rem;">Apply</button>
+                </div>`;
+            }).join('');
+    } catch(e) { /* silent */ }
+}
 
-    async function getRazorpayKey() {
-        try {
-            const res = await fetch('/api/payment/razorpay-key');
-            if (res.ok) {
-                const data = await res.json();
-                paymentConfigured = data.configured;
-                razorpayKey = data.key;
-                
-                const configuredDiv = document.getElementById('payment-status-configured');
-                const unconfiguredDiv = document.getElementById('payment-status-unconfigured');
-                
-                if (paymentConfigured) {
-                    configuredDiv.style.display = 'block';
-                    unconfiguredDiv.style.display = 'none';
-                    document.getElementById('button-text').textContent = 'Complete Purchase - Secure Payment';
-                } else {
-                    configuredDiv.style.display = 'none';
-                    unconfiguredDiv.style.display = 'block';
-                    document.getElementById('button-text').textContent = 'Complete Purchase';
-                }
-                
-                console.log("[v0] Payment configured:", paymentConfigured);
-            }
-        } catch (error) {
-            console.log("[v0] Failed to check payment status:", error);
-            document.getElementById('payment-status-unconfigured').style.display = 'block';
-            document.getElementById('payment-status-configured').style.display = 'none';
+function applyAutoCoupon(code) {
+    document.getElementById('coupon-input').value = code;
+    applyCoupon();
+}
+
+async function applyCoupon() {
+    const code = document.getElementById('coupon-input').value.trim().toUpperCase();
+    const statusEl = document.getElementById('coupon-status');
+    if (!code) { statusEl.innerHTML = '<span style="color:#fca5a5;">Please enter a coupon code</span>'; return; }
+    statusEl.innerHTML = '<span style="color:var(--accent-gray);">Checking…</span>';
+    try {
+        const res = await fetch('/api/coupons/validate', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({code, items: CartModule.items, subtotal: currentSubtotal})
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) {
+            statusEl.innerHTML = `<span style="color:#fca5a5;">✗ ${data.error || 'Invalid coupon'}</span>`;
+            appliedCoupon = null;
+        } else {
+            appliedCoupon = {...data, code};
+            let msg = data.coupon_type === 'buy_n_get_n'
+                ? `Buy ${data.buy_quantity} Get ${data.get_quantity} Free applied! You save ₹${data.discount_amount.toFixed(2)}`
+                : `✓ Coupon applied! You save ₹${data.discount_amount.toFixed(2)}`;
+            statusEl.innerHTML = `<span style="color:#86efac;">${msg}</span>`;
         }
+    } catch(e) {
+        statusEl.innerHTML = '<span style="color:#fca5a5;">Network error</span>';
+        appliedCoupon = null;
     }
+    updateTotals();
+}
 
-    async function handleCheckout(event) {
-        event.preventDefault();
-        
-        const submitButton = document.getElementById('submit-button');
-        const originalText = submitButton.querySelector('#button-text').textContent;
-        submitButton.disabled = true;
-        submitButton.querySelector('#button-text').textContent = 'Processing...';
+// ─── Razorpay key check ───────────────────────────────────────────────────────
+async function getRazorpayKey() {
+    try {
+        const res = await fetch('/api/payment/razorpay-key');
+        if (res.ok) {
+            const data = await res.json();
+            paymentConfigured = data.configured || false;
+            razorpayKey = data.key || null;
+            document.getElementById(paymentConfigured ? 'payment-status-configured' : 'payment-status-unconfigured').style.display = 'block';
+            if (paymentConfigured) document.getElementById('button-text').textContent = 'Complete Purchase — Secure Payment';
+        }
+    } catch(e) {
+        document.getElementById('payment-status-unconfigured').style.display = 'block';
+    }
+}
 
-        try {
-            if (CartModule.items.length === 0) {
-                throw new Error('Your cart is empty');
+// ─── Main checkout handler ────────────────────────────────────────────────────
+async function handleCheckout(event) {
+    event.preventDefault();
+    const btn = document.getElementById('submit-button');
+    const btnText = document.getElementById('button-text');
+    const origText = btnText.textContent;
+    btn.disabled = true;
+    btnText.textContent = 'Processing…';
+
+    try {
+        if (!CartModule.items.length) throw new Error('Your cart is empty');
+        if (!document.getElementById('terms-checkbox').checked) throw new Error('Please accept Terms & Conditions');
+
+        const name = document.getElementById('name').value.trim();
+        const email = document.getElementById('email').value.trim();
+        const phone = document.getElementById('phone').value.trim();
+        const street = document.getElementById('street').value.trim();
+        const city = document.getElementById('city').value.trim();
+        const state = document.getElementById('state').value.trim();
+        const zip = document.getElementById('zip').value.trim();
+        const country = document.getElementById('country').value.trim();
+
+        if (!name || !email || !phone || !street || !city || !state || !zip || !country)
+            throw new Error('Please fill in all shipping details');
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Please enter a valid email address');
+        if (!/^\d{6}$/.test(zip)) throw new Error('Please enter a valid 6-digit PIN code');
+
+        const isCOD = document.getElementById('pm-cod').checked;
+        const paymentMethod = isCOD ? 'cod' : 'prepaid';
+        const { total, isCOD: _cod, cashOnDelivery } = updateTotals();
+        const shippingAddress = { name, street, city, state, zip, country, phone,
+            firstName: name.split(' ')[0], lastName: name.split(' ').slice(1).join(' ') || '' };
+        const idempotencyKey = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+        const orderPayload = {
+            items: CartModule.items,
+            total: total,
+            shippingAddress,
+            paymentMethod,
+            couponCode: appliedCoupon ? appliedCoupon.code : null,
+            email,
+            phone,
+            idempotencyKey,
+            termsAccepted: true,
+        };
+
+        if (isCOD) {
+            // For COD: charge ₹150 advance via Razorpay, then finalize order
+            if (!paymentConfigured || !razorpayKey) {
+                // No payment gateway — create order directly (fallback)
+                const orderRes = await fetch('/api/orders', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({...orderPayload, paymentStatus: 'COD - Pending'})
+                });
+                if (orderRes.status === 401) { window.location.href = '/login'; return; }
+                if (!orderRes.ok) throw new Error((await orderRes.json()).error || 'Failed to create order');
+                const orderData = await orderRes.json();
+                await CartModule.clearCart();
+                window.location.href = `/checkout/confirmation?order=${orderData.orderId}`;
+                return;
             }
-
-            // Validate form inputs
-            const name = document.getElementById('name').value.trim();
-            const email = document.getElementById('email').value.trim();
-            const street = document.getElementById('street').value.trim();
-            const city = document.getElementById('city').value.trim();
-            const state = document.getElementById('state').value.trim();
-            const zip = document.getElementById('zip').value.trim();
-            const country = document.getElementById('country').value.trim();
-
-            if (!name || !email || !street || !city || !state || !zip || !country) {
-                throw new Error('Please fill in all shipping details');
-            }
-
-            if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-                throw new Error('Please enter a valid email address');
-            }
-
-            const total = CartModule.getTotal() + 15;
-            const shippingAddress = { name, street, city, state, zip, country };
-
-            // Create order on backend
-            const orderRes = await fetch('/api/orders', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+            btnText.textContent = 'Opening payment for ₹150 advance…';
+            // Create Razorpay order for ₹150 COD advance
+            const codOrderRes = await fetch('/api/payments/create-order', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({
-                    items: CartModule.items,
-                    total: total,
-                    shippingAddress: shippingAddress,
-                    paymentStatus: 'pending',
-                    paymentMethod: 'razorpay'
+                    amount: COD_FEE,
+                    checkoutPayload: {...orderPayload, razorpay_order_id: null},
+                    idempotencyKey
                 })
             });
+            if (!codOrderRes.ok) throw new Error('Failed to initialize COD advance payment');
+            const codPaymentOrder = await codOrderRes.json();
 
-            if (orderRes.status === 401) {
-                window.location.href = '/login';
-                return;
-            }
-
-            if (!orderRes.ok) {
-                throw new Error('Failed to create order');
-            }
-
-            const orderData = await orderRes.json();
-
-            // If Razorpay is not configured, complete order without payment
-            if (!paymentConfigured || !razorpayKey) {
-                console.log("[v0] Payment not configured, completing order");
-                await CartModule.clearCart();
-                window.location.href = `/checkout/confirmation?order=${orderData.id}`;
-                return;
-            }
-
-            // Create Razorpay order
-            const paymentOrderRes = await fetch('/api/payment/create-order', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ amount: total })
+            await new Promise((resolve, reject) => {
+                const options = {
+                    key: razorpayKey,
+                    amount: COD_FEE * 100,
+                    currency: 'INR',
+                    order_id: codPaymentOrder.id,
+                    name: 'U.S ATELIER',
+                    description: `COD Advance — Remaining ₹${cashOnDelivery.toFixed(0)} payable in cash`,
+                    prefill: { name, email, contact: phone },
+                    notes: { type: 'cod_advance', total_order_value: total.toFixed(2) },
+                    handler: async function(response) {
+                        try {
+                            const finalRes = await fetch('/api/orders', {
+                                method: 'POST', headers: {'Content-Type':'application/json'},
+                                body: JSON.stringify({
+                                    ...orderPayload,
+                                    razorpay_order_id: response.razorpay_order_id,
+                                    razorpay_payment_id: response.razorpay_payment_id,
+                                    razorpay_signature: response.razorpay_signature,
+                                })
+                            });
+                            if (finalRes.status === 401) { window.location.href = '/login'; return; }
+                            if (!finalRes.ok) throw new Error((await finalRes.json()).error || 'Order creation failed');
+                            const finalData = await finalRes.json();
+                            await CartModule.clearCart();
+                            window.location.href = `/checkout/confirmation?order=${finalData.orderId}`;
+                            resolve();
+                        } catch(e) { reject(e); }
+                    },
+                    modal: { ondismiss: () => reject(new Error('Payment cancelled')) },
+                    theme: { color: '#030303' }
+                };
+                const rzp = new Razorpay(options);
+                rzp.on('payment.failed', e => reject(new Error(e.error?.description || 'Payment failed')));
+                rzp.open();
             });
 
-            if (!paymentOrderRes.ok) {
-                if (paymentOrderRes.status === 503) {
-                    throw new Error('Payment gateway temporarily unavailable');
-                }
-                throw new Error('Failed to initialize payment');
+        } else {
+            // Prepaid: full amount via Razorpay
+            if (!paymentConfigured || !razorpayKey) {
+                const orderRes = await fetch('/api/orders', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({...orderPayload, paymentStatus: 'pending'})
+                });
+                if (orderRes.status === 401) { window.location.href = '/login'; return; }
+                if (!orderRes.ok) throw new Error((await orderRes.json()).error || 'Failed to create order');
+                const orderData = await orderRes.json();
+                await CartModule.clearCart();
+                window.location.href = `/checkout/confirmation?order=${orderData.orderId}`;
+                return;
             }
-
+            const paymentOrderRes = await fetch('/api/payments/create-order', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ amount: total, checkoutPayload: orderPayload, idempotencyKey })
+            });
+            if (!paymentOrderRes.ok) {
+                const errData = await paymentOrderRes.json().catch(() => ({}));
+                throw new Error(paymentOrderRes.status === 503 ? 'Payment gateway temporarily unavailable' : (errData.error || 'Failed to initialize payment'));
+            }
             const paymentOrder = await paymentOrderRes.json();
 
-            // Prepare Razorpay options
-            const options = {
-                key: razorpayKey,
-                amount: Math.round(total * 100),
-                currency: 'INR',
-                order_id: paymentOrder.id,
-                name: 'U.S ATELIER',
-                description: `Premium Clothing - Order ${orderData.id}`,
-                image: '/logo/us-atelier-wordmark.svg',
-                prefill: {
-                    name: name,
-                    email: email,
-                    contact: ''
-                },
-                notes: {
-                    orderId: orderData.id
-                },
-                handler: async function (response) {
-                    try {
-                        // Verify payment signature
-                        const verifyRes = await fetch('/api/payment/verify', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                razorpay_order_id: response.razorpay_order_id,
-                                razorpay_payment_id: response.razorpay_payment_id,
-                                razorpay_signature: response.razorpay_signature
-                            })
-                        });
-
-                        if (!verifyRes.ok) {
-                            throw new Error('Payment verification failed');
-                        }
-
-                        // Create final order with payment confirmation
-                        const finalOrderRes = await fetch('/api/orders', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                items: CartModule.items,
-                                total: total,
-                                shippingAddress: shippingAddress,
-                                paymentStatus: 'completed',
-                                paymentMethod: 'razorpay',
-                                razorpayOrderId: response.razorpay_order_id,
-                                razorpayPaymentId: response.razorpay_payment_id
-                            })
-                        });
-
-                        const finalOrder = await finalOrderRes.json();
-                        await CartModule.clearCart();
-                        window.location.href = `/checkout/confirmation?order=${finalOrder.id}`;
-                    } catch (error) {
-                        console.log("[v0] Payment verification error:", error);
-                        submitButton.disabled = false;
-                        submitButton.querySelector('#button-text').textContent = originalText;
-                        alert('Payment verification failed. Your order was created. Contact support for assistance.');
-                    }
-                },
-                modal: {
-                    ondismiss: function() {
-                        console.log("[v0] Payment modal closed");
-                        submitButton.disabled = false;
-                        submitButton.querySelector('#button-text').textContent = originalText;
-                    }
-                },
-                theme: {
-                    color: '#030303'
-                }
-            };
-
-            // Open Razorpay checkout
-            const razorpay = new Razorpay(options);
-            razorpay.on('payment.failed', function (response) {
-                console.log("[v0] Payment failed:", response.error);
-                submitButton.disabled = false;
-                submitButton.querySelector('#button-text').textContent = originalText;
-                alert('Payment failed: ' + response.error.description);
+            await new Promise((resolve, reject) => {
+                const options = {
+                    key: razorpayKey,
+                    amount: Math.round(total * 100),
+                    currency: 'INR',
+                    order_id: paymentOrder.id,
+                    name: 'U.S ATELIER',
+                    description: 'Premium Clothing',
+                    prefill: { name, email, contact: phone },
+                    handler: async function(response) {
+                        try {
+                            const finalRes = await fetch('/api/orders', {
+                                method: 'POST', headers: {'Content-Type':'application/json'},
+                                body: JSON.stringify({
+                                    ...orderPayload,
+                                    razorpay_order_id: response.razorpay_order_id,
+                                    razorpay_payment_id: response.razorpay_payment_id,
+                                    razorpay_signature: response.razorpay_signature,
+                                })
+                            });
+                            if (!finalRes.ok) throw new Error((await finalRes.json()).error || 'Order failed');
+                            const finalData = await finalRes.json();
+                            await CartModule.clearCart();
+                            window.location.href = `/checkout/confirmation?order=${finalData.orderId}`;
+                            resolve();
+                        } catch(e) { reject(e); }
+                    },
+                    modal: { ondismiss: () => reject(new Error('Payment cancelled')) },
+                    theme: { color: '#030303' }
+                };
+                const rzp = new Razorpay(options);
+                rzp.on('payment.failed', e => reject(new Error(e.error?.description || 'Payment failed')));
+                rzp.open();
             });
-            
-            razorpay.open();
-
-        } catch (error) {
-            console.log("[v0] Checkout error:", error);
-            submitButton.disabled = false;
-            submitButton.querySelector('#button-text').textContent = originalText;
-            alert('Error: ' + error.message);
         }
-    }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        getRazorpayKey();
-        CartModule.loadCart().then(() => {
-            loadCheckoutSummary();
-        });
-    });
+    } catch(err) {
+        console.error('[checkout]', err);
+        btn.disabled = false;
+        btnText.textContent = origText;
+        AuthModule.showToast(err.message || 'Checkout failed', 'error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await getRazorpayKey();
+    await CartModule.loadCart();
+    loadCheckoutSummary();
+    // Pre-fill email if logged in
+    try {
+        const res = await fetch('/api/auth/user');
+        const data = await res.json();
+        if (data.user) document.getElementById('email').value = data.user;
+    } catch(e) {}
+});
 </script>
 {% endblock %}

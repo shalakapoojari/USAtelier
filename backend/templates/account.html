@@ -329,26 +329,50 @@
             if (orders.length === 0) {
                 ordersContainer.innerHTML = '<p style="color: var(--accent-gray);">You have no orders yet.</p>';
             } else {
-                ordersContainer.innerHTML = orders.map(order => `
+                ordersContainer.innerHTML = orders.map(order => {
+                    const isCancellable = order.status !== 'Cancelled' && order.status !== 'Delivered' && !order.delhivery_shipment_id;
+                    const isCOD = order.payment_method === 'cod';
+                    const createdTime = new Date(order.createdAt || order.created_at);
+                    const now = new Date();
+                    const minutesElapsed = (now - createdTime) / (1000 * 60);
+                    const canCancel = isCancellable && minutesElapsed <= 30;
+                    
+                    return `
                     <div class="order-item">
                         <div class="order-header">
-                            <span>Order #${order.id}</span>
-                            <span style="text-transform: uppercase;">${order.status}</span>
+                            <div>
+                                <span>Order #${order.order_number || order.id}</span>
+                                ${isCOD ? '<span style="margin-left:0.75rem;font-size:0.75rem;padding:0.2rem 0.5rem;background:rgba(251,191,36,0.15);color:#fcd34d;border-radius:3px;">COD</span>' : ''}
+                            </div>
+                            <span style="text-transform: uppercase;color:${order.status === 'Cancelled' ? '#ff6b6b' : order.status === 'Delivered' ? '#4ade80' : 'var(--primary-light)'};">${order.status}</span>
                         </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="color: var(--accent-gray);">${new Date(order.created_at).toLocaleDateString()}</span>
-                            <span style="font-weight: 600;">$${order.total}</span>
+                        <div style="display: flex; justify-content: space-between; align-items: center;margin-bottom:1rem;">
+                            <span style="color: var(--accent-gray);font-size:0.875rem;">${createdTime.toLocaleDateString()} ${createdTime.toLocaleTimeString()}</span>
+                            <span style="font-weight: 600;">₹${order.total}</span>
                         </div>
-                        <div style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                        ${isCOD && order.cod_collectable_amount ? `
+                        <div style="padding:0.75rem;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:4px;margin-bottom:1rem;font-size:0.85rem;">
+                            <div style="color:#fcd34d;margin-bottom:0.25rem;">COD Payment Details:</div>
+                            <div style="color:var(--accent-gray);">Advance paid: ₹150 | Pay on delivery: ₹${order.cod_collectable_amount.toFixed(2)}</div>
+                        </div>` : ''}
+                        <div style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
                             ${order.items.map(i => `
                                 <div style="display: flex; gap: 1rem; margin-bottom: 0.5rem; font-size: 0.9rem;">
-                                    <span style="color: var(--accent-gray);">x${i.quantity}</span>
-                                    <span>${i.name || 'Product'}</span>
+                                    <span style="color: var(--accent-gray);">×${i.quantity}</span>
+                                    <span>${i.product_name || i.name || 'Product'}</span>
+                                    ${i.size ? `<span style="color:var(--accent-gray);font-size:0.8rem;">(${i.size})</span>` : ''}
                                 </div>
                             `).join('')}
                         </div>
+                        ${canCancel ? `
+                        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border-color);">
+                            ${isCOD ? `<p style="font-size:0.75rem;color:var(--accent-gray);margin-bottom:0.5rem;">Note: ₹150 COD advance fee is non-refundable as per our policy.</p>` : ''}
+                            <button onclick="cancelOrder('${order.order_number || order.id}')" class="btn" style="padding:0.5rem 1rem;font-size:0.8rem;background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.4);color:#fca5a5;">Cancel Order</button>
+                            <span style="margin-left:0.75rem;font-size:0.75rem;color:var(--accent-gray);">${Math.floor(30 - minutesElapsed)} min left</span>
+                        </div>` : ''}
+                        ${isCancellable && !canCancel ? '<p style="margin-top:1rem;font-size:0.8rem;color:var(--accent-gray);">30-minute cancellation window closed. Contact support.</p>' : ''}
                     </div>
-                `).join('');
+                `}).join('');
             }
         } catch (e) {
             console.error("Orders error", e);
@@ -380,6 +404,27 @@
             }
         } catch (e) {
             console.error("Wishlist error", e);
+        }
+    }
+
+    async function cancelOrder(orderNumber) {
+        const isCOD = document.querySelector(`[data-order="${orderNumber}"]`)?.dataset.cod === 'true';
+        const msg = isCOD 
+            ? 'Cancel this order? Note: The ₹150 COD advance fee is non-refundable.'
+            : 'Cancel this order? If paid online, a full refund will be initiated.';
+        if (!confirm(msg)) return;
+        
+        try {
+            const res = await fetch(`/api/orders/${orderNumber}/cancel`, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                AuthModule.showToast(data.message || 'Order cancelled');
+                setTimeout(loadAccountData, 1000);
+            } else {
+                AuthModule.showToast(data.error || 'Cancellation failed', 'error');
+            }
+        } catch(e) {
+            AuthModule.showToast('Network error', 'error');
         }
     }
 

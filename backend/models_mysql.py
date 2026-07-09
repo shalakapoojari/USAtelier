@@ -532,18 +532,27 @@ class Coupon(db_mysql.Model):
 
     id               = db_mysql.Column(db_mysql.Integer, primary_key=True)
     code             = db_mysql.Column(db_mysql.String(50), unique=True, nullable=False, index=True)
-    discount_type    = db_mysql.Column(db_mysql.String(20), nullable=False)  # "percent" | "fixed"
+    # "standard" | "buy_n_get_n" | "influencer"
+    coupon_type      = db_mysql.Column(db_mysql.String(20), default="standard", nullable=False)
+    discount_type    = db_mysql.Column(db_mysql.String(20), nullable=False)  # "percent" | "fixed" | "buy_n_get_n"
     discount_value   = db_mysql.Column(db_mysql.Float, nullable=False)
     min_order_amount = db_mysql.Column(db_mysql.Float, default=0.0)
     max_uses         = db_mysql.Column(db_mysql.Integer, nullable=True)      # None = unlimited
     uses             = db_mysql.Column(db_mysql.Integer, default=0)
     expires_at       = db_mysql.Column(db_mysql.DateTime, nullable=True)
     is_active        = db_mysql.Column(db_mysql.Boolean, default=True)
+    # Buy N Get N fields
+    buy_quantity     = db_mysql.Column(db_mysql.Integer, nullable=True)      # N in "Buy N"
+    get_quantity     = db_mysql.Column(db_mysql.Integer, nullable=True)      # N in "Get N Free"
+    # Influencer code fields
+    visibility       = db_mysql.Column(db_mysql.String(20), default="hidden")  # "hidden" | "visible"
+    influencer_name  = db_mysql.Column(db_mysql.String(100), nullable=True)
     created_at       = db_mysql.Column(db_mysql.DateTime, default=datetime.utcnow)
 
-    def is_valid(self, order_subtotal: float) -> tuple:
+    def is_valid(self, order_subtotal: float, cart_items: list = None) -> tuple:
         """
         Returns (True, None) or (False, "reason string").
+        cart_items: list of {"quantity": int, ...} for buy_n_get_n validation
         """
         if not self.is_active:
             return False, "Coupon is inactive"
@@ -555,20 +564,51 @@ class Coupon(db_mysql.Model):
             return False, "Coupon has expired"
         if self.max_uses is not None and self.uses >= self.max_uses:
             return False, "Coupon usage limit reached"
-        if order_subtotal < self.min_order_amount:
-            return False, f"Minimum order amount is ₹{self.min_order_amount:.0f}"
+
+        # For buy_n_get_n, check quantity condition OR min_order_amount
+        if self.coupon_type == "buy_n_get_n" and self.buy_quantity:
+            total_qty = sum(int(i.get("quantity", 1)) for i in (cart_items or []))
+            if total_qty < self.buy_quantity:
+                if order_subtotal < self.min_order_amount:
+                    return False, f"Add at least {self.buy_quantity} items or order ₹{self.min_order_amount:.0f}+ to qualify"
+                # Passes via min_order_amount
+            # else: passes via quantity condition
+        else:
+            if order_subtotal < self.min_order_amount:
+                return False, f"Minimum order amount is ₹{self.min_order_amount:.0f}"
+
         return True, None
 
-    def apply(self, subtotal: float) -> float:
+    def apply(self, subtotal: float, cart_items: list = None) -> float:
         """Return the discount amount (not the final price)."""
+        if self.coupon_type == "buy_n_get_n" and self.get_quantity and cart_items:
+            # Sort items by price ascending, give cheapest N items free
+            prices = sorted(
+                [float(i.get("sellingPrice", 0)) * int(i.get("quantity", 1)) for i in cart_items]
+            )
+            free_count = min(self.get_quantity, len(prices))
+            return round(sum(prices[:free_count]), 2)
         if self.discount_type == "percent":
             return round(subtotal * self.discount_value / 100, 2)
         return min(self.discount_value, subtotal)
+
+    def auto_qualifies(self, order_subtotal: float, cart_items: list = None) -> bool:
+        """True if this coupon should auto-show/apply based on cart state."""
+        if not self.is_active:
+            return False
+        if self.coupon_type == "buy_n_get_n" and self.buy_quantity:
+            total_qty = sum(int(i.get("quantity", 1)) for i in (cart_items or []))
+            if total_qty >= self.buy_quantity:
+                return True
+        if self.min_order_amount and order_subtotal >= self.min_order_amount:
+            return True
+        return False
 
     def to_dict(self):
         return {
             "id":               self.id,
             "code":             self.code,
+            "coupon_type":      self.coupon_type or "standard",
             "discount_type":    self.discount_type,
             "discount_value":   self.discount_value,
             "min_order_amount": self.min_order_amount,
@@ -576,7 +616,12 @@ class Coupon(db_mysql.Model):
             "uses":             self.uses,
             "expires_at":       self.expires_at.isoformat() if self.expires_at else None,
             "is_active":        self.is_active,
+            "buy_quantity":     self.buy_quantity,
+            "get_quantity":     self.get_quantity,
+            "visibility":       self.visibility or "hidden",
+            "influencer_name":  self.influencer_name,
         }
+
 
 
 # ---------------------------------------------------------------------------
@@ -728,6 +773,34 @@ class CartSettings(db_mysql.Model):
             "discount_code_enabled":    self.discount_code_enabled,
             "discount_code":            self.discount_code,
             "updated_at":               self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+# ---------------------------------------------------------------------------
+# SiteVisit  — tracks every page visit to the website
+# ---------------------------------------------------------------------------
+
+class SiteVisit(db_mysql.Model):
+    __tablename__ = "site_visits"
+
+    id          = db_mysql.Column(db_mysql.Integer, primary_key=True)
+    session_id  = db_mysql.Column(db_mysql.String(128), nullable=True, index=True)
+    user_id     = db_mysql.Column(db_mysql.Integer, db_mysql.ForeignKey("users.id"), nullable=True)
+    page        = db_mysql.Column(db_mysql.String(500), nullable=False)
+    referrer    = db_mysql.Column(db_mysql.String(500), nullable=True)
+    user_agent  = db_mysql.Column(db_mysql.String(500), nullable=True)
+    ip_address  = db_mysql.Column(db_mysql.String(45), nullable=True)
+    country     = db_mysql.Column(db_mysql.String(100), nullable=True)
+    timestamp   = db_mysql.Column(db_mysql.DateTime, default=datetime.utcnow, index=True)
+
+    def to_dict(self):
+        return {
+            "id":         self.id,
+            "session_id": self.session_id,
+            "user_id":    self.user_id,
+            "page":       self.page,
+            "referrer":   self.referrer,
+            "timestamp":  self.timestamp.isoformat() if self.timestamp else None,
         }
 
 
