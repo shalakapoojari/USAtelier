@@ -116,6 +116,7 @@ export default function CheckoutPage() {
   const [couponMessage, setCouponMessage] = useState("")
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
   const [availableCoupons, setAvailableCoupons] = useState<any[]>([])
+  const [appliedCoupons, setAppliedCoupons] = useState<any[]>([])
   const [paymentMethod, setPaymentMethod] = useState<"razorpay" | "cod">("razorpay")
 
   const isMumbai = formData.zip.startsWith("400") || formData.zip.startsWith("401")
@@ -130,6 +131,19 @@ export default function CheckoutPage() {
   const shipping = shippingEstimate?.shipping_cost ?? (discountedSubtotal >= 2000 ? 0 : 149)
   const codFee = paymentMethod === "cod" ? (discountedSubtotal < 2000 ? 150 : 0) : 0
   const grandTotal = discountedSubtotal + shipping + tax + codFee
+
+  const formatCouponCondition = (coupon: any) => {
+    if (coupon?.coupon_type === "buy_n_get_n") {
+      return `Buy ${coupon.buy_quantity} item${coupon.buy_quantity > 1 ? "s" : ""} and get ${coupon.get_quantity} free`
+    }
+
+    if (coupon?.discount_type === "percent") {
+      return `${Number(coupon.discount_value || 0)}% off`
+    }
+
+    const value = `₹${Number(coupon?.discount_value || 0).toLocaleString("en-IN")} off`
+    return coupon?.min_order_amount ? `${value} on orders of ₹${Number(coupon.min_order_amount).toLocaleString("en-IN")}+` : value
+  }
 
   useEffect(() => {
     if (user) {
@@ -1052,9 +1066,38 @@ export default function CheckoutPage() {
               <div className="pt-4 border-t border-white/10 space-y-3">
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-gray-500">
                   <Tag size={12} />
-                  Coupon Code
+                  Coupon & Offers
                 </div>
-                {appliedCoupon ? (
+
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      value={couponCode}
+                      onChange={(e) => {
+                        setCouponCode(e.target.value.toUpperCase())
+                        setCouponMessage("")
+                      }}
+                      placeholder="Enter coupon code"
+                      className="bg-transparent border-white/20 text-white placeholder:text-gray-600 h-11 uppercase"
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => applyCoupon()}
+                      disabled={isApplyingCoupon}
+                      className="border border-white/30 bg-transparent px-4 uppercase tracking-widest text-[10px] hover:bg-white hover:text-black disabled:opacity-50"
+                    >
+                      {isApplyingCoupon ? "Checking" : "Apply"}
+                    </Button>
+                  </div>
+
+                  {couponMessage && (
+                    <p className={`text-[10px] uppercase tracking-[0.25em] ${appliedCoupon ? "text-green-400" : "text-amber-400"}`}>
+                      {couponMessage}
+                    </p>
+                  )}
+                </div>
+
+                {appliedCoupon && (
                   <div className="flex items-center justify-between gap-3 border border-green-500/30 bg-green-500/5 px-3 py-3">
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-widest text-green-300 truncate">{appliedCoupon.code}</p>
@@ -1069,47 +1112,54 @@ export default function CheckoutPage() {
                       <X size={14} />
                     </button>
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Input
-                        value={couponCode}
-                        onChange={(e) => {
-                          setCouponCode(e.target.value.toUpperCase())
-                          setCouponMessage("")
-                        }}
-                        placeholder="Enter code"
-                        className="bg-transparent border-white/20 text-white placeholder:text-gray-600 h-11 uppercase"
-                      />
-                      <Button
-                        type="button"
-                        onClick={() => applyCoupon()}
-                        disabled={isApplyingCoupon}
-                        className="border border-white/30 bg-transparent px-4 uppercase tracking-widest text-[10px] hover:bg-white hover:text-black disabled:opacity-50"
-                      >
-                        {isApplyingCoupon ? "Checking" : "Apply"}
-                      </Button>
-                    </div>
-                    {availableCoupons.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {availableCoupons.slice(0, 3).map((coupon) => (
+                )}
+
+                <div className="space-y-2">
+                  <p className="text-[9px] uppercase tracking-[0.25em] text-gray-500">Available offers</p>
+                  {availableCoupons.length > 0 ? (
+                    <div className="space-y-2">
+                      {availableCoupons.map((coupon) => {
+                        const isActive = appliedCoupon?.code === coupon.code
+                        return (
                           <button
                             key={coupon.code}
                             type="button"
                             onClick={() => applyCoupon(coupon.code)}
-                            className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[9px] uppercase tracking-[0.25em] text-gray-300 hover:border-white/40 hover:text-white"
+                            className={`w-full rounded border px-3 py-2 text-left transition-colors ${isActive ? "border-green-500/40 bg-green-500/10" : "border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10"}`}
                           >
-                            {coupon.code}
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] uppercase tracking-[0.25em] text-gray-200">{coupon.code}</span>
+                              <span className={`text-[9px] uppercase tracking-[0.25em] ${isActive ? "text-green-400" : "text-gray-400"}`}>
+                                {isActive ? "Applied" : "Apply"}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-gray-400">{formatCouponCondition(coupon)}</p>
+                            {coupon.min_order_amount ? (
+                              <p className="mt-1 text-[9px] uppercase tracking-[0.2em] text-gray-500">Min order ₹{Number(coupon.min_order_amount).toLocaleString("en-IN")}</p>
+                            ) : null}
                           </button>
-                        ))}
-                      </div>
-                    )}
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500">No offers available for this cart yet.</p>
+                  )}
+                </div>
+
+                {appliedCoupons.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[9px] uppercase tracking-[0.25em] text-gray-500">Applied coupons</p>
+                    <div className="space-y-2">
+                      {appliedCoupons.map((coupon) => (
+                        <div key={`${coupon.code}-${coupon.discountAmount}`} className="rounded border border-white/10 bg-black/20 px-3 py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] uppercase tracking-[0.25em] text-gray-200">{coupon.code}</span>
+                            <span className="text-[9px] uppercase tracking-[0.25em] text-green-400">Saved ₹{Number(coupon.discountAmount || 0).toLocaleString("en-IN")}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                )}
-                {couponMessage && (
-                  <p className={`text-[10px] uppercase tracking-[0.25em] ${appliedCoupon ? "text-green-400" : "text-amber-400"}`}>
-                    {couponMessage}
-                  </p>
                 )}
               </div>
 
