@@ -333,7 +333,7 @@ export function SiteHeader() {
             </div>
             <div className="reveal-fade hidden md:flex flex-col gap-1.5 md:gap-2">
               <span className="text-[9px] tracking-[0.15em] text-white/40 font-sans">Legal</span>
-              <Link href="/terms" className="text-[11px] md:text-[12px] font-sans tracking-wide text-white/80 hover:text-white transition-colors">
+              <Link href="/terms-and-conditions" className="text-[11px] md:text-[12px] font-sans tracking-wide text-white/80 hover:text-white transition-colors">
                 Terms of service
               </Link>
             </div>

@@ -115,6 +115,7 @@ export default function CheckoutPage() {
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null)
   const [couponMessage, setCouponMessage] = useState("")
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
+  const [availableCoupons, setAvailableCoupons] = useState<any[]>([])
   const [paymentMethod, setPaymentMethod] = useState<"razorpay" | "cod">("razorpay")
 
   const isMumbai = formData.zip.startsWith("400") || formData.zip.startsWith("401")
@@ -276,53 +277,94 @@ export default function CheckoutPage() {
   const checkPincode = async (pincode: string) => {
     if (!pincode || pincode.length !== 6) return
     setPincodeStatus("checking")
+
+    // Helper: fetch with timeout + retry
+    const fetchWithRetry = async (url: string, body: object, retries = 2): Promise<Response> => {
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 6000) // 6s timeout
+        try {
+          const res = await apiFetch(API_BASE, url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+            signal: controller.signal,
+          })
+          clearTimeout(timer)
+          return res
+        } catch (err: any) {
+          clearTimeout(timer)
+          if (attempt === retries) throw err
+          await new Promise(r => setTimeout(r, 500 * (attempt + 1))) // backoff
+        }
+      }
+      throw new Error("Max retries exceeded")
+    }
+
     try {
-      // Check serviceability + get estimate
-      const [checkRes, estimateRes, lookupRes] = await Promise.all([
-        apiFetch(API_BASE, "/api/delivery/check-pincode", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pincode }),
-        }),
-        apiFetch(API_BASE, "/api/delivery/estimate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pincode, subtotal: discountedSubtotal }),
-        }),
-        apiFetch(API_BASE, "/api/delivery/pincode-lookup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pincode }),
-        }),
+      const [checkRes, estimateRes, lookupRes] = await Promise.allSettled([
+        fetchWithRetry("/api/delivery/check-pincode", { pincode }),
+        fetchWithRetry("/api/delivery/estimate", { pincode, subtotal: discountedSubtotal }),
+        fetchWithRetry("/api/delivery/pincode-lookup", { pincode }),
       ])
-      const checkData = await checkRes.json()
-      const estimateData = await estimateRes.json()
-      const lookupData = await lookupRes.json()
 
-      if (checkData.serviceable) {
-        setPincodeStatus("valid")
-        setPincodeMessage(checkData.message || "Delivery available")
+      // Serviceability
+      if (checkRes.status === "fulfilled" && checkRes.value.ok) {
+        const checkData = await checkRes.value.json()
+        if (checkData.serviceable) {
+          setPincodeStatus("valid")
+          setPincodeMessage(checkData.message || "Delivery available")
+        } else {
+          setPincodeStatus("invalid")
+          setPincodeMessage(checkData.message || "Delivery not available to this pincode")
+        }
       } else {
-        setPincodeStatus("invalid")
-        setPincodeMessage(checkData.message || "Delivery not available")
+        // Fail open — don't block the user if the API is unreachable
+        setPincodeStatus("valid")
+        setPincodeMessage("Delivery will be attempted to this pincode")
       }
 
-      if (estimateData.success) {
-        setShippingEstimate(estimateData)
+      // Shipping estimate
+      if (estimateRes.status === "fulfilled" && estimateRes.value.ok) {
+        const estimateData = await estimateRes.value.json()
+        if (estimateData.success) setShippingEstimate(estimateData)
       }
 
-      // Autofill city/state from pincode lookup
-      if (lookupData.success) {
-        setFormData((prev: FormData) => ({
-          ...prev,
-          city: lookupData.city || prev.city,
-          state: lookupData.state || prev.state,
-        }))
+      // City/state autofill
+      if (lookupRes.status === "fulfilled" && lookupRes.value.ok) {
+        const lookupData = await lookupRes.value.json()
+        if (lookupData.success && lookupData.city) {
+          setFormData((prev: FormData) => ({
+            ...prev,
+            city: lookupData.city || prev.city,
+            state: lookupData.state || prev.state,
+          }))
+        }
       }
     } catch {
-      setPincodeStatus("valid") // fail open
-      setPincodeMessage("Delivery will be attempted")
+      // Complete fail-open: network unreachable, let the backend validate
+      setPincodeStatus("valid")
+      setPincodeMessage("Delivery will be attempted to this pincode")
     }
+  }
+
+  // Load visible/auto-apply coupons when entering review step
+  const loadAvailableCoupons = async () => {
+    if (items.length === 0) return
+    try {
+      const res = await apiFetch(API_BASE, "/api/coupons/auto-apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map(i => ({ id: i.id, quantity: i.quantity, sellingPrice: i.sellingPrice })),
+          subtotal: total,
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setAvailableCoupons(Array.isArray(data) ? data : [])
+      }
+    } catch { /* silent — coupons are a nice-to-have */ }
   }
 
   const applyCoupon = async () => {
@@ -400,6 +442,8 @@ export default function CheckoutPage() {
       if (pincodeStatus !== "valid") {
         await checkPincode(formData.zip)
       }
+      // Load auto-apply coupons for review step
+      loadAvailableCoupons()
       setStep("review")
     }
   }
@@ -900,7 +944,7 @@ export default function CheckoutPage() {
                       className="mt-0.5 h-4 w-4 rounded border-white/30 bg-transparent accent-white"
                     />
                     <span>
-                      I agree to the <Link href="/terms%26conditions" target="_blank" className="text-[#C8A45D] hover:text-white underline underline-offset-4">Terms &amp; Conditions</Link> and authorize order placement.
+                      I agree to the <Link href="/terms-and-conditions" target="_blank" className="text-[#C8A45D] hover:text-white underline underline-offset-4">Terms &amp; Conditions</Link> and authorize order placement.
                     </span>
                   </label>
                   {checkoutTermsError && (
@@ -1073,7 +1117,7 @@ export default function CheckoutPage() {
           <span>© {new Date().getFullYear()} U.S Atelier. All rights reserved.</span>
           <div className="flex items-center gap-6">
             <Link href="/privacy-policy" className="hover:text-gray-400 transition-colors">Privacy</Link>
-            <Link href="/terms%26conditions" className="hover:text-gray-400 transition-colors">Terms</Link>
+            <Link href="/terms-and-conditions" className="hover:text-gray-400 transition-colors">Terms</Link>
             <Link href="/refund-policy" className="hover:text-gray-400 transition-colors">Refunds</Link>
           </div>
         </div>

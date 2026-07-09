@@ -3550,20 +3550,33 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
 
         user = User.query.filter_by(email=email).first()
         if not user:
-            user = User(
-                email      = email,
-                password   = generate_password_hash(secrets.token_hex(32)),  # random, unused
-                first_name = first_name,
-                last_name  = last_name,
-                phone      = phone,
-                is_admin   = False,
-            )
-            db_mysql.session.add(user)
-            db_mysql.session.flush()
             try:
-                send_signup_confirmation(mail, user.email, user.first_name)
-            except Exception:
-                pass
+                user = User(
+                    email      = email,
+                    password   = generate_password_hash(secrets.token_hex(32)),  # random, unused
+                    first_name = first_name,
+                    last_name  = last_name,
+                    phone      = phone,
+                    is_admin   = False,
+                )
+                db_mysql.session.add(user)
+                db_mysql.session.flush()  # Assign user.id immediately
+                if not user.id:
+                    db_mysql.session.rollback()
+                    return jsonify({"error": "Failed to create user account. Please try again."}), 500
+                try:
+                    send_signup_confirmation(mail, user.email, user.first_name)
+                except Exception:
+                    pass
+            except Exception as user_exc:
+                db_mysql.session.rollback()
+                app.logger.error("guest_user_creation_failed email=%s err=%s", email, user_exc)
+                return jsonify({"error": "Failed to create user account. Please try again."}), 500
+
+        # Guarantee user.id is set before continuing
+        if not user or not user.id:
+            db_mysql.session.rollback()
+            return jsonify({"error": "User account could not be resolved. Please log in and try again."}), 500
 
         session.clear()
         session.permanent     = True
@@ -5009,9 +5022,9 @@ def get_cart_analytics_summary():
             continue
         # Check user hasn't completed a purchase since this event
         order_after = OrderSQL.query.filter(
-            OrderSQL.shipping_address.isnot(None)
+            OrderSQL.shipping_address_json.isnot(None)
         ).filter(
-            db_mysql.func.json_extract(OrderSQL.shipping_address, '$.email') == ev.user_email
+            db_mysql.func.json_extract(OrderSQL.shipping_address_json, '$.email') == ev.user_email
         ).filter(OrderSQL.created_at > ev.timestamp).first()
         if order_after:
             continue
