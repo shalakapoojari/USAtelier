@@ -44,13 +44,19 @@ const sections = [
     id: "cod-orders",
     title: "7. Cash on Delivery (COD) Orders",
     content:
-      "COD orders include an additional ₹150 handling charge at the time of delivery. This charge is non-refundable. COD exchanges follow the same policy as prepaid orders — the item must be returned in original condition within 7 days of delivery.",
+      "COD orders require a ₹150 advance fee paid online via Razorpay at checkout. This advance fee is strictly non-refundable under all circumstances, including:\n\n• Order cancellation (within or outside the 30-minute window)\n• Exchange requests\n• Return of defective/damaged items\n• Any other reason\n\nThe ₹150 COD advance covers handling, logistics coordination, and the cost of reserving your order for cash payment at delivery. By selecting COD, you acknowledge and agree that this fee will not be returned to you regardless of the outcome of your order.\n\nThe remaining balance (order total minus ₹150) is payable in cash to the delivery agent upon receipt. COD exchanges follow the same policy as prepaid orders — the item must be returned in original condition within 7 days of delivery.",
+  },
+  {
+    id: "cancellation-policy",
+    title: "9. Order Cancellation Policy",
+    content:
+      "Orders may be cancelled within 30 minutes of placement, subject to the following:\n\n• Prepaid Orders: A full refund will be initiated to your original payment method (UPI, card, net banking) within 5–10 business days.\n• COD Orders: Cancellation is permitted within 30 minutes, however the ₹150 COD advance fee is non-refundable. No other amount is charged for COD cancellations.\n• Once 30 minutes have elapsed, orders cannot be cancelled through the platform. Contact support at usatelier08@gmail.com if you need assistance.\n• Orders that have already been dispatched (assigned a tracking number) cannot be cancelled under any circumstances.",
   },
   {
     id: "payment-refunds",
-    title: "8. Refunds for Defective Items",
+    title: "10. Refunds for Defective Items",
     content:
-      "In the rare case that a defective item cannot be exchanged (due to stock unavailability), a full refund will be processed to your original payment method within 5–10 business days. For UPI, card, or net banking payments, the refund timeline is subject to your bank's processing period.",
+      "In the rare case that a defective item cannot be exchanged (due to stock unavailability), a full refund will be processed to your original payment method within 5–10 business days. For UPI, card, or net banking payments, the refund timeline is subject to your bank's processing period. For COD orders, refunds (excluding the ₹150 advance fee) will be processed via bank transfer — please contact us with your bank details.",
   },
 ]
 

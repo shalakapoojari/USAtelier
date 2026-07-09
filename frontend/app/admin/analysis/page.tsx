@@ -52,6 +52,35 @@ interface ProductViewStat {
     view_count: number
 }
 
+interface SiteVisitSummary {
+    total_visits: number
+    unique_sessions: number
+    unique_users: number
+}
+
+interface SiteVisitDay {
+    date: string
+    visits: number
+    unique_visitors: number
+}
+
+interface TopPage {
+    page: string
+    visits: number
+}
+
+interface TopReferrer {
+    referrer: string
+    visits: number
+}
+
+interface SiteVisitData {
+    summary: SiteVisitSummary
+    daily_trend: SiteVisitDay[]
+    top_pages: TopPage[]
+    top_referrers: TopReferrer[]
+}
+
 interface AnalysisData {
     most_sold: any[]
     most_favorited: any[]
@@ -77,6 +106,8 @@ export default function BusinessAnalysisPage() {
     const [data, setData] = useState<AnalysisData | null>(null)
     const [revenueTrend, setRevenueTrend] = useState<RevenueTrendPoint[]>([])
     const [productViews, setProductViews] = useState<ProductViewStat[]>([])
+    const [siteVisits, setSiteVisits] = useState<SiteVisitData | null>(null)
+    const [visitRange, setVisitRange] = useState<"today" | "7d" | "30d">("7d")
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
@@ -88,10 +119,11 @@ export default function BusinessAnalysisPage() {
         setLoading(true)
         setError(null)
         try {
-            const [analysisRes, trendRes, viewsRes] = await Promise.all([
+            const [analysisRes, trendRes, viewsRes, siteVisitsRes] = await Promise.all([
                 apiFetch(API_BASE, "/api/admin/analysis"),
                 apiFetch(API_BASE, "/api/admin/analytics/revenue-trend"),
                 apiFetch(API_BASE, "/api/admin/analytics/product-views?range=30d"),
+                apiFetch(API_BASE, "/api/admin/analytics/site-visits?range=7d"),
             ])
 
             if (!analysisRes.ok) {
@@ -112,17 +144,14 @@ export default function BusinessAnalysisPage() {
             }
             setData(enriched)
 
-            if (trendRes.ok) {
-                setRevenueTrend(await trendRes.json())
-            } else {
-                setRevenueTrend([])
-            }
+            if (trendRes.ok) setRevenueTrend(await trendRes.json())
+            else setRevenueTrend([])
 
-            if (viewsRes.ok) {
-                setProductViews(await viewsRes.json())
-            } else {
-                setProductViews([])
-            }
+            if (viewsRes.ok) setProductViews(await viewsRes.json())
+            else setProductViews([])
+
+            if (siteVisitsRes.ok) setSiteVisits(await siteVisitsRes.json())
+            else setSiteVisits(null)
         } catch (err: any) {
             setError(err.message || "Failed to load analytics")
         } finally {
@@ -130,9 +159,15 @@ export default function BusinessAnalysisPage() {
         }
     }
 
-    useEffect(() => {
-        fetchData()
-    }, [])
+    const fetchSiteVisits = async (range: "today" | "7d" | "30d") => {
+        if (!API_BASE) return
+        try {
+            const res = await apiFetch(API_BASE, `/api/admin/analytics/site-visits?range=${range}`)
+            if (res.ok) setSiteVisits(await res.json())
+        } catch { /* silent */ }
+    }
+
+    useEffect(() => { fetchData() }, [])
 
     const getViewCount = (productId: number) =>
         productViews.find((v) => v.product_id === productId)?.view_count ?? 0
@@ -480,10 +515,129 @@ export default function BusinessAnalysisPage() {
                 </div>
             </div>
 
+            {/* ── SITE VISITS ─────────────────────────────────────────────── */}
+            <section className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <h2 className="text-sm uppercase tracking-[0.3em] font-bold text-[#e8e8e3] flex items-center gap-3">
+                        <TrendingUp className="w-4 h-4" />
+                        Site Visit Analytics
+                    </h2>
+                    <div className="flex gap-2">
+                        {(["today", "7d", "30d"] as const).map((r) => (
+                            <button
+                                key={r}
+                                onClick={() => { setVisitRange(r); fetchSiteVisits(r) }}
+                                className={`px-4 py-1.5 text-[9px] uppercase tracking-[0.25em] border transition-all ${
+                                    visitRange === r
+                                        ? "border-white/40 text-white bg-white/5"
+                                        : "border-white/10 text-white/30 hover:text-white hover:border-white/30"
+                                }`}
+                            >
+                                {r === "today" ? "Today" : r === "7d" ? "7 Days" : "30 Days"}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Summary Cards */}
+                <div className="grid grid-cols-3 gap-4">
+                    {[
+                        { label: "Total Visits", value: siteVisits?.summary.total_visits ?? 0, color: "text-[#e8e8e3]" },
+                        { label: "Unique Visitors", value: siteVisits?.summary.unique_sessions ?? 0, color: "text-blue-400" },
+                        { label: "Logged-in Users", value: siteVisits?.summary.unique_users ?? 0, color: "text-green-400" },
+                    ].map((card) => (
+                        <div key={card.label} className="bg-white/5 border border-white/10 p-5">
+                            <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-2">{card.label}</p>
+                            <p className={`text-3xl font-serif ${card.color}`}>
+                                {card.value.toLocaleString("en-IN")}
+                            </p>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Daily Trend Bars */}
+                {siteVisits && siteVisits.daily_trend.length > 0 && (
+                    <div className="bg-white/5 border border-white/10 p-6">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-5">Daily Visits Trend</p>
+                        <div className="flex items-end gap-1 h-28">
+                            {siteVisits.daily_trend.slice(-14).map((day) => {
+                                const maxV = Math.max(...siteVisits.daily_trend.map((d) => d.visits), 1)
+                                const pct = (day.visits / maxV) * 100
+                                return (
+                                    <div
+                                        key={day.date}
+                                        className="flex-1 flex flex-col items-center gap-1 group"
+                                        title={`${day.date}: ${day.visits} visits, ${day.unique_visitors} unique`}
+                                    >
+                                        <span className="text-[8px] text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                            {day.visits}
+                                        </span>
+                                        <div
+                                            className="w-full bg-white/20 hover:bg-white/40 transition-colors rounded-sm"
+                                            style={{ height: `${Math.max(pct, 3)}%` }}
+                                        />
+                                        <span className="text-[7px] text-gray-700 rotate-[-45deg] origin-top-right hidden sm:block">
+                                            {day.date.slice(5)}
+                                        </span>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* Top Pages + Referrers side by side */}
+                <div className="grid lg:grid-cols-2 gap-6">
+                    <div className="bg-white/5 border border-white/10 p-6">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-5">Top Pages</p>
+                        {siteVisits && siteVisits.top_pages.length > 0 ? (
+                            <div className="space-y-3">
+                                {siteVisits.top_pages.slice(0, 8).map((page) => {
+                                    const maxV = Math.max(...siteVisits.top_pages.map((p) => p.visits), 1)
+                                    return (
+                                        <div key={page.page}>
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="text-[10px] text-gray-400 truncate max-w-[70%] font-mono">{page.page}</span>
+                                                <span className="text-[10px] text-white/70 font-bold">{page.visits}</span>
+                                            </div>
+                                            <div className="h-px bg-white/5">
+                                                <div
+                                                    className="h-px bg-white/30"
+                                                    style={{ width: `${(page.visits / maxV) * 100}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                            <p className="text-[10px] uppercase tracking-widest text-gray-600">No data yet</p>
+                        )}
+                    </div>
+
+                    <div className="bg-white/5 border border-white/10 p-6">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-5">Traffic Sources</p>
+                        {siteVisits && siteVisits.top_referrers.length > 0 ? (
+                            <div className="space-y-3">
+                                {siteVisits.top_referrers.slice(0, 8).map((ref, i) => (
+                                    <div key={i} className="flex items-center justify-between py-1 border-b border-white/5">
+                                        <span className="text-[10px] text-gray-400 truncate max-w-[70%]">
+                                            {ref.referrer || "Direct / None"}
+                                        </span>
+                                        <span className="text-[10px] text-white/70 font-bold shrink-0 ml-2">{ref.visits}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-[10px] uppercase tracking-widest text-gray-600">No referrer data yet</p>
+                        )}
+                    </div>
+                </div>
+            </section>
+
             <div className="pt-12 border-t border-white/5 flex justify-between items-center text-[9px] uppercase tracking-[0.4em] text-gray-700">
                 <span>U.S ATELIER INTEL - DYNAMIC ANALYSIS</span>
                 <span>GLOBAL SYNC: {new Date().toLocaleTimeString()}</span>
-            </div>
-        </div>
+            </div>        </div>
     )
 }
