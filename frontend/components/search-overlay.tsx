@@ -17,6 +17,7 @@ export function SearchOverlay({ isOpen, onClose, categories = [] }: SearchOverla
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<any[]>([])
   const [searching, setSearching] = useState(false)
+  const [suggestedCategories, setSuggestedCategories] = useState<any[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
@@ -25,10 +26,24 @@ export function SearchOverlay({ isOpen, onClose, categories = [] }: SearchOverla
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 80)
       document.body.style.overflow = "hidden"
+      const loadCategories = async () => {
+        try {
+          const base = getApiBase()
+          const res = await fetch(`${base}/api/categories`, { credentials: "include" })
+          if (res.ok) {
+            const data = await res.json()
+            setSuggestedCategories(Array.isArray(data) ? data : [])
+          }
+        } catch {
+          setSuggestedCategories([])
+        }
+      }
+      loadCategories()
     } else {
       document.body.style.overflow = ""
       setQuery("")
       setResults([])
+      setSuggestedCategories([])
     }
     return () => { document.body.style.overflow = "" }
   }, [isOpen])
@@ -243,13 +258,13 @@ export function SearchOverlay({ isOpen, onClose, categories = [] }: SearchOverla
         )}
 
         {/* Category suggestions — shown when no query */}
-        {!query && categories.length > 0 && (
+        {!query && (suggestedCategories.length > 0 || categories.length > 0) && (
           <div className="w-full max-w-3xl mt-12">
             <p className="text-[9px] uppercase tracking-[0.5em] mb-6" style={{ color: "rgba(255,255,255,0.4)" }}>
               Browse Collections
             </p>
             <div className="flex flex-wrap gap-2">
-              {categories.map(cat => (
+              {(suggestedCategories.length > 0 ? suggestedCategories : categories).map((cat: any) => (
                 <button
                   key={cat.name}
                   onClick={() => handleCategoryClick(cat.name)}

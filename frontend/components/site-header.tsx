@@ -183,7 +183,7 @@ export function SiteHeader() {
       {/* ------------------------------------------------------------------ */}
       {/* MAIN HEADER (Z-50) */}
       {/* ------------------------------------------------------------------ */}
-      <header className="absolute top-0 left-0 w-full z-[50] bg-transparent text-white mix-blend-difference">
+      <header className="absolute top-0 left-0 w-full z-[50] bg-[#050505]/90 text-white backdrop-blur-xl border-b border-white/10">
         <div className="w-full max-w-screen-2xl mx-auto flex justify-between items-center px-6 md:px-12 py-6 md:py-8">
 
           <div className="flex items-center w-1/3 min-w-0">
@@ -228,7 +228,7 @@ export function SiteHeader() {
       {/* ------------------------------------------------------------------ */}
       <div
         ref={menuContainerRef}
-        className="fixed top-0 left-0 w-full h-[100dvh] z-[100] bg-[#050505] flex flex-col justify-between overflow-hidden text-white pointer-events-none"
+        className="fixed top-0 left-0 w-full h-[100dvh] z-[100] bg-[#050505]/95 backdrop-blur-2xl flex flex-col justify-between overflow-hidden text-white pointer-events-none"
         style={{ pointerEvents: isMenuOpen ? 'auto' : 'none' }}
       >
         {/* Menu Header */}

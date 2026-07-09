@@ -273,7 +273,7 @@ function ShopContent() {
 
         {/* ─── CATEGORIES & FILTERS BAR ───────────────────────────────────── */}
         {!loading && (
-          <div className="mb-8 px-4 md:px-12 flex items-center justify-between gap-4 border-b border-white/5 pb-4 md:pb-6 relative z-30">
+          <div className="mb-8 px-4 md:px-12 flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-white/5 pb-4 md:pb-6 relative z-30">
 
             {/* Mobile category <select> — shown only below md breakpoint */}
             {!urlSearch && categories.length > 0 && (
@@ -348,7 +348,7 @@ function ShopContent() {
             )}
 
             {/* Filter Dropdowns */}
-            <div className="flex flex-nowrap items-center gap-2 shrink-0 overflow-x-auto no-scrollbar max-w-[60vw] md:max-w-none">
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto md:flex-nowrap md:shrink-0 md:overflow-x-auto md:no-scrollbar">
             {/* Gender filter */}
             <FilterDropdown label={<><span className="hidden md:inline">Gender</span><Users size={12} className="md:hidden" /></>} activeCount={selectedGenders.length}>
               <div className="p-4 space-y-2">

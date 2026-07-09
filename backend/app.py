@@ -3661,14 +3661,18 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
             verified_amount = None
 
     discounted_subtotal = max(0.0, computed_subtotal - discount_amount)
-    expected_shipping = 0 if discounted_subtotal >= 2000 else 99
+    shipping_estimate = data.get("shippingEstimate") if isinstance(data.get("shippingEstimate"), dict) else {}
+    shipping = float(shipping_estimate.get("shipping_cost") or 0) if shipping_estimate.get("shipping_cost") is not None else (0 if discounted_subtotal >= 2000 else 149)
     if delivery_pincode.startswith("400") or delivery_pincode.startswith("401"):
-        expected_tax = discounted_subtotal * 0.05
+        cgst = float(shipping_estimate.get("cgst") or 0) if shipping_estimate.get("cgst") is not None else discounted_subtotal * 0.025
+        sgst = float(shipping_estimate.get("sgst") or 0) if shipping_estimate.get("sgst") is not None else discounted_subtotal * 0.025
+        tax = cgst + sgst
     else:
-        expected_tax = discounted_subtotal * 0.05
+        igst = float(shipping_estimate.get("igst") or 0) if shipping_estimate.get("igst") is not None else discounted_subtotal * 0.05
+        tax = igst
 
-    expected_min = discounted_subtotal + expected_shipping + expected_tax + cod_fee - 1.0
-    if client_total < expected_min:
+    expected_total = discounted_subtotal + shipping + tax + cod_fee
+    if client_total + 1.0 < expected_total:
         db_mysql.session.rollback()
         return jsonify({"error": "Order total mismatch"}), 400
     if not is_cod and verified_amount is not None and verified_amount + 1.0 < client_total:

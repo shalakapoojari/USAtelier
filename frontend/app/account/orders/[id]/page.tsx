@@ -73,7 +73,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const getCancelEligibility = () => {
     if (!order) return { eligible: false, reason: "" }
     const s = (order.status || "").toLowerCase()
-    const ps = (order.payment_status || "").toLowerCase()
     if (["cancelled", "delivered", "shipped", "out for delivery", "refunded", "expired"].includes(s))
       return { eligible: false, reason: `Order is already ${order.status}.` }
     if (order.delhivery_shipment_id)
@@ -94,9 +93,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       const res = await apiFetch(API_BASE, `/api/orders/${orderNum}/cancel`, { method: "POST" })
       const data = await res.json()
       if (res.ok && data.success) {
-        setCancelMessage(data.message || "Order cancelled.")
+        const isCOD = order.payment_method === "cod"
+        const fallbackMessage = isCOD
+          ? "Order cancelled. The ₹150 COD advance fee is non-refundable."
+          : "Order cancelled. Refund will be initiated to your original payment method within 5–10 business days."
+        setCancelMessage(data.message || fallbackMessage)
         setCancelState("done")
-        setOrder((prev: any) => ({ ...prev, status: "Cancelled", payment_status: data.is_cod ? "COD Advance Non-Refundable" : "Refunded" }))
+        setOrder((prev: any) => ({ ...prev, status: "Cancelled", payment_status: isCOD ? "COD Advance Non-Refundable" : "Refunded" }))
       } else {
         setCancelMessage(data.error || "Cancellation failed.")
         setCancelState("error")
@@ -221,7 +224,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                           <p className="text-sm text-amber-300 font-medium mb-1">Are you sure?</p>
                           {isCOD ? (
                             <p className="text-xs text-amber-400/80 leading-relaxed">
-                              Your order will be cancelled. The <strong>₹150 COD advance fee is non-refundable</strong> as per our policy.
+                              Your order will be cancelled. The <strong>₹150 COD advance fee is non-refundable</strong> and the remaining balance will not be collected.
                             </p>
                           ) : (
                             <p className="text-xs text-gray-400 leading-relaxed">

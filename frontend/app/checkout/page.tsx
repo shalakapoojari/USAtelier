@@ -367,19 +367,20 @@ export default function CheckoutPage() {
     } catch { /* silent — coupons are a nice-to-have */ }
   }
 
-  const applyCoupon = async () => {
-    const code = couponCode.trim().toUpperCase()
+  const applyCoupon = async (codeOverride?: string) => {
+    const code = (codeOverride || couponCode).trim().toUpperCase()
     if (!code) {
       setCouponMessage("Enter a coupon code")
       return
     }
+    setCouponCode(code)
     setIsApplyingCoupon(true)
     setCouponMessage("")
     try {
       const res = await apiFetch(API_BASE, "/api/coupons/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, subtotal: total }),
+        body: JSON.stringify({ code, subtotal: total, items: items.map(i => ({ id: i.id, quantity: i.quantity, sellingPrice: i.sellingPrice })) }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Coupon could not be applied")
@@ -1069,24 +1070,40 @@ export default function CheckoutPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex gap-2">
-                    <Input
-                      value={couponCode}
-                      onChange={(e) => {
-                        setCouponCode(e.target.value.toUpperCase())
-                        setCouponMessage("")
-                      }}
-                      placeholder="Enter code"
-                      className="bg-transparent border-white/20 text-white placeholder:text-gray-600 h-11 uppercase"
-                    />
-                    <Button
-                      type="button"
-                      onClick={applyCoupon}
-                      disabled={isApplyingCoupon}
-                      className="border border-white/30 bg-transparent px-4 uppercase tracking-widest text-[10px] hover:bg-white hover:text-black disabled:opacity-50"
-                    >
-                      {isApplyingCoupon ? "Checking" : "Apply"}
-                    </Button>
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        value={couponCode}
+                        onChange={(e) => {
+                          setCouponCode(e.target.value.toUpperCase())
+                          setCouponMessage("")
+                        }}
+                        placeholder="Enter code"
+                        className="bg-transparent border-white/20 text-white placeholder:text-gray-600 h-11 uppercase"
+                      />
+                      <Button
+                        type="button"
+                        onClick={() => applyCoupon()}
+                        disabled={isApplyingCoupon}
+                        className="border border-white/30 bg-transparent px-4 uppercase tracking-widest text-[10px] hover:bg-white hover:text-black disabled:opacity-50"
+                      >
+                        {isApplyingCoupon ? "Checking" : "Apply"}
+                      </Button>
+                    </div>
+                    {availableCoupons.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {availableCoupons.slice(0, 3).map((coupon) => (
+                          <button
+                            key={coupon.code}
+                            type="button"
+                            onClick={() => applyCoupon(coupon.code)}
+                            className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[9px] uppercase tracking-[0.25em] text-gray-300 hover:border-white/40 hover:text-white"
+                          >
+                            {coupon.code}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
                 {couponMessage && (
