@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useMemo, useEffect, useRef, Suspense } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useState, useMemo, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { ProductCard } from "@/components/product-card"
@@ -10,6 +10,31 @@ import { Slider } from "@/components/ui/slider"
 import { getApiBase, apiFetch } from "@/lib/api-base"
 
 const API_BASE = getApiBase()
+
+type UrlFilters = {
+  category: string
+  subcategory: string
+  search: string
+  jumpTo: string
+}
+
+const emptyUrlFilters: UrlFilters = {
+  category: "",
+  subcategory: "",
+  search: "",
+  jumpTo: "",
+}
+
+function readUrlFilters(): UrlFilters {
+  if (typeof window === "undefined") return emptyUrlFilters
+  const params = new URLSearchParams(window.location.search)
+  return {
+    category: params.get("category") || "",
+    subcategory: params.get("subcategory") || "",
+    search: params.get("search") || "",
+    jumpTo: params.get("jumpTo") || "",
+  }
+}
 
 const getAllowedSizesForCategory = (categoryName: string) => {
   const cat = (categoryName || "").toLowerCase()
@@ -116,17 +141,24 @@ function ShopContent() {
   const [sortOrder, setSortOrder] = useState<"none" | "low-high" | "high-low">("none")
   const [searchInput, setSearchInput] = useState("")
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+  const [urlFilters, setUrlFilters] = useState<UrlFilters>(() => readUrlFilters())
 
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const urlCategory = searchParams.get("category")
-  const urlSubcategory = searchParams.get("subcategory")
-  const urlSearch = searchParams.get("search")
-  const jumpTo = searchParams.get("jumpTo")
+  const urlCategory = urlFilters.category
+  const urlSubcategory = urlFilters.subcategory
+  const urlSearch = urlFilters.search
+  const jumpTo = urlFilters.jumpTo
   const activeSearch = searchInput.trim()
 
   useEffect(() => {
-    setSearchInput(urlSearch || "")
+    const syncUrlFilters = () => setUrlFilters(readUrlFilters())
+    syncUrlFilters()
+    window.addEventListener("popstate", syncUrlFilters)
+    return () => window.removeEventListener("popstate", syncUrlFilters)
+  }, [])
+
+  useEffect(() => {
+    setSearchInput(urlSearch)
   }, [urlSearch])
 
   // Sync with URL category and subcategory
@@ -436,7 +468,7 @@ function ShopContent() {
               aria-label="Search products"
             />
             {activeSearch && (
-              <button type="button" onClick={() => { setSearchInput(""); if (urlSearch) router.push("/view-all") }} className="p-2 text-white/40 hover:text-white" aria-label="Clear search">
+              <button type="button" onClick={() => { setSearchInput(""); if (urlSearch) { setUrlFilters(emptyUrlFilters); router.push("/view-all") } }} className="p-2 text-white/40 hover:text-white" aria-label="Clear search">
                 <X size={14} />
               </button>
             )}
@@ -677,16 +709,8 @@ function ShopContent() {
 export default function ShopPage() {
   return (
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen overflow-x-hidden">
-      <Suspense
-        fallback={
-          <div className="bg-[#030303] min-h-screen flex items-center justify-center">
-            <Loader2 className="animate-spin text-gray-400" />
-          </div>
-        }
-      >
-        <SiteHeader />
-        <ShopContent />
-      </Suspense>
+      <SiteHeader />
+      <ShopContent />
       <SiteFooter />
     </div>
   )
