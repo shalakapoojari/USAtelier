@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { usePathname, useSearchParams } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { apiFetch, getApiBase } from "@/lib/api-base"
 
 const SESSION_KEY = "usa_site_session_id"
@@ -19,12 +19,20 @@ function getSessionId() {
   }
 }
 
+const SKIPPED_ANALYTICS_PAGES = ["/admin", "/view-all", "/collections", "/new-arrivals"]
+
+function shouldTrackPage(pathname: string | null) {
+  if (!pathname) return false
+  return !SKIPPED_ANALYTICS_PAGES.some((page) => pathname === page || pathname.startsWith(`${page}/`))
+}
+
 export function SiteVisitTracker() {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
 
   useEffect(() => {
-    const query = searchParams.toString()
+    if (!shouldTrackPage(pathname)) return
+
+    const query = window.location.search.replace(/^\?/, "")
     const page = query ? `${pathname}?${query}` : pathname
     apiFetch(getApiBase(), "/api/track/pageview", {
       method: "POST",
@@ -36,7 +44,7 @@ export function SiteVisitTracker() {
         user_agent: navigator.userAgent || "",
       }),
     }).catch(() => { /* analytics should never interrupt shopping */ })
-  }, [pathname, searchParams])
+  }, [pathname])
 
   return null
 }

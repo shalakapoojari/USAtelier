@@ -5465,16 +5465,25 @@ def get_site_visit_analytics():
     else:
         cutoff = None
 
-    base_q = SiteVisit.query
+    excluded_page_filters = [
+        ~SiteVisit.page.like("/admin%"),
+        ~SiteVisit.page.like("/view-all%"),
+        ~SiteVisit.page.like("/collections%"),
+        ~SiteVisit.page.like("/new-arrivals%"),
+    ]
+
+    base_q = SiteVisit.query.filter(*excluded_page_filters)
     if cutoff:
         base_q = base_q.filter(SiteVisit.timestamp >= cutoff)
 
     total_visits    = base_q.count()
     unique_sessions = db_mysql.session.query(func.count(func.distinct(SiteVisit.session_id))).filter(
+        *excluded_page_filters,
         *([SiteVisit.timestamp >= cutoff] if cutoff else [])
     ).scalar() or 0
     unique_users    = db_mysql.session.query(func.count(func.distinct(SiteVisit.user_id))).filter(
         SiteVisit.user_id != None,
+        *excluded_page_filters,
         *([SiteVisit.timestamp >= cutoff] if cutoff else [])
     ).scalar() or 0
 
@@ -5482,7 +5491,7 @@ def get_site_visit_analytics():
     top_pages_q = db_mysql.session.query(
         SiteVisit.page,
         func.count(SiteVisit.id).label("visits")
-    ).group_by(SiteVisit.page).order_by(func.count(SiteVisit.id).desc())
+    ).filter(*excluded_page_filters).group_by(SiteVisit.page).order_by(func.count(SiteVisit.id).desc())
     if cutoff:
         top_pages_q = top_pages_q.filter(SiteVisit.timestamp >= cutoff)
     top_pages = [{"page": r[0], "visits": int(r[1])} for r in top_pages_q.limit(10).all()]
@@ -5494,7 +5503,7 @@ def get_site_visit_analytics():
         func.date(SiteVisit.timestamp).label("day"),
         func.count(SiteVisit.id).label("visits"),
         func.count(func.distinct(SiteVisit.session_id)).label("unique_visitors"),
-    ).filter(SiteVisit.timestamp >= trend_cutoff).group_by(
+    ).filter(SiteVisit.timestamp >= trend_cutoff, *excluded_page_filters).group_by(
         func.date(SiteVisit.timestamp)
     ).order_by(func.date(SiteVisit.timestamp))
 
@@ -5513,7 +5522,7 @@ def get_site_visit_analytics():
     referrer_q = db_mysql.session.query(
         SiteVisit.referrer,
         func.count(SiteVisit.id).label("visits")
-    ).filter(SiteVisit.referrer != None)
+    ).filter(SiteVisit.referrer != None, *excluded_page_filters)
     if cutoff:
         referrer_q = referrer_q.filter(SiteVisit.timestamp >= cutoff)
     referrer_q = referrer_q.group_by(SiteVisit.referrer).order_by(func.count(SiteVisit.id).desc())

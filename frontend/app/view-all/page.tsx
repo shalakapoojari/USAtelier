@@ -123,20 +123,11 @@ function ShopContent() {
   const urlSubcategory = searchParams.get("subcategory")
   const urlSearch = searchParams.get("search")
   const jumpTo = searchParams.get("jumpTo")
+  const activeSearch = searchInput.trim()
 
   useEffect(() => {
     setSearchInput(urlSearch || "")
   }, [urlSearch])
-
-  const submitSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    const q = searchInput.trim()
-    const params = new URLSearchParams(searchParams.toString())
-    if (q) params.set("search", q)
-    else params.delete("search")
-    params.delete("jumpTo")
-    router.push(`/view-all${params.toString() ? `?${params.toString()}` : ""}`)
-  }
 
   // Sync with URL category and subcategory
   useEffect(() => {
@@ -181,7 +172,7 @@ function ShopContent() {
   useEffect(() => {
     if (jumpTo) return
     window.scrollTo({ top: 0, behavior: "auto" })
-  }, [urlCategory, urlSubcategory, urlSearch, jumpTo])
+  }, [urlCategory, urlSubcategory, activeSearch, jumpTo])
 
   const allSizes = useMemo(() => {
     const norm = (str: any) => (str ?? "").toString().toLowerCase().trim()
@@ -194,8 +185,8 @@ function ShopContent() {
         (selectedSubcategories.length === 0 || selectedSubcategories.some((s) => norm(s) === norm(p.subcategory)))
       const genderMatch =
         selectedGenders.length === 0 || selectedGenders.some((g) => norm(g) === norm(p.gender))
-      const searchMatch = !urlSearch || (() => {
-        const words = norm(urlSearch).split(/\s+/).filter(Boolean)
+      const searchMatch = !activeSearch || (() => {
+        const words = norm(activeSearch).split(/\s+/).filter(Boolean)
         const text = norm(`${p.name || ""} ${p.description || ""} ${p.category || ""}`)
         return words.every((w: string) => text.includes(w))
       })()
@@ -219,7 +210,7 @@ function ShopContent() {
       } catch {}
     })
     return Array.from(sizes).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }))
-  }, [products, urlCategory, urlSubcategory, urlSearch, selectedCategories, selectedSubcategories, selectedGenders])
+  }, [products, urlCategory, urlSubcategory, activeSearch, selectedCategories, selectedSubcategories, selectedGenders])
 
   useEffect(() => {
     setSelectedSizes((prev) => prev.filter((size) => allSizes.includes(size)))
@@ -270,15 +261,15 @@ function ShopContent() {
         selectedGenders.length === 0 ||
         selectedGenders.some((sg) => norm(sg) === norm(product.gender))
 
-      const searchMatch = !urlSearch || (() => {
-        const words = urlSearch.toLowerCase().trim().split(/\s+/).filter(Boolean)
+      const searchMatch = !activeSearch || (() => {
+        const words = activeSearch.toLowerCase().trim().split(/\s+/).filter(Boolean)
         const text = `${product.name || ""} ${product.description || ""} ${product.category || ""}`.toLowerCase()
         return words.every((w: string) => text.includes(w))
       })()
 
       return categoryMatch && subcategoryMatch && sizeMatch && priceMatch && genderMatch && searchMatch
     })
-  }, [products, selectedCategories, selectedSubcategories, selectedSizes, priceRange, priceMode, selectedGenders, urlSearch])
+  }, [products, selectedCategories, selectedSubcategories, selectedSizes, priceRange, priceMode, selectedGenders, activeSearch])
 
   const visibleProducts = useMemo(() => {
     const next = [...filteredProducts]
@@ -435,24 +426,24 @@ function ShopContent() {
       {/* ─── MAIN CONTENT ────────────────────────────────────────── */}
       <main className="px-0 pb-32 pt-36 md:pt-40">
         <div className="px-4 md:px-12 mb-6 md:mb-8">
-          <form onSubmit={submitSearch} className="mx-auto max-w-4xl border-b border-white/20 flex items-center gap-3 py-3 focus-within:border-white/60 transition-colors">
+          <div className="mx-auto max-w-4xl border-b border-white/20 flex items-center gap-3 py-3 focus-within:border-white/60 transition-colors">
             <SlidersHorizontal size={14} className="text-white/30 rotate-90" />
             <input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search products"
               className="flex-1 bg-transparent outline-none text-lg md:text-2xl font-serif text-white placeholder:text-white/25"
+              aria-label="Search products"
             />
-            {searchInput && (
-              <button type="button" onClick={() => { setSearchInput(""); router.push("/view-all") }} className="p-2 text-white/40 hover:text-white" aria-label="Clear search">
+            {activeSearch && (
+              <button type="button" onClick={() => { setSearchInput(""); if (urlSearch) router.push("/view-all") }} className="p-2 text-white/40 hover:text-white" aria-label="Clear search">
                 <X size={14} />
               </button>
             )}
-            <button type="submit" className="px-4 py-2 text-[10px] uppercase tracking-[0.25em] text-white/70 hover:text-white">Search</button>
-          </form>
-          {urlSearch && (
+          </div>
+          {activeSearch && (
             <div className="mx-auto max-w-4xl mt-4 flex items-center justify-between gap-4">
-              <p className="text-[10px] uppercase tracking-[0.25em] text-white/35">Results for <span className="text-white/75">{urlSearch}</span></p>
+              <p className="text-[10px] uppercase tracking-[0.25em] text-white/35">Results for <span className="text-white/75">{activeSearch}</span></p>
               <span className="text-[10px] uppercase tracking-[0.25em] text-white/35">{visibleProducts.length} piece{visibleProducts.length === 1 ? "" : "s"}</span>
             </div>
           )}
@@ -463,7 +454,7 @@ function ShopContent() {
           <div className="mb-8 px-4 md:px-12 flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-white/5 pb-4 md:pb-6 relative z-30 overflow-visible">
 
             {/* Category pills */}
-            {!urlSearch && categories.length > 0 && (
+            {!activeSearch && categories.length > 0 && (
               <div className="flex-1 w-full overflow-x-auto no-scrollbar pr-4">
                 <div className="flex items-center gap-3 min-w-max">
                   <a
@@ -559,7 +550,7 @@ function ShopContent() {
           ) : (
             <>
               {/* Grid — plain when no category or with search */}
-              {(!urlCategory || urlSearch || urlSubcategory) ? (
+              {(!urlCategory || activeSearch || urlSubcategory) ? (
                 <div className="grid grid-cols-2 lg:grid-cols-4" style={{ gap: 0 }}>
                   {visibleProducts.map((product) => (
                     <ProductCard key={product.id || Math.random()} product={product} />
