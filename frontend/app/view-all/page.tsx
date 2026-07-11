@@ -61,7 +61,7 @@ function FilterDropdown({
   }, [])
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative shrink-0">
       <button
         onClick={() => setOpen((v) => !v)}
         className={`flex items-center gap-2 px-4 py-2 border text-[10px] uppercase tracking-[0.25em] transition-all duration-200 whitespace-nowrap ${
@@ -90,9 +90,9 @@ function FilterDropdown({
             onClick={(e) => { e.stopPropagation(); setOpen(false); }} 
           />
           {/* Dropdown / Mobile Sheet */}
-          <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0a] border-t border-white/10 p-6 pb-12 rounded-t-3xl md:p-0 md:pb-0 md:rounded-none md:border-t-0 md:absolute md:top-full md:bottom-auto md:left-0 md:mt-1 md:min-w-[180px] md:border animate-in slide-in-from-bottom-8 md:slide-in-from-top-1 duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] md:shadow-2xl flex flex-col max-h-[80vh]">
+          <div className="fixed bottom-0 left-0 right-0 z-[80] bg-[#0a0a0a] border-t border-white/10 p-6 pb-12 rounded-t-3xl md:p-0 md:pb-0 md:rounded-none md:border-t-0 md:absolute md:top-full md:bottom-auto md:left-0 md:mt-1 md:min-w-[220px] md:border md:border-white/15 animate-in slide-in-from-bottom-8 md:slide-in-from-top-1 duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] md:shadow-2xl flex flex-col max-h-[80vh] md:max-h-none">
             <div className="w-12 h-1 bg-white/20 rounded-full mx-auto mb-6 md:hidden" />
-            <div className="overflow-y-auto no-scrollbar">
+            <div className="overflow-y-auto no-scrollbar md:overflow-visible">
               {children}
             </div>
           </div>
@@ -112,6 +112,8 @@ function ShopContent() {
   const [selectedGenders, setSelectedGenders] = useState<string[]>([])
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000])
   const [sliderRange, setSliderRange] = useState<[number, number]>([0, 100000])
+  const [priceMode, setPriceMode] = useState<"all" | "range">("all")
+  const [sortOrder, setSortOrder] = useState<"none" | "low-high" | "high-low">("none")
   const [searchInput, setSearchInput] = useState("")
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
@@ -239,6 +241,7 @@ function ShopContent() {
   useEffect(() => {
     setPriceRange([0, categoryMaxPrice])
     setSliderRange([0, categoryMaxPrice])
+    setPriceMode("all")
   }, [categoryMaxPrice])
 
   const filteredProducts = useMemo(() => {
@@ -261,7 +264,7 @@ function ShopContent() {
         selectedSizes.length === 0 ||
         productSizes.some((size: string) => selectedSizes.includes(size))
 
-      const priceMatch = (product.sellingPrice || 0) >= priceRange[0] && (product.sellingPrice || 0) <= priceRange[1]
+      const priceMatch = priceMode !== "range" || ((product.sellingPrice || 0) >= priceRange[0] && (product.sellingPrice || 0) <= priceRange[1])
 
       const genderMatch =
         selectedGenders.length === 0 ||
@@ -275,13 +278,25 @@ function ShopContent() {
 
       return categoryMatch && subcategoryMatch && sizeMatch && priceMatch && genderMatch && searchMatch
     })
-  }, [products, selectedCategories, selectedSubcategories, selectedSizes, priceRange, selectedGenders, urlSearch])
+  }, [products, selectedCategories, selectedSubcategories, selectedSizes, priceRange, priceMode, selectedGenders, urlSearch])
+
+  const visibleProducts = useMemo(() => {
+    const next = [...filteredProducts]
+    if (sortOrder === "low-high") {
+      next.sort((a, b) => Number(a.sellingPrice || 0) - Number(b.sellingPrice || 0))
+    }
+    if (sortOrder === "high-low") {
+      next.sort((a, b) => Number(b.sellingPrice || 0) - Number(a.sellingPrice || 0))
+    }
+    return next
+  }, [filteredProducts, sortOrder])
 
   const activeFilterCount =
     selectedCategories.length +
     selectedSizes.length +
     selectedGenders.length +
-    (priceRange[0] > 0 || priceRange[1] < categoryMaxPrice ? 1 : 0)
+    (priceMode === "range" ? 1 : 0) +
+    (sortOrder !== "none" ? 1 : 0)
 
   const clearAllFilters = () => {
     setSelectedCategories([])
@@ -289,6 +304,8 @@ function ShopContent() {
     setSelectedGenders([])
     setPriceRange([0, categoryMaxPrice])
     setSliderRange([0, categoryMaxPrice])
+    setPriceMode("all")
+    setSortOrder("none")
   }
 
   const filterControls = (mobile = false) => (
@@ -357,24 +374,56 @@ function ShopContent() {
         </FilterDropdown>
       )}
 
-      <FilterDropdown label={mobile ? "Price" : <><span className="hidden md:inline">Price</span><Tag size={12} className="md:hidden" /></>} activeCount={priceRange[0] > 0 || priceRange[1] < categoryMaxPrice ? 1 : 0}>
-        <div className="p-5 w-64">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-[9px] uppercase tracking-[0.3em] text-white/40">Price Range</span>
-            <span className="text-[9px] text-white/60 font-mono">₹{sliderRange[0].toLocaleString("en-IN")} - ₹{sliderRange[1].toLocaleString("en-IN")}</span>
+      <FilterDropdown label={mobile ? "Price" : <><span className="hidden md:inline">Price</span><Tag size={12} className="md:hidden" /></>} activeCount={(priceMode === "range" ? 1 : 0) + (sortOrder !== "none" ? 1 : 0)}>
+        <div className="p-4 w-72 space-y-4">
+          <div className="grid gap-2">
+            {[
+              ["none", "Recommended"],
+              ["low-high", "Price: Low to High"],
+              ["high-low", "Price: High to Low"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setSortOrder(value as "none" | "low-high" | "high-low")}
+                className={`flex items-center justify-between border px-3 py-2 text-left text-[10px] uppercase tracking-[0.18em] transition-colors ${sortOrder === value ? "border-white/50 bg-white/10 text-white" : "border-white/10 text-white/45 hover:text-white hover:border-white/30"}`}
+              >
+                {label}
+                {sortOrder === value && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+              </button>
+            ))}
           </div>
-          <Slider
-            value={sliderRange}
-            min={0}
-            max={categoryMaxPrice || 100000}
-            step={100}
-            onValueChange={(val) => setSliderRange(val as [number, number])}
-            onValueCommit={(val) => setPriceRange(val as [number, number])}
-            className="py-3"
-          />
-          <div className="flex justify-between mt-2 text-[9px] text-white/30 font-mono tracking-tight">
-            <span>₹0</span>
-            <span>₹{(categoryMaxPrice || 100000).toLocaleString("en-IN")}</span>
+
+          <div className="border-t border-white/10 pt-4">
+            <button
+              type="button"
+              onClick={() => setPriceMode(priceMode === "range" ? "all" : "range")}
+              className={`w-full flex items-center justify-between border px-3 py-2 text-[10px] uppercase tracking-[0.18em] transition-colors ${priceMode === "range" ? "border-white/50 bg-white/10 text-white" : "border-white/10 text-white/45 hover:text-white hover:border-white/30"}`}
+            >
+              Price Range
+              <span>{priceMode === "range" ? "On" : "Off"}</span>
+            </button>
+            {priceMode === "range" && (
+              <div className="pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[9px] uppercase tracking-[0.25em] text-white/40">Range</span>
+                  <span className="text-[9px] text-white/70 font-mono">₹{sliderRange[0].toLocaleString("en-IN")} - ₹{sliderRange[1].toLocaleString("en-IN")}</span>
+                </div>
+                <Slider
+                  value={sliderRange}
+                  min={0}
+                  max={categoryMaxPrice || 100000}
+                  step={100}
+                  onValueChange={(val) => setSliderRange(val as [number, number])}
+                  onValueCommit={(val) => setPriceRange(val as [number, number])}
+                  className="py-3"
+                />
+                <div className="flex justify-between mt-2 text-[9px] text-white/30 font-mono tracking-tight">
+                  <span>₹0</span>
+                  <span>₹{(categoryMaxPrice || 100000).toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </FilterDropdown>
@@ -404,14 +453,14 @@ function ShopContent() {
           {urlSearch && (
             <div className="mx-auto max-w-4xl mt-4 flex items-center justify-between gap-4">
               <p className="text-[10px] uppercase tracking-[0.25em] text-white/35">Results for <span className="text-white/75">{urlSearch}</span></p>
-              <span className="text-[10px] uppercase tracking-[0.25em] text-white/35">{filteredProducts.length} piece{filteredProducts.length === 1 ? "" : "s"}</span>
+              <span className="text-[10px] uppercase tracking-[0.25em] text-white/35">{visibleProducts.length} piece{visibleProducts.length === 1 ? "" : "s"}</span>
             </div>
           )}
         </div>
 
         {/* ─── CATEGORIES & FILTERS BAR ───────────────────────────────────── */}
         {!loading && (
-          <div className="mb-8 px-4 md:px-12 flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-white/5 pb-4 md:pb-6 relative z-30">
+          <div className="mb-8 px-4 md:px-12 flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-white/5 pb-4 md:pb-6 relative z-30 overflow-visible">
 
             {/* Category pills */}
             {!urlSearch && categories.length > 0 && (
@@ -445,7 +494,7 @@ function ShopContent() {
             )}
 
             {/* Filter Dropdowns */}
-            <div className="hidden md:flex flex-wrap items-center gap-2 w-full md:w-auto md:flex-nowrap md:shrink-0 md:overflow-x-auto md:no-scrollbar">
+            <div className="hidden md:flex flex-wrap items-center gap-2 w-full md:w-auto md:flex-nowrap md:shrink-0 md:overflow-visible">
               {filterControls(false)}
             </div>
 
@@ -469,7 +518,7 @@ function ShopContent() {
             {activeFilterCount > 0 && (
               <div className="flex items-center gap-2 ml-auto">
                 <span className="text-[9px] uppercase tracking-widest text-white/30">
-                  {filteredProducts.length} result{filteredProducts.length !== 1 ? "s" : ""}
+                  {visibleProducts.length} result{visibleProducts.length !== 1 ? "s" : ""}
                 </span>
                 <button
                   onClick={clearAllFilters}
@@ -484,7 +533,7 @@ function ShopContent() {
             {/* Result count when no filters active */}
             {activeFilterCount === 0 && !loading && (
               <span className="ml-auto text-[9px] uppercase tracking-widest text-white/20">
-                {filteredProducts.length} piece{filteredProducts.length !== 1 ? "s" : ""}
+                {visibleProducts.length} piece{visibleProducts.length !== 1 ? "s" : ""}
               </span>
             )}
           </div>
@@ -497,7 +546,7 @@ function ShopContent() {
               <Loader2 className="animate-spin text-gray-400" />
               <p className="text-xs uppercase tracking-[0.3em] text-gray-500">Discovering pieces...</p>
             </div>
-          ) : filteredProducts.length === 0 ? (
+          ) : visibleProducts.length === 0 ? (
             <div className="w-full min-h-[60vh] flex flex-col items-center justify-center text-center">
               <h2 className="text-3xl font-serif text-gray-500 font-light">No pieces found</h2>
               <button
@@ -512,7 +561,7 @@ function ShopContent() {
               {/* Grid — plain when no category or with search */}
               {(!urlCategory || urlSearch || urlSubcategory) ? (
                 <div className="grid grid-cols-2 lg:grid-cols-4" style={{ gap: 0 }}>
-                  {filteredProducts.map((product) => (
+                  {visibleProducts.map((product) => (
                     <ProductCard key={product.id || Math.random()} product={product} />
                   ))}
                 </div>
@@ -521,7 +570,7 @@ function ShopContent() {
                   // Grouping Logic for Category Views
                   const subcategories = Array.from(
                     new Set(
-                      filteredProducts.map((p) => {
+                      visibleProducts.map((p) => {
                         if (p.subcategory) return p.subcategory
                         const name = (p.name || "").toLowerCase()
                         const cat = (p.category || "").toLowerCase()
@@ -556,7 +605,7 @@ function ShopContent() {
                   if (subcategories.length === 0) {
                     return (
                       <div className="grid grid-cols-2 lg:grid-cols-4" style={{ gap: 0 }}>
-                        {filteredProducts.map((product) => (
+                        {visibleProducts.map((product) => (
                           <ProductCard key={product.id || Math.random()} product={product} />
                         ))}
                       </div>
@@ -581,7 +630,7 @@ function ShopContent() {
                   return (
                     <div className="space-y-20 w-full">
                       {subcategories.map((subName: any) => {
-                        const sectionProducts = filteredProducts.filter((p) => matchProduct(p, subName))
+                        const sectionProducts = visibleProducts.filter((p) => matchProduct(p, subName))
                         if (sectionProducts.length === 0) return null
                         return (
                           <div key={subName} className="w-full pt-4 scroll-mt-40" id={`section-${subName.toLowerCase()}`}>
@@ -602,7 +651,7 @@ function ShopContent() {
 
                       {/* Fallback for unmatched products */}
                       {(() => {
-                        const unmatched = filteredProducts.filter(
+                        const unmatched = visibleProducts.filter(
                           (p) => !subcategories.some((subName) => matchProduct(p, subName))
                         )
                         if (unmatched.length === 0) return null
