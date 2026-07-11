@@ -278,10 +278,6 @@ export default function CheckoutPage() {
     return () => { cancelled = true }
   }, [isHydrated])
 
-  if (!isHydrated || items.length === 0) {
-    return null
-  }
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
     if (errors[e.target.name]) {
@@ -591,6 +587,17 @@ export default function CheckoutPage() {
     { key: "shipping", label: "Shipping", icon: MapPin },
     { key: "review", label: "Review & Pay", icon: CreditCard },
   ]
+
+  if (!isHydrated || items.length === 0) {
+    return (
+      <div className="bg-[#030303] text-[#e8e8e3] min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-white/20 border-t-white animate-spin rounded-full" />
+          <p className="text-[10px] uppercase tracking-widest text-gray-500">Preparing checkout...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="bg-[#030303] text-[#e8e8e3] min-h-screen overflow-x-hidden">
