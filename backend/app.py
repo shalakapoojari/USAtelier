@@ -716,6 +716,7 @@ with app.app_context():
         ("products", "selling_price", "ALTER TABLE products CHANGE price selling_price FLOAT NOT NULL"),
         ("products", "mrp", "ALTER TABLE products ADD COLUMN mrp FLOAT DEFAULT NULL"),
         ("order_items", "selling_price", "ALTER TABLE order_items CHANGE price selling_price FLOAT NOT NULL"),
+        ("coupons", "max_free_item_value", "ALTER TABLE coupons ADD COLUMN max_free_item_value FLOAT DEFAULT NULL"),
     ]
     for table_name, column_name, alter_sql in migration_columns:
         try:
@@ -2450,6 +2451,7 @@ def validate_coupon():
         "final_amount":    round(subtotal - discount, 2),
         "buy_quantity":    coupon.buy_quantity,
         "get_quantity":    coupon.get_quantity,
+        "max_free_item_value": coupon.max_free_item_value,
         "visibility":      coupon.visibility or "hidden",
         "influencer_name": coupon.influencer_name,
     })
@@ -2471,15 +2473,26 @@ def auto_apply_coupons():
         Coupon.visibility == "visible"
     ).all()
 
-    qualified = []
+    offers = []
     for c in visible_coupons:
-        if c.auto_qualifies(subtotal, cart_items=cart_items):
-            discount = c.apply(subtotal, cart_items=cart_items)
-            entry = c.to_dict()
-            entry["discount_amount"] = discount
-            qualified.append(entry)
+        valid, reason = c.is_valid(subtotal, cart_items=cart_items)
+        discount = c.apply(subtotal, cart_items=cart_items) if valid else 0
+        entry = c.to_dict()
+        entry["discount_amount"] = discount
+        entry["eligible"] = bool(valid)
+        entry["unavailable_reason"] = reason
+        entry["offer_category"] = getattr(c, "offer_category", None) or "brand"
+        if c.coupon_type == "buy_n_get_n":
+            total_qty = sum(int(i.get("quantity", 1) or 1) for i in cart_items)
+            required_qty = int(c.buy_quantity or 0) + int(c.get_quantity or 0)
+            entry["required_quantity"] = required_qty
+            entry["current_quantity"] = total_qty
+            entry["items_to_add"] = max(0, required_qty - total_qty)
+        else:
+            entry["amount_to_add"] = max(0, float(c.min_order_amount or 0) - subtotal)
+        offers.append(entry)
 
-    return jsonify(qualified)
+    return jsonify(offers)
 
 
 @app.route("/api/admin/coupons", methods=["GET"])
@@ -2538,8 +2551,12 @@ def create_coupon():
         # Buy N Get N quantities
         buy_qty_raw = data.get("buy_quantity")
         get_qty_raw = data.get("get_quantity")
+        max_free_raw = data.get("max_free_item_value")
         buy_quantity = int(buy_qty_raw) if buy_qty_raw not in (None, "") else None
         get_quantity = int(get_qty_raw) if get_qty_raw not in (None, "") else None
+        max_free_item_value = float(max_free_raw) if max_free_raw not in (None, "") else None
+        if max_free_item_value is not None and max_free_item_value < 0:
+            return jsonify({"error": "Max free item value cannot be negative"}), 400
 
         visibility      = _sanitise_str(data.get("visibility", "hidden"), 20)
         if visibility not in ("hidden", "visible"):
@@ -2557,6 +2574,7 @@ def create_coupon():
             is_active        = bool(data.get("is_active", True)),
             buy_quantity     = buy_quantity,
             get_quantity     = get_quantity,
+            max_free_item_value = max_free_item_value,
             visibility       = visibility,
             influencer_name  = influencer_name,
         )
@@ -2597,6 +2615,9 @@ def update_coupon(coupon_id):
         if "get_quantity" in data:
             raw = data["get_quantity"]
             coupon.get_quantity = int(raw) if raw not in (None, "") else None
+        if "max_free_item_value" in data:
+            raw = data["max_free_item_value"]
+            coupon.max_free_item_value = float(raw) if raw not in (None, "") else None
         if "expires_at" in data:
             if data["expires_at"]:
                 expires_raw = str(data["expires_at"]).strip()
@@ -2661,7 +2682,7 @@ def create_razorpay_order():
     # Check for existing COMPLETED order with this idempotency key
     if idempotency_key:
         existing = OrderSQL.query.filter_by(idempotency_key=idempotency_key).first()
-        if existing and existing.items and existing.payment_status in ("Paid", "COD - Pending"):
+        if existing and existing.items and existing.payment_status in ("Paid", "COD - Pending", "COD Advance Paid"):
             return jsonify({
                 "id":       existing.razorpay_order_id,
                 "amount":   int(existing.total * 100),
@@ -3172,6 +3193,16 @@ def razorpay_webhook():
             db_mysql.session.commit()
             app.logger.info("WEBHOOK_COMMITTED payment=%s", rzp_payment_id)
 
+        elif event in ("payment.settled", "settlement.processed"):
+            entity = (data.get("payload", {}).get("payment", {}) or {}).get("entity", {})
+            rzp_payment_id = str(entity.get("id") or entity.get("payment_id") or "")
+            if rzp_payment_id:
+                payment = Payment.query.filter_by(razorpay_payment_id=rzp_payment_id).first()
+                if payment:
+                    payment.status = "settled"
+                    db_mysql.session.commit()
+                    app.logger.info("WEBHOOK_PAYMENT_SETTLED payment=%s", rzp_payment_id)
+
         elif event == "payment.failed":
             # ── Payment.failed — mark Payment row as failed ──────────────────
             try:
@@ -3343,7 +3374,41 @@ def cancel_admin_order(order_id):
         msg = "Payment gateway not configured" if not razorpay_client else "No payment ID on order"
         return jsonify({"success": True, "refunded": False, "message": f"Order cancelled. ({msg} — no refund issued.)"}), 200
 
-    # ── Razorpay refund ─────────────────────────────────────────────────────
+    # ── COD: cancel shipment/order but keep the ₹150 advance non-refundable ──
+    if (order.payment_method or "").lower() == "cod":
+        try:
+            delhivery_cancelled = False
+            if order.delhivery_waybill_number or order.delhivery_shipment_id:
+                from delhivery_utils import cancel_shipment
+                waybill_to_cancel = order.delhivery_waybill_number or order.delhivery_shipment_id
+                res = cancel_shipment(waybill_to_cancel)
+                if res.get("success"):
+                    delhivery_cancelled = True
+            for item in order.items:
+                prod = ProductSQL.query.get(item.product_id)
+                if prod:
+                    size = item.size
+                    if size:
+                        prod.update_stock_for_size(size, item.quantity)
+                    else:
+                        prod.stock += item.quantity
+            if payment:
+                payment.status = "cod_advance_non_refundable"
+            order.payment_status = "COD Advance Non-Refundable"
+            order.status = "Cancelled"
+            _audit("order_cancelled_admin_cod_no_refund", "order", order.id, {"razorpay_payment_id": rzp_payment_id})
+            db_mysql.session.commit()
+            return jsonify({
+                "success": True,
+                "refunded": False,
+                "delhivery_cancelled": delhivery_cancelled,
+                "message": "Order cancelled. The ₹150 COD advance is non-refundable."
+            }), 200
+        except Exception as exc:
+            db_mysql.session.rollback()
+            return jsonify({"error": "Failed to cancel COD order", "detail": str(exc)}), 500
+
+    # ── Razorpay refund for prepaid orders ───────────────────────────────────
     try:
         client      = get_razorpay_client()
         refund_data = {}
@@ -3462,6 +3527,8 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
         return jsonify({"error": "Terms and Conditions must be accepted"}), 400
 
     payment_method = _sanitise_str(data.get("paymentMethod", "prepaid"), 20).lower()
+    if payment_method == "razorpay":
+        payment_method = "prepaid"
     if payment_method not in ("prepaid", "cod"):
         return jsonify({"error": "Invalid payment method"}), 400
     is_cod = payment_method == "cod"
@@ -3495,16 +3562,28 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
     if existing_by_payment and existing_by_payment.items:
         return jsonify({"success": True, "orderId": existing_by_payment.order_number, "duplicate": True}), 200
 
-    if not is_cod and (not rzp_order_id or not rzp_payment_id):
+    if not rzp_order_id or not rzp_payment_id:
         return jsonify({"error": "Payment verification required. Please complete payment first."}), 400
-    if not is_cod and require_signature and not rzp_signature:
+    if require_signature and not rzp_signature:
         return jsonify({"error": "Payment verification required. Please complete payment first."}), 400
 
-    if not is_cod and not razorpay_client:
+    if not razorpay_client:
         return jsonify({"error": "Payment gateway not configured"}), 500
 
-    if is_cod:
-        payment_status = "COD - Pending"
+    if is_cod and require_signature:
+        try:
+            razorpay_client.utility.verify_payment_signature({
+                "razorpay_order_id":   rzp_order_id,
+                "razorpay_payment_id": rzp_payment_id,
+                "razorpay_signature":  rzp_signature,
+            })
+        except Exception:
+            return jsonify({"error": "COD advance payment verification failed. Please try again."}), 400
+        payment_status = "COD Advance Paid"
+    elif is_cod:
+        if verified_payment.get("status") not in ("captured", "authorized"):
+            return jsonify({"error": "COD advance payment verification failed"}), 400
+        payment_status = "COD Advance Paid"
     elif require_signature:
         try:
             razorpay_client.utility.verify_payment_signature({
@@ -3639,13 +3718,8 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
         else:
             coupon_code = None
 
-    # ── COD advance fee: ₹150 charged online upfront, deducted from cash payable ──
-    # The cod_fee is NOT an extra charge — it is part of the grand total paid online.
-    if is_cod:
-        discounted_sub_for_cod = max(0.0, computed_subtotal - discount_amount)
-        cod_fee = 150.0 if discounted_sub_for_cod < 2000.0 else 0.0
-    else:
-        cod_fee = 0.0
+    # COD advance: ₹150 is collected online and deducted from Delhivery COD collection.
+    cod_fee = 150.0 if is_cod else 0.0
 
     try:
         client_total = float(data.get("total", 0))
@@ -3675,7 +3749,11 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
     if client_total + 1.0 < expected_total:
         db_mysql.session.rollback()
         return jsonify({"error": "Order total mismatch"}), 400
-    if not is_cod and verified_amount is not None and verified_amount + 1.0 < client_total:
+    if is_cod:
+        if verified_amount is not None and verified_amount + 1.0 < cod_fee:
+            db_mysql.session.rollback()
+            return jsonify({"error": "COD advance payment is lower than required"}), 400
+    elif verified_amount is not None and verified_amount + 1.0 < client_total:
         db_mysql.session.rollback()
         return jsonify({"error": "Payment amount is lower than order total"}), 400
 
@@ -3733,7 +3811,7 @@ def _finalize_order_from_payload(data: dict, require_signature: bool = True, ver
             payment.status   = "captured"
             payment.order_id = new_order.id
             payment.user_id  = user.id
-            payment.amount   = client_total
+            payment.amount   = cod_fee if is_cod else client_total
             payment.method   = verified_payment.get("method") or payment.method
             payment.email    = verified_payment.get("email") or payment.email
             payment.phone    = verified_payment.get("contact") or payment.phone
@@ -4133,6 +4211,15 @@ def delhivery_webhook():
 
     return jsonify({"success": True}), 200
 
+def _settled_order_id_filter():
+    settled_payments = Payment.query.filter(Payment.status == "settled").all()
+    order_ids = {p.order_id for p in settled_payments if p.order_id}
+    payment_ids = [p.razorpay_payment_id for p in settled_payments if p.razorpay_payment_id]
+    if payment_ids:
+        for order in OrderSQL.query.filter(OrderSQL.razorpay_payment_id.in_(payment_ids)).all():
+            order_ids.add(order.id)
+    return OrderSQL.id.in_(list(order_ids)) if order_ids else text("0=1")
+
 # ============================================================
 # ADMIN — ANALYSIS
 # ============================================================
@@ -4323,7 +4410,7 @@ def get_analysis_data():
                 func.sum(OrderSQL.total),
                 func.count(OrderSQL.id),
             )
-            .filter(OrderSQL.payment_status == "Paid")
+            .filter(_settled_order_id_filter())
             .group_by(
                 extract("year", OrderSQL.created_at),
                 extract("month", OrderSQL.created_at)
@@ -4350,7 +4437,7 @@ def get_analysis_data():
         total_orders = OrderSQL.query.filter(OrderSQL.status != "Cancelled").count()
         total_revenue_raw = db_mysql.session.query(
             func.sum(OrderSQL.total)
-        ).filter(OrderSQL.status != "Cancelled").scalar()
+        ).filter(OrderSQL.status != "Cancelled", _settled_order_id_filter()).scalar()
         total_revenue = round(float(total_revenue_raw or 0), 2)
 
         # ---------------- TOP BY REVENUE ----------------
@@ -4362,7 +4449,7 @@ def get_analysis_data():
                 func.count(func.distinct(OrderItem.order_id)).label("order_count"),
             )
             .join(OrderSQL, OrderSQL.id == OrderItem.order_id)
-            .filter(OrderSQL.status != "Cancelled")
+            .filter(OrderSQL.status != "Cancelled", _settled_order_id_filter())
             .group_by(OrderItem.product_id, OrderItem.product_name)
             .order_by(func.sum(OrderItem.selling_price * OrderItem.quantity).desc())
             .limit(10)
@@ -4453,6 +4540,7 @@ def get_revenue_trend():
             )
             .filter(
                 OrderSQL.status != "Cancelled",
+                _settled_order_id_filter(),
                 OrderSQL.created_at >= datetime.utcnow() - timedelta(days=30),
             )
             .group_by(func.date(OrderSQL.created_at))

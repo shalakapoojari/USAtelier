@@ -59,6 +59,7 @@ export default function ProductPage({
   const [addedToCart, setAddedToCart] = useState(false)
   const [showShareMenu, setShowShareMenu] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [isImagePaused, setIsImagePaused] = useState(false)
 
   // Mobile swipe
   const touchStartX = useRef<number | null>(null)
@@ -143,6 +144,24 @@ export default function ProductPage({
       body: JSON.stringify({ session_id: sessionId }),
     }).catch(() => { /* analytics — silent failure ok */ })
   }, [product?.id])
+
+  useEffect(() => {
+    if (!product || isImagePaused) return
+    const imageCount = (() => {
+      if (Array.isArray(product.images)) return product.images.length
+      try {
+        const parsed = JSON.parse(product.images)
+        return Array.isArray(parsed) ? parsed.length : product.images ? 1 : 0
+      } catch {
+        return product.images ? 1 : 0
+      }
+    })()
+    if (imageCount <= 1) return
+    const timer = window.setInterval(() => {
+      setSelectedImage((prev) => (prev + 1) % imageCount)
+    }, 4200)
+    return () => window.clearInterval(timer)
+  }, [product?.id, product?.images, isImagePaused])
 
   // Handle Hash Nav
   useEffect(() => {
@@ -459,11 +478,14 @@ export default function ProductPage({
 
       {/* ── PRODUCT LAYOUT ── */}
       <main className="pt-10 px-6 md:px-12 pb-32">
-        <div className="grid md:grid-cols-2 gap-16 lg:gap-24 items-start max-w-350 mx-auto">
+        <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)] gap-10 lg:gap-16 items-start max-w-350 mx-auto">
 
           {/* ── IMAGES CAROUSEL (single-image controlled view) ── */}
           <div
-            className="relative w-full overflow-hidden bg-[#111] aspect-[3/4] md:aspect-[4/5]"
+            className="relative w-full overflow-hidden bg-[#090909] aspect-[3/4] md:aspect-[4/5] cursor-zoom-in"
+            onClick={() => setIsImagePaused((prev) => !prev)}
+            onMouseEnter={() => setIsImagePaused(true)}
+            onMouseLeave={() => setIsImagePaused(false)}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
@@ -474,7 +496,7 @@ export default function ProductPage({
                 key={idx}
                 src={resolveMediaUrl(img)}
                 alt={`${product.name} - View ${idx + 1}`}
-                className={`absolute inset-0 w-full h-full object-cover block select-none transition-opacity duration-150 ${
+                className={`absolute inset-0 w-full h-full object-cover block select-none transition-all duration-700 ${isImagePaused && idx === selectedImage ? "scale-110" : "scale-100"} ${
                   idx === selectedImage ? "opacity-100" : "opacity-0 pointer-events-none"
                 }`}
                 draggable={false}
@@ -511,7 +533,7 @@ export default function ProductPage({
                   onTouchStart={(e) => e.stopPropagation()}
                   onTouchEnd={(e) => { e.stopPropagation(); goToPrevImage() }}
                   aria-label="Previous image"
-                  className="absolute left-3 top-1/2 -translate-y-1/2 z-20 flex items-center justify-center w-10 h-10 rounded-full bg-black/60 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 hover:border-white/60 active:scale-95 transition-all duration-200 shadow-lg cursor-pointer pointer-events-auto"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 z-20 flex items-center justify-center w-10 h-10 rounded-full bg-black/55 backdrop-blur-sm text-white hover:bg-black/90 active:scale-95 transition-all duration-200 shadow-lg cursor-pointer pointer-events-auto"
                 >
                   <ChevronLeft size={20} strokeWidth={2.5} />
                 </button>
@@ -521,7 +543,7 @@ export default function ProductPage({
                   onTouchStart={(e) => e.stopPropagation()}
                   onTouchEnd={(e) => { e.stopPropagation(); goToNextImage() }}
                   aria-label="Next image"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 z-20 flex items-center justify-center w-10 h-10 rounded-full bg-black/60 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 hover:border-white/60 active:scale-95 transition-all duration-200 shadow-lg cursor-pointer pointer-events-auto"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 z-20 flex items-center justify-center w-10 h-10 rounded-full bg-black/55 backdrop-blur-sm text-white hover:bg-black/90 active:scale-95 transition-all duration-200 shadow-lg cursor-pointer pointer-events-auto"
                 >
                   <ChevronRight size={20} strokeWidth={2.5} />
                 </button>
@@ -548,7 +570,7 @@ export default function ProductPage({
           </div>
 
           {/* ── DETAILS COLUMN ── */}
-          <div className="space-y-0 lg:sticky lg:top-32 self-start pb-12">
+          <div className="space-y-0 lg:sticky lg:top-28 self-start pb-12 lg:pt-2">
 
             {/* Category breadcrumb */}
             <Link
@@ -595,13 +617,13 @@ export default function ProductPage({
             {/* Details grid (fabric, category, stock) */}
             <div className="grid grid-cols-2 gap-3 mb-8 text-xs">
               {product.fabric && (
-                <div className="bg-white/5 rounded px-4 py-3">
+                <div className="bg-white/[0.03] px-4 py-3">
                   <p className="text-gray-500 uppercase tracking-widest mb-1">Fabric</p>
                   <p className="text-white">{product.fabric}</p>
                 </div>
               )}
               {product.care && (
-                <div className="bg-white/5 rounded px-4 py-3">
+                <div className="bg-white/[0.03] px-4 py-3">
                   <p className="text-gray-500 uppercase tracking-widest mb-1">Care</p>
                   <p className="text-white">{product.care}</p>
                 </div>
@@ -745,7 +767,7 @@ export default function ProductPage({
             </div>
 
             {/* Accordions */}
-            <div className="border-t border-white/10 divide-y divide-white/10">
+            <div className="divide-y divide-white/10">
 
               {/* Description */}
               <div>
@@ -765,7 +787,7 @@ export default function ProductPage({
 
               {/* Size Guide */}
               {(product.sizeGuideImage || product.size_guide_image) && (
-                <div className="border-t border-white/10">
+                <div>
                   <button
                     onClick={() => {
                       const el = document.getElementById("size-guide-content");
@@ -777,7 +799,7 @@ export default function ProductPage({
                     <ChevronDown size={16} className="text-amber-500" />
                   </button>
                   <div id="size-guide-content" className="pb-10 hidden animate-in fade-in slide-in-from-top-2 duration-500">
-                    <div className="mx-auto max-w-md bg-white/2 border border-white/10 p-4 rounded-sm shadow-2xl">
+                    <div className="mx-auto max-w-md bg-white/[0.02] p-4 shadow-2xl">
                       <div className="relative overflow-hidden bg-black/40">
                         <img
                           src={resolveMediaUrl(product.sizeGuideImage || product.size_guide_image)}
@@ -785,7 +807,7 @@ export default function ProductPage({
                           className="w-full h-auto max-h-150 object-contain block mx-auto transition-transform duration-700 hover:scale-105"
                         />
                       </div>
-                      <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+                      <div className="mt-4 pt-4 flex items-center justify-between">
                         <p className="text-[9px] text-gray-500 uppercase tracking-[0.3em]">Piece Guidelines</p>
                         <div className="flex gap-1">
                           <div className="w-1 h-1 rounded-full bg-amber-500/50" />
@@ -847,8 +869,46 @@ export default function ProductPage({
           </div>
         </div>
 
+        {/* ── RELATED PRODUCTS ── */}
+        {relatedProducts.length > 0 && (
+          <section className="mt-28 max-w-350 mx-auto">
+            <div className="text-center mb-14">
+              <p className="uppercase tracking-[0.4em] text-xs text-gray-500 mb-4">You may also like</p>
+              <h2 className="font-serif text-4xl font-light">Related Products</h2>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+              {relatedProducts.map((p: any) => {
+                const pImages = Array.isArray(p.images) ? p.images : (() => { try { return JSON.parse(p.images) } catch { return [p.images] } })()
+                return (
+                  <Link key={p.id} href={`/product/${encodeURIComponent(slugify(p.name))}`} className="group block">
+                    <div className="relative aspect-3/4 overflow-hidden mb-4 bg-[#111]">
+                      <Image
+                        src={resolveMediaUrl(pImages[0])}
+                        alt={p.name}
+                        fill
+                        className="object-cover transition-transform duration-700 group-hover:scale-105"
+                      />
+                      {(p.newArrival || p.is_new) && (
+                        <span className="absolute top-3 left-3 bg-white text-black text-[9px] uppercase tracking-widest px-2 py-0.5">
+                          New
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm uppercase tracking-widest group-hover:text-gray-400 transition-colors">
+                      {p.name}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">₹{p.sellingPrice.toLocaleString('en-IN')}</p>
+                  </Link>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
+
         {/* ── REVIEWS ── */}
-        <div id="reviews-section" className="mt-32 border-t border-white/10 pt-20">
+        <div id="reviews-section" className="mt-28 pt-12">
           <div className="flex flex-col md:flex-row items-start justify-between gap-8 mb-12">
             <div>
               <h2 className="font-serif text-3xl font-light">Client Reviews</h2>
@@ -937,42 +997,6 @@ export default function ProductPage({
           )}
         </div>
 
-        {/* ── RELATED PRODUCTS ── */}
-        {relatedProducts.length > 0 && (
-          <section className="mt-40 max-w-350 mx-auto">
-            <div className="text-center mb-14">
-              <p className="uppercase tracking-[0.4em] text-xs text-gray-500 mb-4">You may also like</p>
-              <h2 className="font-serif text-4xl font-light">Related Products</h2>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-              {relatedProducts.map((p: any) => {
-                const pImages = Array.isArray(p.images) ? p.images : (() => { try { return JSON.parse(p.images) } catch { return [p.images] } })()
-                return (
-                  <Link key={p.id} href={`/product/${encodeURIComponent(slugify(p.name))}`} className="group block">
-                    <div className="relative aspect-3/4 overflow-hidden mb-4 bg-[#111]">
-                      <Image
-                        src={resolveMediaUrl(pImages[0])}
-                        alt={p.name}
-                        fill
-                        className="object-cover transition-transform duration-700 group-hover:scale-105"
-                      />
-                      {(p.newArrival || p.is_new) && (
-                        <span className="absolute top-3 left-3 bg-white text-black text-[9px] uppercase tracking-widest px-2 py-0.5">
-                          New
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm uppercase tracking-widest group-hover:text-gray-400 transition-colors">
-                      {p.name}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">₹{p.sellingPrice.toLocaleString('en-IN')}</p>
-                  </Link>
-                )
-              })}
-            </div>
-          </section>
-        )}
       </main>
 
       <SiteFooter />

@@ -29,7 +29,7 @@ const termsSections = [
     id: "cancellation-and-refund-policy",
     title: "5. Orders",
     content:
-      "Once an order is placed and confirmed, it cannot be canceled after processing. We reserve the right to cancel any order in case of product unavailability or other issues.",
+      "Orders may be cancelled within 30 minutes of placement if they have not been dispatched. Prepaid cancellations are refunded to the original payment method. COD cancellations are allowed within the same window, but the ₹150 COD advance is non-refundable.",
   },
   {
     id: "shipping-and-delivery-policy",
@@ -45,7 +45,7 @@ const termsSections = [
   {
     title: "8. Cash on Delivery (COD)",
     content:
-      "Cash on Delivery orders will include an additional Rs.150 COD handling charge.",
+      "Cash on Delivery orders require a ₹150 advance paid online through Razorpay. This amount is deducted from the final cash amount collected by Delhivery at delivery. The ₹150 COD advance is non-refundable if the order is cancelled, returned, refused, or otherwise not completed.",
   },
   {
     title: "9. Intellectual Property",

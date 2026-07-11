@@ -1,4 +1,5 @@
 import type React from "react"
+import { Suspense } from "react"
 import type { Metadata, Viewport } from "next"
 import { Cormorant_Garamond, Inter } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
@@ -11,6 +12,7 @@ import { ScrollRevealProvider } from "@/components/scroll-reveal-provider"
 import { CookieConsentBanner } from "@/components/cookie-consent-banner"
 import { LenisProvider } from "@/components/lenis-provider"
 import { organizationJsonLd, rootMetadata, rootViewport, websiteJsonLd } from "@/lib/seo"
+import { SiteVisitTracker } from "@/components/site-visit-tracker"
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
@@ -55,6 +57,9 @@ export default function RootLayout({
             </CartProvider>
           </WishlistProvider>
         </AuthProvider>
+        <Suspense fallback={null}>
+          <SiteVisitTracker />
+        </Suspense>
         <Analytics />
         <CookieConsentBanner />
       </body>

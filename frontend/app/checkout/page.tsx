@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
 const API_BASE = getApiBase()
+const COD_ADVANCE_AMOUNT = 150
+const FALLBACK_IMAGE = "/placeholder.jpg"
 
 type FormData = {
   email: string; firstName: string; lastName: string
@@ -116,8 +118,8 @@ export default function CheckoutPage() {
   const [couponMessage, setCouponMessage] = useState("")
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
   const [availableCoupons, setAvailableCoupons] = useState<any[]>([])
-  const [appliedCoupons, setAppliedCoupons] = useState<any[]>([])
-  const [paymentMethod, setPaymentMethod] = useState<"razorpay" | "cod">("razorpay")
+  const [couponTab, setCouponTab] = useState<"brand" | "payment">("brand")
+  const [paymentMethod, setPaymentMethod] = useState<"prepaid" | "cod">("prepaid")
 
   const isMumbai = formData.zip.startsWith("400") || formData.zip.startsWith("401")
   const isOut = formData.zip.length === 6 && !isMumbai
@@ -129,12 +131,16 @@ export default function CheckoutPage() {
   const tax = shippingEstimate?.tax_total ?? (cgst + sgst + igst)
 
   const shipping = shippingEstimate?.shipping_cost ?? (discountedSubtotal >= 2000 ? 0 : 149)
-  const codFee = paymentMethod === "cod" ? (discountedSubtotal < 2000 ? 150 : 0) : 0
-  const grandTotal = discountedSubtotal + shipping + tax + codFee
+  const orderTotal = discountedSubtotal + shipping + tax
+  const codAdvance = paymentMethod === "cod" ? Math.min(COD_ADVANCE_AMOUNT, orderTotal) : 0
+  const balanceDueOnDelivery = paymentMethod === "cod" ? Math.max(0, orderTotal - codAdvance) : 0
+  const payableNow = paymentMethod === "cod" ? codAdvance : orderTotal
+  const grandTotal = orderTotal
 
   const formatCouponCondition = (coupon: any) => {
     if (coupon?.coupon_type === "buy_n_get_n") {
-      return `Buy ${coupon.buy_quantity} item${coupon.buy_quantity > 1 ? "s" : ""} and get ${coupon.get_quantity} free`
+      const maxValue = coupon.max_free_item_value ? ` Free item eligible up to ₹${Number(coupon.max_free_item_value).toLocaleString("en-IN")}; higher-priced items remain fully payable.` : ""
+      return `Buy ${coupon.buy_quantity} item${coupon.buy_quantity > 1 ? "s" : ""} and get ${coupon.get_quantity} free.${maxValue}`
     }
 
     if (coupon?.discount_type === "percent") {
@@ -165,9 +171,11 @@ export default function CheckoutPage() {
   const buildCheckoutPayload = (payment?: any) => ({
     email: formData.email,
     phone: formData.phone,
-    total: grandTotal,
+    total: orderTotal,
     paymentMethod,
-    codFee,
+    codFee: codAdvance,
+    codAdvancePaid: codAdvance,
+    balanceDueOnDelivery,
     idempotencyKey: payment?.razorpay_order_id,
     items: items.map((item) => ({
       id: item.id,
@@ -200,7 +208,9 @@ export default function CheckoutPage() {
       cgst,
       sgst,
       igst,
-      total: grandTotal,
+      total: orderTotal,
+      codAdvancePaid: codAdvance,
+      balanceDueOnDelivery,
       address: formData,
       paymentId,
     }))
@@ -362,7 +372,7 @@ export default function CheckoutPage() {
     }
   }
 
-  // Load visible/auto-apply coupons when entering review step
+  // Load visible coupons throughout checkout, including offers not yet unlocked.
   const loadAvailableCoupons = async () => {
     if (items.length === 0) return
     try {
@@ -380,6 +390,11 @@ export default function CheckoutPage() {
       }
     } catch { /* silent — coupons are a nice-to-have */ }
   }
+
+  useEffect(() => {
+    if (!isHydrated || items.length === 0) return
+    loadAvailableCoupons()
+  }, [isHydrated, items, total])
 
   const applyCoupon = async (codeOverride?: string) => {
     const code = (codeOverride || couponCode).trim().toUpperCase()
@@ -457,8 +472,6 @@ export default function CheckoutPage() {
       if (pincodeStatus !== "valid") {
         await checkPincode(formData.zip)
       }
-      // Load auto-apply coupons for review step
-      loadAvailableCoupons()
       setStep("review")
     }
   }
@@ -484,7 +497,7 @@ export default function CheckoutPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: grandTotal,
+          amount: payableNow,
           checkoutPayload: buildCheckoutPayload(),
         }),
       })
@@ -510,7 +523,7 @@ export default function CheckoutPage() {
         amount: rzpOrder.amount,
         currency: rzpOrder.currency || "INR",
         name: "U.S ATELIER",
-        description: `Order for ${items.length} item(s)`,
+        description: paymentMethod === "cod" ? "COD advance payment" : `Order for ${items.length} item(s)`,
         order_id: rzpOrder.id,
         handler: async (response: any) => {
           try {
@@ -570,49 +583,8 @@ export default function CheckoutPage() {
     }
   }
 
-  const handleCODOrder = async () => {
-    if (!checkoutTermsAccepted) {
-      setCheckoutTermsError("Please accept the Terms & Conditions before placing your order")
-      return
-    }
-
-    if (pincodeStatus === "invalid") {
-      setGlobalError("Delivery is not available to the entered pincode. Please update your address.")
-      return
-    }
-
-    setCheckoutTermsError("")
-    setGlobalError("")
-    setIsProcessing(true)
-
-    try {
-      const res = await apiFetch(API_BASE, "/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildCheckoutPayload()),
-      })
-
-      if (!res.ok) {
-        const err = await res.json()
-        setGlobalError(err.error || "Failed to place order")
-        return
-      }
-
-      const data = await res.json()
-      await completeSuccessfulOrder(data.orderId)
-    } catch (err: any) {
-      setGlobalError(`Something went wrong: ${err.message || "Unknown error"}`)
-    } finally {
-      setIsProcessing(false)
-    }
-  }
-
   const handlePlaceOrder = () => {
-    if (paymentMethod === "cod") {
-      handleCODOrder()
-    } else {
-      handlePayAndPlaceOrder()
-    }
+    handlePayAndPlaceOrder()
   }
 
   const steps = [
@@ -873,7 +845,7 @@ export default function CheckoutPage() {
                       >
                         <div className="relative w-16 h-22 md:w-20 md:h-28 shrink-0 overflow-hidden rounded-sm">
                           <Image
-                            src={item.image}
+                            src={item.image || FALLBACK_IMAGE}
                             alt={item.name}
                             fill
                             className="object-cover"
@@ -914,8 +886,8 @@ export default function CheckoutPage() {
                 <div className="border border-white/10 p-6 md:p-8 bg-white/[0.01] space-y-4">
                   <h3 className="uppercase tracking-widest text-xs text-gray-400">Payment Method</h3>
                   {[
-                    { value: "razorpay" as const, label: "Pay Online (Razorpay)", description: "Credit / Debit card, UPI, Netbanking" },
-                    { value: "cod" as const, label: "Cash on Delivery", description: codFee > 0 ? `+₹${codFee} COD fee` : "+ ₹150 extra charges" },
+                    { value: "prepaid" as const, label: "Pay Online (Razorpay)", description: "Credit / Debit card, UPI, Netbanking" },
+                    { value: "cod" as const, label: "Cash on Delivery", description: `Pay ₹${COD_ADVANCE_AMOUNT.toLocaleString("en-IN")} now. This advance is adjusted against delivery balance and is non-refundable on cancellation or return.` },
                   ].map((option) => (
                     <label
                       key={option.value}
@@ -983,12 +955,12 @@ export default function CheckoutPage() {
                     ) : paymentMethod === "cod" ? (
                       <>
                         <Banknote size={14} />
-                        Place Order · ₹{grandTotal.toLocaleString("en-IN")}
+                        Pay COD Advance · ₹{payableNow.toLocaleString("en-IN")}
                       </>
                     ) : (
                       <>
                         <Shield size={14} />
-                        Pay Securely · ₹{grandTotal.toLocaleString("en-IN")}
+                        Pay Securely · ₹{payableNow.toLocaleString("en-IN")}
                       </>
                     )}
                   </div>
@@ -1051,16 +1023,22 @@ export default function CheckoutPage() {
                     <span>₹{igst.toLocaleString('en-IN')}</span>
                   </div>
                 )}
-                {codFee > 0 && (
-                  <div className="flex justify-between text-xs text-gray-400">
-                    <span>COD Fee</span>
-                    <span>₹{codFee.toLocaleString("en-IN")}</span>
-                  </div>
-                )}
                 <div className="border-t border-white/10 pt-4 flex justify-between text-white font-medium">
                   <span>Total</span>
-                  <span className="text-lg">₹{grandTotal.toLocaleString('en-IN')}</span>
+                  <span className="text-lg">₹{orderTotal.toLocaleString('en-IN')}</span>
                 </div>
+                {paymentMethod === "cod" && (
+                  <>
+                    <div className="flex justify-between text-xs text-green-400">
+                      <span>Advance paid now</span>
+                      <span>₹{codAdvance.toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-amber-300">
+                      <span>Balance due on delivery</span>
+                      <span>₹{balanceDueOnDelivery.toLocaleString("en-IN")}</span>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="pt-4 border-t border-white/10 space-y-3">
@@ -1114,53 +1092,72 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <p className="text-[9px] uppercase tracking-[0.25em] text-gray-500">Available offers</p>
-                  {availableCoupons.length > 0 ? (
-                    <div className="space-y-2">
-                      {availableCoupons.map((coupon) => {
-                        const isActive = appliedCoupon?.code === coupon.code
-                        return (
-                          <button
-                            key={coupon.code}
-                            type="button"
-                            onClick={() => applyCoupon(coupon.code)}
-                            className={`w-full rounded border px-3 py-2 text-left transition-colors ${isActive ? "border-green-500/40 bg-green-500/10" : "border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10"}`}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[10px] uppercase tracking-[0.25em] text-gray-200">{coupon.code}</span>
-                              <span className={`text-[9px] uppercase tracking-[0.25em] ${isActive ? "text-green-400" : "text-gray-400"}`}>
-                                {isActive ? "Applied" : "Apply"}
-                              </span>
-                            </div>
-                            <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-gray-400">{formatCouponCondition(coupon)}</p>
-                            {coupon.min_order_amount ? (
-                              <p className="mt-1 text-[9px] uppercase tracking-[0.2em] text-gray-500">Min order ₹{Number(coupon.min_order_amount).toLocaleString("en-IN")}</p>
-                            ) : null}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500">No offers available for this cart yet.</p>
-                  )}
-                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    {([
+                      ["brand", "Brand Offers"],
+                      ["payment", "Payment Offers"],
+                    ] as const).map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setCouponTab(key)}
+                        className={`flex-1 border px-2 py-2 text-[9px] uppercase tracking-[0.18em] transition-colors ${couponTab === key ? "border-white/40 bg-white/10 text-white" : "border-white/10 text-gray-500 hover:text-white"}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
 
-                {appliedCoupons.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-[9px] uppercase tracking-[0.25em] text-gray-500">Applied coupons</p>
-                    <div className="space-y-2">
-                      {appliedCoupons.map((coupon) => (
-                        <div key={`${coupon.code}-${coupon.discountAmount}`} className="rounded border border-white/10 bg-black/20 px-3 py-2">
+                  {(() => {
+                    const tabCoupons = availableCoupons.filter((coupon) => (coupon.offer_category || "brand") === couponTab)
+                    const eligibleCoupons = tabCoupons.filter((coupon) => coupon.eligible !== false)
+                    const unavailableCoupons = tabCoupons.filter((coupon) => coupon.eligible === false)
+                    const renderCoupon = (coupon: any, locked: boolean) => {
+                      const isActive = appliedCoupon?.code === coupon.code
+                      const progress = coupon.coupon_type === "buy_n_get_n"
+                        ? `${Math.min(Number(coupon.current_quantity || 0), Number(coupon.required_quantity || 0))}/${Number(coupon.required_quantity || 0)} items`
+                        : coupon.amount_to_add > 0
+                          ? `Add ₹${Number(coupon.amount_to_add).toLocaleString("en-IN")} more to avail this offer`
+                          : ""
+                      return (
+                        <button
+                          key={coupon.code}
+                          type="button"
+                          onClick={() => !locked && applyCoupon(coupon.code)}
+                          disabled={locked}
+                          className={`w-full rounded border px-3 py-2 text-left transition-colors ${isActive ? "border-green-500/40 bg-green-500/10" : locked ? "border-white/10 bg-white/[0.02] opacity-70" : "border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10"}`}
+                        >
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-[10px] uppercase tracking-[0.25em] text-gray-200">{coupon.code}</span>
-                            <span className="text-[9px] uppercase tracking-[0.25em] text-green-400">Saved ₹{Number(coupon.discountAmount || 0).toLocaleString("en-IN")}</span>
+                            <span className={`text-[9px] uppercase tracking-[0.25em] ${isActive ? "text-green-400" : locked ? "text-amber-400" : "text-gray-400"}`}>
+                              {isActive ? "Applied" : locked ? "Locked" : "Apply"}
+                            </span>
                           </div>
+                          <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-gray-400 leading-relaxed">{formatCouponCondition(coupon)}</p>
+                          {progress && <p className={`mt-1 text-[9px] uppercase tracking-[0.18em] ${locked ? "text-amber-400" : "text-green-400"}`}>{progress}</p>}
+                          {coupon.coupon_type === "buy_n_get_n" && coupon.items_to_add > 0 && (
+                            <p className="mt-1 text-[9px] uppercase tracking-[0.18em] text-amber-400">Add {coupon.items_to_add} more item{coupon.items_to_add === 1 ? "" : "s"} to avail this offer</p>
+                          )}
+                        </button>
+                      )
+                    }
+                    return tabCoupons.length > 0 ? (
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <p className="text-[9px] uppercase tracking-[0.25em] text-gray-500">Available Offers</p>
+                          {eligibleCoupons.length > 0 ? eligibleCoupons.map((coupon) => renderCoupon(coupon, false)) : <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500">No available offers in this tab.</p>}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                        <div className="space-y-2">
+                          <p className="text-[9px] uppercase tracking-[0.25em] text-gray-500">Unavailable Offers</p>
+                          {unavailableCoupons.length > 0 ? unavailableCoupons.map((coupon) => renderCoupon(coupon, true)) : <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500">No locked offers in this tab.</p>}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500">No {couponTab === "brand" ? "brand" : "payment"} offers right now.</p>
+                    )
+                  })()}
+                </div>
               </div>
 
               <div className="pt-4 border-t border-white/10 space-y-3">

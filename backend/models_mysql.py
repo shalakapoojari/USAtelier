@@ -544,6 +544,7 @@ class Coupon(db_mysql.Model):
     # Buy N Get N fields
     buy_quantity     = db_mysql.Column(db_mysql.Integer, nullable=True)      # N in "Buy N"
     get_quantity     = db_mysql.Column(db_mysql.Integer, nullable=True)      # N in "Get N Free"
+    max_free_item_value = db_mysql.Column(db_mysql.Float, nullable=True)     # Max eligible unit price for free item
     # Influencer code fields
     visibility       = db_mysql.Column(db_mysql.String(20), default="hidden")  # "hidden" | "visible"
     influencer_name  = db_mysql.Column(db_mysql.String(100), nullable=True)
@@ -565,29 +566,30 @@ class Coupon(db_mysql.Model):
         if self.max_uses is not None and self.uses >= self.max_uses:
             return False, "Coupon usage limit reached"
 
-        # For buy_n_get_n, check quantity condition OR min_order_amount
         if self.coupon_type == "buy_n_get_n" and self.buy_quantity:
             total_qty = sum(int(i.get("quantity", 1)) for i in (cart_items or []))
-            if total_qty < self.buy_quantity:
-                if order_subtotal < self.min_order_amount:
-                    return False, f"Add at least {self.buy_quantity} items or order ₹{self.min_order_amount:.0f}+ to qualify"
-                # Passes via min_order_amount
-            # else: passes via quantity condition
-        else:
-            if order_subtotal < self.min_order_amount:
-                return False, f"Minimum order amount is ₹{self.min_order_amount:.0f}"
+            required_qty = int(self.buy_quantity or 0) + int(self.get_quantity or 0)
+            if total_qty < required_qty:
+                return False, f"Add {required_qty - total_qty} more item{'s' if required_qty - total_qty != 1 else ''} to avail this offer"
+        elif order_subtotal < self.min_order_amount:
+            return False, f"Add ₹{self.min_order_amount - order_subtotal:.0f} more to avail this offer"
 
         return True, None
 
     def apply(self, subtotal: float, cart_items: list = None) -> float:
         """Return the discount amount (not the final price)."""
         if self.coupon_type == "buy_n_get_n" and self.get_quantity and cart_items:
-            # Sort items by price ascending, give cheapest N items free
-            prices = sorted(
-                [float(i.get("sellingPrice", 0)) * int(i.get("quantity", 1)) for i in cart_items]
+            unit_prices = []
+            for i in cart_items:
+                price = float(i.get("sellingPrice", 0) or 0)
+                qty = max(0, int(i.get("quantity", 1) or 1))
+                unit_prices.extend([price] * qty)
+            eligible = sorted(
+                price for price in unit_prices
+                if not self.max_free_item_value or price <= float(self.max_free_item_value)
             )
-            free_count = min(self.get_quantity, len(prices))
-            return round(sum(prices[:free_count]), 2)
+            free_count = min(int(self.get_quantity or 0), len(eligible))
+            return round(sum(eligible[:free_count]), 2)
         if self.discount_type == "percent":
             return round(subtotal * self.discount_value / 100, 2)
         return min(self.discount_value, subtotal)
@@ -598,7 +600,8 @@ class Coupon(db_mysql.Model):
             return False
         if self.coupon_type == "buy_n_get_n" and self.buy_quantity:
             total_qty = sum(int(i.get("quantity", 1)) for i in (cart_items or []))
-            if total_qty >= self.buy_quantity:
+            required_qty = int(self.buy_quantity or 0) + int(self.get_quantity or 0)
+            if total_qty >= required_qty:
                 return True
         if self.min_order_amount and order_subtotal >= self.min_order_amount:
             return True
@@ -618,6 +621,7 @@ class Coupon(db_mysql.Model):
             "is_active":        self.is_active,
             "buy_quantity":     self.buy_quantity,
             "get_quantity":     self.get_quantity,
+            "max_free_item_value": self.max_free_item_value,
             "visibility":       self.visibility or "hidden",
             "influencer_name":  self.influencer_name,
         }

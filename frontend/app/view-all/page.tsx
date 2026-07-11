@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect, useRef, Suspense } from "react"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { ProductCard } from "@/components/product-card"
@@ -29,6 +29,14 @@ const getAllowedSizesForCategory = (categoryName: string) => {
     return ["XS", "S", "M", "L", "XL", "2XL", "3XL"]
   }
   return null
+}
+
+function CheckMark() {
+  return (
+    <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+      <path d="M1.5 4L3 5.5L6.5 2" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
 }
 
 // ── Dropdown filter component ──────────────────────────────────────────────
@@ -104,12 +112,29 @@ function ShopContent() {
   const [selectedGenders, setSelectedGenders] = useState<string[]>([])
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000])
   const [sliderRange, setSliderRange] = useState<[number, number]>([0, 100000])
+  const [searchInput, setSearchInput] = useState("")
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
+  const router = useRouter()
   const searchParams = useSearchParams()
   const urlCategory = searchParams.get("category")
   const urlSubcategory = searchParams.get("subcategory")
   const urlSearch = searchParams.get("search")
   const jumpTo = searchParams.get("jumpTo")
+
+  useEffect(() => {
+    setSearchInput(urlSearch || "")
+  }, [urlSearch])
+
+  const submitSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    const q = searchInput.trim()
+    const params = new URLSearchParams(searchParams.toString())
+    if (q) params.set("search", q)
+    else params.delete("search")
+    params.delete("jumpTo")
+    router.push(`/view-all${params.toString() ? `?${params.toString()}` : ""}`)
+  }
 
   // Sync with URL category and subcategory
   useEffect(() => {
@@ -266,59 +291,131 @@ function ShopContent() {
     setSliderRange([0, categoryMaxPrice])
   }
 
+  const filterControls = (mobile = false) => (
+    <>
+      <FilterDropdown label={mobile ? "Gender" : <><span className="hidden md:inline">Gender</span><Users size={12} className="md:hidden" /></>} activeCount={selectedGenders.length}>
+        <div className="p-4 space-y-2">
+          {["Men", "Women"].map((gender) => (
+            <button
+              key={gender}
+              onClick={() =>
+                setSelectedGenders((prev) =>
+                  prev.includes(gender) ? prev.filter((g) => g !== gender) : [...prev, gender]
+                )
+              }
+              className={`w-full text-left flex items-center gap-3 px-2 py-1.5 text-[11px] uppercase tracking-widest transition-colors ${
+                selectedGenders.includes(gender) ? "text-white" : "text-white/40 hover:text-white/80"
+              }`}
+            >
+              <span className={`w-3.5 h-3.5 border flex items-center justify-center shrink-0 ${selectedGenders.includes(gender) ? "border-white bg-white" : "border-white/20"}`}>
+                {selectedGenders.includes(gender) && <CheckMark />}
+              </span>
+              {gender}
+            </button>
+          ))}
+        </div>
+      </FilterDropdown>
+
+      {!urlCategory && (
+        <FilterDropdown label="Category" activeCount={selectedCategories.length}>
+          <div className="p-4 space-y-2 max-h-60 overflow-y-auto">
+            {categories.map((cat: any) => (
+              <button
+                key={cat.id || cat.name}
+                onClick={() =>
+                  setSelectedCategories((prev) =>
+                    prev.includes(cat.name) ? prev.filter((c) => c !== cat.name) : [...prev, cat.name]
+                  )
+                }
+                className={`w-full text-left flex items-center gap-3 px-2 py-1.5 text-[11px] uppercase tracking-widest transition-colors ${selectedCategories.includes(cat.name) ? "text-white" : "text-white/40 hover:text-white/80"}`}
+              >
+                <span className={`w-3.5 h-3.5 border flex items-center justify-center shrink-0 ${selectedCategories.includes(cat.name) ? "border-white bg-white" : "border-white/20"}`}>
+                  {selectedCategories.includes(cat.name) && <CheckMark />}
+                </span>
+                {cat.name}
+              </button>
+            ))}
+          </div>
+        </FilterDropdown>
+      )}
+
+      {allSizes.length > 0 && (
+        <FilterDropdown label={mobile ? "Size" : <><span className="hidden md:inline">Size</span><Ruler size={12} className="md:hidden" /></>} activeCount={selectedSizes.length}>
+          <div className="p-4 w-64">
+            <div className="flex flex-wrap gap-2 max-w-[220px]">
+              {allSizes.map((size) => (
+                <button
+                  key={size}
+                  onClick={() => setSelectedSizes((prev) => prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size])}
+                  className={`px-3 py-1.5 border text-[10px] tracking-widest transition-all ${selectedSizes.includes(size) ? "border-white text-white bg-white/10" : "border-white/15 text-white/50 hover:border-white/40 hover:text-white"}`}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          </div>
+        </FilterDropdown>
+      )}
+
+      <FilterDropdown label={mobile ? "Price" : <><span className="hidden md:inline">Price</span><Tag size={12} className="md:hidden" /></>} activeCount={priceRange[0] > 0 || priceRange[1] < categoryMaxPrice ? 1 : 0}>
+        <div className="p-5 w-64">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-[9px] uppercase tracking-[0.3em] text-white/40">Price Range</span>
+            <span className="text-[9px] text-white/60 font-mono">₹{sliderRange[0].toLocaleString("en-IN")} - ₹{sliderRange[1].toLocaleString("en-IN")}</span>
+          </div>
+          <Slider
+            value={sliderRange}
+            min={0}
+            max={categoryMaxPrice || 100000}
+            step={100}
+            onValueChange={(val) => setSliderRange(val as [number, number])}
+            onValueCommit={(val) => setPriceRange(val as [number, number])}
+            className="py-3"
+          />
+          <div className="flex justify-between mt-2 text-[9px] text-white/30 font-mono tracking-tight">
+            <span>₹0</span>
+            <span>₹{(categoryMaxPrice || 100000).toLocaleString("en-IN")}</span>
+          </div>
+        </div>
+      </FilterDropdown>
+    </>
+  )
+
   return (
     <>
       {/* ─── MAIN CONTENT ────────────────────────────────────────── */}
-      <main className="px-0 pb-32 pt-44 md:pt-48">
+      <main className="px-0 pb-32 pt-36 md:pt-40">
+        <div className="px-4 md:px-12 mb-6 md:mb-8">
+          <form onSubmit={submitSearch} className="mx-auto max-w-4xl border-b border-white/20 flex items-center gap-3 py-3 focus-within:border-white/60 transition-colors">
+            <SlidersHorizontal size={14} className="text-white/30 rotate-90" />
+            <input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search products"
+              className="flex-1 bg-transparent outline-none text-lg md:text-2xl font-serif text-white placeholder:text-white/25"
+            />
+            {searchInput && (
+              <button type="button" onClick={() => { setSearchInput(""); router.push("/view-all") }} className="p-2 text-white/40 hover:text-white" aria-label="Clear search">
+                <X size={14} />
+              </button>
+            )}
+            <button type="submit" className="px-4 py-2 text-[10px] uppercase tracking-[0.25em] text-white/70 hover:text-white">Search</button>
+          </form>
+          {urlSearch && (
+            <div className="mx-auto max-w-4xl mt-4 flex items-center justify-between gap-4">
+              <p className="text-[10px] uppercase tracking-[0.25em] text-white/35">Results for <span className="text-white/75">{urlSearch}</span></p>
+              <span className="text-[10px] uppercase tracking-[0.25em] text-white/35">{filteredProducts.length} piece{filteredProducts.length === 1 ? "" : "s"}</span>
+            </div>
+          )}
+        </div>
 
         {/* ─── CATEGORIES & FILTERS BAR ───────────────────────────────────── */}
         {!loading && (
           <div className="mb-8 px-4 md:px-12 flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-white/5 pb-4 md:pb-6 relative z-30">
 
-            {/* Mobile category <select> — shown only below md breakpoint */}
+            {/* Category pills */}
             {!urlSearch && categories.length > 0 && (
-              <div className="flex-1 md:hidden">
-                <select
-                  aria-label="Select category"
-                  value={urlCategory || ""}
-                  onChange={(e) => {
-                    const val = e.target.value
-                    if (val === "") {
-                      window.location.href = "/view-all"
-                    } else {
-                      window.location.href = `/view-all?category=${encodeURIComponent(val)}`
-                    }
-                  }}
-                  style={{
-                    width: "100%",
-                    background: "#0a0a0a",
-                    color: "#e8e8e3",
-                    border: "1px solid rgba(255,255,255,0.15)",
-                    padding: "8px 12px",
-                    fontSize: "10px",
-                    letterSpacing: "0.2em",
-                    textTransform: "uppercase",
-                    borderRadius: 0,
-                    appearance: "none",
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E")`,
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: "right 12px center",
-                    paddingRight: "32px",
-                  }}
-                >
-                  <option value="">All</option>
-                  {categories.map((cat: any) => (
-                    <option key={cat.id || cat.name} value={cat.name}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Desktop category pills — hidden on mobile */}
-            {!urlSearch && categories.length > 0 && (
-              <div className="flex-1 overflow-x-auto no-scrollbar pr-4 hidden md:block">
+              <div className="flex-1 w-full overflow-x-auto no-scrollbar pr-4">
                 <div className="flex items-center gap-3 min-w-max">
                   <a
                     href="/view-all"
@@ -348,130 +445,25 @@ function ShopContent() {
             )}
 
             {/* Filter Dropdowns */}
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto md:flex-nowrap md:shrink-0 md:overflow-x-auto md:no-scrollbar">
-            {/* Gender filter */}
-            <FilterDropdown label={<><span className="hidden md:inline">Gender</span><Users size={12} className="md:hidden" /></>} activeCount={selectedGenders.length}>
-              <div className="p-4 space-y-2">
-                {["Men", "Women"].map((gender) => (
-                  <button
-                    key={gender}
-                    onClick={() =>
-                      setSelectedGenders((prev) =>
-                        prev.includes(gender) ? prev.filter((g) => g !== gender) : [...prev, gender]
-                      )
-                    }
-                    className={`w-full text-left flex items-center gap-3 px-2 py-1.5 text-[11px] uppercase tracking-widest transition-colors ${
-                      selectedGenders.includes(gender) ? "text-white" : "text-white/40 hover:text-white/80"
-                    }`}
-                  >
-                    <span
-                      className={`w-3.5 h-3.5 border flex items-center justify-center flex-shrink-0 ${
-                        selectedGenders.includes(gender) ? "border-white bg-white" : "border-white/20"
-                      }`}
-                    >
-                      {selectedGenders.includes(gender) && (
-                        <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                          <path d="M1.5 4L3 5.5L6.5 2" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )}
-                    </span>
-                    {gender}
-                  </button>
-                ))}
-              </div>
-            </FilterDropdown>
+            <div className="hidden md:flex flex-wrap items-center gap-2 w-full md:w-auto md:flex-nowrap md:shrink-0 md:overflow-x-auto md:no-scrollbar">
+              {filterControls(false)}
+            </div>
 
-            {/* Category filter (only when no URL category) */}
-            {!urlCategory && (
-              <FilterDropdown label="Category" activeCount={selectedCategories.length}>
-                <div className="p-4 space-y-2 max-h-60 overflow-y-auto">
-                  {categories.map((cat: any) => (
-                    <button
-                      key={cat.id || cat.name}
-                      onClick={() =>
-                        setSelectedCategories((prev) =>
-                          prev.includes(cat.name) ? prev.filter((c) => c !== cat.name) : [...prev, cat.name]
-                        )
-                      }
-                      className={`w-full text-left flex items-center gap-3 px-2 py-1.5 text-[11px] uppercase tracking-widest transition-colors ${
-                        selectedCategories.includes(cat.name) ? "text-white" : "text-white/40 hover:text-white/80"
-                      }`}
-                    >
-                      <span
-                        className={`w-3.5 h-3.5 border flex items-center justify-center flex-shrink-0 ${
-                          selectedCategories.includes(cat.name) ? "border-white bg-white" : "border-white/20"
-                        }`}
-                      >
-                        {selectedCategories.includes(cat.name) && (
-                          <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                            <path d="M1.5 4L3 5.5L6.5 2" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
-                      </span>
-                      {cat.name}
-                    </button>
-                  ))}
+            <div className="md:hidden w-full">
+              <button
+                type="button"
+                onClick={() => setMobileFiltersOpen((v) => !v)}
+                className="w-full h-11 border border-white/15 flex items-center justify-between px-4 text-[10px] uppercase tracking-[0.25em] text-white/70"
+              >
+                <span className="flex items-center gap-2"><SlidersHorizontal size={13} /> Filters</span>
+                <ChevronDown size={12} className={`transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`} />
+              </button>
+              {mobileFiltersOpen && (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {filterControls(true)}
                 </div>
-              </FilterDropdown>
-            )}
-
-            {/* Size filter */}
-            {allSizes.length > 0 && (
-              <FilterDropdown label={<><span className="hidden md:inline">Size</span><Ruler size={12} className="md:hidden" /></>} activeCount={selectedSizes.length}>
-              <div className="p-4 w-64">
-                  <div className="flex flex-wrap gap-2 max-w-[220px]">
-                    {allSizes.map((size) => (
-                      <button
-                        key={size}
-                        onClick={() =>
-                          setSelectedSizes((prev) =>
-                            prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size]
-                          )
-                        }
-                        className={`px-3 py-1.5 border text-[10px] tracking-widest transition-all ${
-                          selectedSizes.includes(size)
-                            ? "border-white text-white bg-white/10"
-                            : "border-white/15 text-white/50 hover:border-white/40 hover:text-white"
-                        }`}
-                      >
-                        {size}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </FilterDropdown>
-            )}
-
-            {/* Price filter */}
-            <FilterDropdown
-              label={<><span className="hidden md:inline">Price</span><Tag size={12} className="md:hidden" /></>}
-              activeCount={priceRange[0] > 0 || priceRange[1] < categoryMaxPrice ? 1 : 0}
-            >
-              <div className="p-5 w-64">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-[9px] uppercase tracking-[0.3em] text-white/40">Price Range</span>
-                  <span className="text-[9px] text-white/60 font-mono">
-                    ₹{sliderRange[0].toLocaleString("en-IN")} — ₹{sliderRange[1].toLocaleString("en-IN")}
-                  </span>
-                </div>
-                <Slider
-                  value={sliderRange}
-                  min={0}
-                  max={categoryMaxPrice || 100000}
-                  step={100}
-                  onValueChange={(val) => {
-                    const next = val as [number, number]
-                    setSliderRange(next)
-                  }}
-                  onValueCommit={(val) => setPriceRange(val as [number, number])}
-                  className="py-3"
-                />
-                <div className="flex justify-between mt-2 text-[9px] text-white/30 font-mono tracking-tight">
-                  <span>₹0</span>
-                  <span>₹{(categoryMaxPrice || 100000).toLocaleString("en-IN")}</span>
-                </div>
-              </div>
-            </FilterDropdown>
+              )}
+            </div>
 
             {/* Active filter chips + clear */}
             {activeFilterCount > 0 && (
@@ -495,7 +487,6 @@ function ShopContent() {
                 {filteredProducts.length} piece{filteredProducts.length !== 1 ? "s" : ""}
               </span>
             )}
-            </div>
           </div>
         )}
 

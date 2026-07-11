@@ -16,6 +16,30 @@ export type CartItem = {
   image: string
 }
 
+const FALLBACK_IMAGE = "/placeholder.jpg"
+
+function normalizeCartItems(raw: unknown): CartItem[] {
+  if (!Array.isArray(raw)) return []
+  return raw.flatMap((item: any) => {
+    const id = String(item?.id ?? "").trim()
+    const name = String(item?.name ?? "").trim()
+    const size = String(item?.size ?? "").trim()
+    const sellingPrice = Number(item?.sellingPrice ?? item?.price ?? 0)
+    const quantity = Math.max(1, Math.floor(Number(item?.quantity ?? 1)))
+    const stock = Math.max(0, Math.floor(Number(item?.stock ?? 99)))
+    if (!id || !name || !Number.isFinite(sellingPrice) || sellingPrice < 0) return []
+    return [{
+      id,
+      name,
+      size,
+      sellingPrice,
+      quantity: stock > 0 ? Math.min(quantity, stock) : quantity,
+      stock,
+      image: typeof item?.image === "string" && item.image.trim() ? item.image : FALLBACK_IMAGE,
+    }]
+  })
+}
+
 type CartContextType = {
   items: CartItem[]
   addItem: (item: Omit<CartItem, "quantity">) => void
@@ -41,7 +65,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const saved = localStorage.getItem("cart")
-      if (saved) setItems(JSON.parse(saved))
+      if (saved) setItems(normalizeCartItems(JSON.parse(saved)))
     } catch { /* ignore */ }
     setIsHydrated(true)
   }, [])

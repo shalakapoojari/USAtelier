@@ -21,6 +21,7 @@ type Coupon = {
   is_active: boolean
   buy_quantity: number | null
   get_quantity: number | null
+  max_free_item_value: number | null
   visibility: "hidden" | "visible"
   influencer_name: string | null
 }
@@ -35,6 +36,7 @@ const emptyForm = {
   expires_at: "",
   buy_quantity: "",
   get_quantity: "",
+  max_free_item_value: "",
   visibility: "hidden",
   influencer_name: "",
 }
@@ -95,6 +97,7 @@ export default function AdminCouponsPage() {
       if (form.coupon_type === "buy_n_get_n") {
         payload.buy_quantity = form.buy_quantity ? Number(form.buy_quantity) : 2
         payload.get_quantity = form.get_quantity ? Number(form.get_quantity) : 1
+        payload.max_free_item_value = form.max_free_item_value ? Number(form.max_free_item_value) : null
         payload.discount_type = "buy_n_get_n"
         payload.discount_value = 0
       } else {
@@ -164,7 +167,7 @@ export default function AdminCouponsPage() {
   }
 
   const discountLabel = (c: Coupon) => {
-    if (c.coupon_type === "buy_n_get_n") return `Buy ${c.buy_quantity} Get ${c.get_quantity} Free`
+    if (c.coupon_type === "buy_n_get_n") return `Buy ${c.buy_quantity} Get ${c.get_quantity} Free${c.max_free_item_value ? ` up to ₹${c.max_free_item_value.toLocaleString("en-IN")}` : ""}`
     return c.discount_type === "percent" ? `${c.discount_value}%` : `₹${c.discount_value.toLocaleString("en-IN")}`
   }
 
@@ -218,18 +221,27 @@ export default function AdminCouponsPage() {
 
           {/* Buy N Get N */}
           {form.coupon_type === "buy_n_get_n" && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">Buy Qty (N)</p>
-                <Input value={form.buy_quantity} onChange={e => f("buy_quantity", e.target.value)}
-                  placeholder="e.g. 2" type="number" min="1"
-                  className="bg-transparent border-white/20 text-white" />
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">Buy Qty (N)</p>
+                  <Input value={form.buy_quantity} onChange={e => f("buy_quantity", e.target.value)}
+                    placeholder="e.g. 2" type="number" min="1"
+                    className="bg-transparent border-white/20 text-white" />
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">Get Qty Free</p>
+                  <Input value={form.get_quantity} onChange={e => f("get_quantity", e.target.value)}
+                    placeholder="e.g. 1" type="number" min="1"
+                    className="bg-transparent border-white/20 text-white" />
+                </div>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">Get Qty Free</p>
-                <Input value={form.get_quantity} onChange={e => f("get_quantity", e.target.value)}
-                  placeholder="e.g. 1" type="number" min="1"
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">Max Free Item Value (₹)</p>
+                <Input value={form.max_free_item_value} onChange={e => f("max_free_item_value", e.target.value)}
+                  placeholder="e.g. 699" type="number" min="0"
                   className="bg-transparent border-white/20 text-white" />
+                <p className="text-[9px] text-white/30 mt-1.5 leading-relaxed">Items priced above this value are not free and remain fully payable.</p>
               </div>
             </div>
           )}
